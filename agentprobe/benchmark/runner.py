@@ -41,9 +41,15 @@ from typing import Any, Callable
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 
-from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
-from agentprobe.observer.classifier import FailureClassifier
 from agentprobe.observer.tracer import get_tracer
+
+# Injector and classifier imports are lazy so this module is independently
+# testable before their respective feature branches are merged.
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
+    from agentprobe.observer.classifier import FailureClassifier as _ClassifierType
 
 _tracer = get_tracer(__name__)
 _console = Console()
@@ -107,7 +113,7 @@ class BenchmarkConfig:
     framework: str = "langgraph"
     task: str = "tool_use"
     n_runs: int = 30
-    failure_config: ToolFailureConfig | None = None
+    failure_config: "ToolFailureConfig | None" = None
     recovery_attempts: int = 1
     timeout_per_run_seconds: float = 60.0
     seed: int = 42
@@ -141,12 +147,19 @@ class BenchmarkRunner:
         self.agent = agent
         self.config = config or BenchmarkConfig()
         self._task_fn = task_fn or _default_task_fn
-        self._classifier = FailureClassifier()
-        self._injector: ToolFailureInjector | None = (
-            ToolFailureInjector(self.config.failure_config)
-            if self.config.failure_config
-            else None
-        )
+        self._classifier: Any = None
+        try:
+            from agentprobe.observer.classifier import FailureClassifier
+            self._classifier = FailureClassifier()
+        except ImportError:
+            pass  # classifier module not yet merged
+        self._injector: Any = None
+        if self.config.failure_config is not None:
+            try:
+                from agentprobe.injector.tool_failure import ToolFailureInjector
+                self._injector = ToolFailureInjector(self.config.failure_config)
+            except ImportError:
+                pass  # injector module not yet merged; runner still functional
 
     def run(self) -> list[RunResult]:
         """Execute the full benchmark. Returns a list of RunResult objects."""
@@ -216,7 +229,10 @@ class BenchmarkRunner:
                 )
             except Exception as exc:
                 latency_ms = (time.perf_counter() - start) * 1000
-                event = self._classifier.classify_exception(exc, framework=cfg.framework)
+                category = "unknown"
+                if self._classifier is not None:
+                    event = self._classifier.classify_exception(exc, framework=cfg.framework)
+                    category = event.category.value
 
                 # Attempt recovery
                 recovered, recovery_latency_ms = self._attempt_recovery(task_input)
@@ -228,7 +244,7 @@ class BenchmarkRunner:
                     failure_type=failure_type,
                     success=False,
                     latency_ms=latency_ms,
-                    failure_category=event.category.value,
+                    failure_category=category,
                     exception_type=type(exc).__name__,
                     exception_msg=str(exc)[:200],
                     recovered=recovered,
