@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_metadata/
+
+# Experiments & results (raw data, kept locally, selectively committed)
+experiments/results/*.csv
+experiments/results/*.json
+experiments/results/*.parquet
+!experiments/results/.gitkeep
+
+# Secrets / API keys
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Prometheus / Grafana local data
+prometheus_data/
+grafana_data/
+
+# OpenTelemetry collector local data
+otel-collector-data/
