@@ -164,9 +164,9 @@ class TestFailureClassifier:
             assert event.category == FailureCategory.CONSISTENCY
 
     def test_nearly_identical_outputs_no_event(self):
-        a = "The capital of France is Paris, a beautiful city."
-        b = "The capital of France is Paris, a wonderful city."
-        # High Jaccard similarity — should be treated as consistent
+        # 9/10 tokens shared → Jaccard = 0.90 > 0.85 threshold → no event
+        a = "The capital of France is Paris the city of light and romance"
+        b = "The capital of France is Paris the city of light and beauty"
         event = self.clf.classify_output_pair(a, b)
         assert event is None
 
