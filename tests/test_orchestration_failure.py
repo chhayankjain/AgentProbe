@@ -145,7 +145,7 @@ class TestOrchestrationFailureInjector:
     def test_reset_clears_state(self):
         cfg = OrchestrationFailureConfig(
             failure_type=OrchestrationFailureType.INFINITE_LOOP,
-            max_loop_iterations=1,
+            max_loop_iterations=2,
         )
         injector = OrchestrationFailureInjector(cfg)
 
@@ -153,12 +153,13 @@ class TestOrchestrationFailureInjector:
             return {}
 
         wrapped = injector.wrap_node(node, node_name="n")
+        wrapped({})  # call 1 — passes
         with pytest.raises(InfiniteLoopError):
-            wrapped({})
+            wrapped({})  # call 2 — raises (2 >= max_loop_iterations=2)
 
         injector.reset()
         assert len(injector.injection_log) == 0
-        # After reset, counter is gone — first call should pass
+        # After reset, loop counter cleared — first call should pass again
         wrapped({})
 
     def test_summary_counts(self):
