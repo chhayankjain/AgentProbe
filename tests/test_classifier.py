@@ -9,22 +9,45 @@ from agentprobe.observer.classifier import (
     FailureClassifier,
     FailureSeverity,
 )
-from agentprobe.injector.tool_failure import (
-    ToolCallAPIError,
-    ToolCallMalformedOutput,
-    ToolCallRateLimited,
-    ToolCallTimeout,
-)
-from agentprobe.injector.orchestration_failure import (
-    InfiniteLoopError,
-    MissingHandoffError,
-    StateCorruptionError,
-    WrongBranchError,
-)
-from agentprobe.injector.context_failure import (
-    ContextWindowOverflow,
-    LostStateError,
-)
+
+# ---------------------------------------------------------------------------
+# Stub exceptions — FailureClassifier matches on type.__name__ (not module),
+# so these stubs work identically to the real injector exception classes.
+# This keeps feature/observer-failure-classifier independently testable
+# without requiring the injector feature branches to be merged first.
+# ---------------------------------------------------------------------------
+
+
+class ToolCallTimeout(Exception): pass
+class ToolCallMalformedOutput(Exception): pass
+
+
+class ToolCallRateLimited(Exception):
+    def __init__(self, retry_after: float = 60.0) -> None:
+        self.retry_after = retry_after
+        super().__init__(str(retry_after))
+
+
+class ToolCallAPIError(Exception):
+    def __init__(self, status_code: int = 500) -> None:
+        self.status_code = status_code
+        super().__init__(str(status_code))
+
+
+class InfiniteLoopError(Exception): pass
+class StateCorruptionError(Exception): pass
+class WrongBranchError(Exception): pass
+class MissingHandoffError(Exception): pass
+
+
+class ContextWindowOverflow(Exception):
+    def __init__(self, token_count: int, token_limit: int) -> None:
+        self.token_count = token_count
+        self.token_limit = token_limit
+        super().__init__(f"{token_count} > {token_limit}")
+
+
+class LostStateError(Exception): pass
 
 
 class TestFailureClassifier:
