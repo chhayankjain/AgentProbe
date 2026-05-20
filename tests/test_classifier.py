@@ -164,9 +164,9 @@ class TestFailureClassifier:
             assert event.category == FailureCategory.CONSISTENCY
 
     def test_nearly_identical_outputs_no_event(self):
-        # 9/10 tokens shared → Jaccard = 0.90 > 0.85 threshold → no event
-        a = "The capital of France is Paris the city of light and romance"
-        b = "The capital of France is Paris the city of light and beauty"
+        # 12/14 unique tokens shared → Jaccard = 0.857 > 0.85 threshold → no event
+        a = "The large language model agent uses tools to search the web and process information"
+        b = "The large language model agent uses tools to search the web and analyze information"
         event = self.clf.classify_output_pair(a, b)
         assert event is None
 
