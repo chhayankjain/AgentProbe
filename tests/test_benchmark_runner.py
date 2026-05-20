@@ -5,7 +5,13 @@ from __future__ import annotations
 import pytest
 
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, RunResult
-from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
+
+# Optional — only available after feature/injector-tool-failure is merged
+try:
+    from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
+    _INJECTOR_AVAILABLE = True
+except ImportError:
+    _INJECTOR_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------------
@@ -125,6 +131,7 @@ class TestBenchmarkRunner:
         results = runner.run()
         assert results[0].failure_type == "none"
 
+    @pytest.mark.skipif(not _INJECTOR_AVAILABLE, reason="requires feature/injector-tool-failure")
     def test_failure_type_label_from_config(self):
         fc = ToolFailureConfig(
             failure_type=ToolFailureType.TIMEOUT,
