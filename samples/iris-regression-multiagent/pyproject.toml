@@ -6,12 +6,13 @@ build-backend = "hatchling.build"
 name = "iris-regression-multiagent"
 version = "0.1.0"
 description = "Multi-framework (LangGraph, AutoGen, CrewAI) Iris linear regression demo for AgentProbe benchmarking"
-authors = [{ name = "AgentProbe Developers", email = "sarthak.dps@example.com" }]
+authors = [{ name = "Chhayank Jain" }]
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 
 dependencies = [
+    "agentprobe",
     "pydantic>=2.0.0",
     "scikit-learn>=1.3.0",
     "numpy>=1.26.0",
@@ -58,4 +59,4 @@ python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
-ignore_missing_imports = false
+ignore_missing_imports = true

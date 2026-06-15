@@ -1,5 +1,7 @@
 """Reference deterministic pipeline (no agents, no LLM) — the ground-truth oracle."""
 
+from __future__ import annotations
+
 from .data import clear_cache as clear_data_cache, load_iris_data
 from .evaluation import evaluate_regression
 from .modeling import clear_cache as clear_model_cache, fit_linear_regression
@@ -63,7 +65,10 @@ def run_pipeline(config: PipelineConfig | None = None) -> PipelineRunResult:
             eval_result = evaluate_regression(EvalInput(model_id=model_id, dataset_id=dataset_id), config)
 
             # Generate report
-            report_result = write_report(ReportInput(model_id=model_id, eval=eval_result, attempt=attempt))
+            report_result = write_report(ReportInput(
+                model_id=model_id, eval=eval_result, attempt=attempt,
+                r2_threshold=config.r2_threshold,
+            ))
 
             # Check verdict
             if eval_result.verdict == "accept" or attempt >= config.max_retrain_attempts:

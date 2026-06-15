@@ -1,7 +1,12 @@
-"""Linear regression modeling for Iris dataset."""
+"""Linear regression modeling for Iris dataset.
+
+Note: Module-level cache (_MODEL_CACHE) is not thread-safe.
+See core/data.py for details.
+"""
+
+from __future__ import annotations
 
 import hashlib
-from typing import Any
 
 import numpy as np
 from sklearn.linear_model import LinearRegression

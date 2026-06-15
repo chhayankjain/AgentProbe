@@ -1,5 +1,7 @@
 """Pydantic schemas for Iris regression pipeline I/O — framework-agnostic contracts."""
 
+from __future__ import annotations
+
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -54,7 +56,7 @@ class EvalOutput(BaseModel):
 
     Verdict is deterministically computed based on r2 vs. PipelineConfig.r2_threshold.
     """
-    r2: float = Field(ge=0.0, le=1.0, description="R² on test set")
+    r2: float = Field(le=1.0, description="R² on test set (can be negative for poor models)")
     mae: float = Field(ge=0.0, description="Mean absolute error on test set")
     rmse: float = Field(ge=0.0, description="Root mean squared error on test set")
     n_samples: int = Field(description="Number of test samples evaluated")
@@ -68,6 +70,7 @@ class ReportInput(BaseModel):
     model_id: str = Field(description="Reference to fitted model")
     eval: EvalOutput = Field(description="Evaluation results (embedded, not cached)")
     attempt: int = Field(ge=1, description="Attempt number (1-indexed)")
+    r2_threshold: float = Field(default=0.85, ge=0.0, le=1.0, description="R² threshold used for verdict")
 
 
 class ReportOutput(BaseModel):

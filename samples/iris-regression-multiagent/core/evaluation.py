@@ -1,5 +1,7 @@
 """Evaluation metrics for linear regression models."""
 
+from __future__ import annotations
+
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 from .data import get_dataset
