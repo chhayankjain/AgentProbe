@@ -1,10 +1,10 @@
 """Mapping from PipelineRunResult to AgentResult + failure-injection seam."""
 
-import time
-from typing import Any, Callable, Protocol
+from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Protocol
 
+from agentprobe.agents.base import AgentResult
 from core.schemas import PipelineRunResult
 
 
@@ -22,15 +22,6 @@ class NoOpFailureHook:
     """Default failure hook: no-op."""
     def maybe_fail(self, tool_name: str) -> None:
         pass
-
-
-class AgentResult(BaseModel):
-    """AgentProbe's canonical result type (imported here for type clarity)."""
-    success: bool
-    output: str | None = None
-    duration_ms: float = Field(default=0.0, ge=0.0)
-    retries: int = Field(default=0, ge=0)
-    error_message: str | None = None
 
 
 def to_agent_result(

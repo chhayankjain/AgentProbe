@@ -5,6 +5,8 @@ callable — frameworks translate these into their native tool formats (LangChai
 ag2 function-calling, CrewAI @tool).
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Callable
 

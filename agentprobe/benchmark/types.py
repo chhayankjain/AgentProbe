@@ -20,7 +20,7 @@ Usage::
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -70,7 +70,7 @@ class RunResult(BaseModel):
     recovery_time_ms: float | None = None
     retries: int = 0
     error_message: str | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class BenchmarkConfig(BaseModel):

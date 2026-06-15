@@ -1,6 +1,7 @@
 """AgentProbe-facing adapters: BaseAgent implementations for each framework."""
 
-from .result_mapper import AgentResult, FailureHook, NoOpFailureHook, to_agent_result
+from agentprobe.agents.base import AgentResult
+from .result_mapper import FailureHook, NoOpFailureHook, to_agent_result
 
 __all__ = [
     "AgentResult",
