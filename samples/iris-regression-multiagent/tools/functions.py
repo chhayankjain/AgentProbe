@@ -1,5 +1,7 @@
 """Tool function implementations: validate input, delegate to core/, return output."""
 
+from __future__ import annotations
+
 from core.data import load_iris_data as core_load_iris_data
 from core.evaluation import evaluate_regression as core_evaluate_regression
 from core.modeling import fit_linear_regression as core_fit_linear_regression

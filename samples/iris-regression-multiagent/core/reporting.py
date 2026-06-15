@@ -1,5 +1,7 @@
 """Report generation for regression results."""
 
+from __future__ import annotations
+
 from .modeling import get_model
 from .schemas import ReportInput, ReportOutput
 
@@ -47,7 +49,7 @@ def write_report(input_config: ReportInput) -> ReportOutput:
         "",
         "### Verdict",
         f"- Status: **{eval_results.verdict.upper()}**",
-        f"- Threshold: R² >= 0.85",
+        f"- Threshold: R² >= {input_config.r2_threshold:.2f}",
         f"- Actual R²: {eval_results.r2:.6f}",
     ])
 

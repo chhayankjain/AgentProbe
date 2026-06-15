@@ -1,10 +1,15 @@
 """Data loading and preprocessing for Iris regression.
 
 Deterministic, seeded, in-process cache to avoid serializing large arrays.
+
+Note: Module-level caches (_DATASET_CACHE) are not thread-safe.
+This is fine for single-threaded benchmark runs. If concurrent execution
+is needed in the future, wrap access with threading.Lock.
 """
 
+from __future__ import annotations
+
 import hashlib
-from typing import Any
 
 import numpy as np
 from sklearn.datasets import load_iris
