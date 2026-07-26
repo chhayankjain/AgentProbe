@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 1745.41,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "api_error",
+    "success": false,
+    "latency_ms": 1765.8,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallAPIError",
+    "recovered": true,
+    "recovery_latency_ms": 14344.34
+  },
+  {
+    "run_id": 2,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 1917.21,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 7137.07,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 10596.21,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 5,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 1762.32,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "api_error",
+    "success": false,
+    "latency_ms": 1602.53,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallAPIError",
+    "recovered": true,
+    "recovery_latency_ms": 14619.76
+  },
+  {
+    "run_id": 7,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "api_error",
+    "success": false,
+    "latency_ms": 1146.64,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallAPIError",
+    "recovered": true,
+    "recovery_latency_ms": 2015.05
+  },
+  {
+    "run_id": 8,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 7144.32,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "api_error",
+    "success": false,
+    "latency_ms": 1438.08,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallAPIError",
+    "recovered": true,
+    "recovery_latency_ms": 10451.67
+  }
+]

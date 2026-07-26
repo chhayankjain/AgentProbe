@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 5896.36,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 2647.48,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 2,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 13352.96,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 5486.78,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "malformed_output",
+    "success": false,
+    "latency_ms": 1875.7,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallMalformedOutput",
+    "recovered": true,
+    "recovery_latency_ms": 12487.51
+  },
+  {
+    "run_id": 5,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 7184.29,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 3397.23,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 7,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 13102.32,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 8,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 4801.31,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 11136.75,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  }
+]

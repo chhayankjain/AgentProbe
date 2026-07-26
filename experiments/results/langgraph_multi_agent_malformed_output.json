@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "langgraph",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 13452.76,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "langgraph",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": false,
+    "latency_ms": 1326.99,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallMalformedOutput",
+    "recovered": true,
+    "recovery_latency_ms": 19627.8
+  },
+  {
+    "run_id": 2,
+    "framework": "langgraph",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 5555.43,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "langgraph",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 16198.3,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "langgraph",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 11022.64,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 5,
+    "framework": "langgraph",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 13986.61,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "langgraph",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 18831.89,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 7,
+    "framework": "langgraph",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 4379.36,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 8,
+    "framework": "langgraph",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 17941.31,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "langgraph",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 12719.18,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  }
+]

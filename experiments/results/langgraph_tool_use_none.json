@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 1945.74,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 12408.35,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 2,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 1652.52,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 5861.91,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 8670.58,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 5,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 1524.01,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 12421.04,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 7,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 1728.63,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 8,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 5891.09,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "langgraph",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 8692.41,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  }
+]

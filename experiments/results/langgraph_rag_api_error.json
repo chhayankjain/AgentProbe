@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 6307.81,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 2803.9,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 2,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 13150.43,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 5219.91,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "api_error",
+    "success": false,
+    "latency_ms": 1778.78,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallAPIError",
+    "recovered": true,
+    "recovery_latency_ms": 11932.19
+  },
+  {
+    "run_id": 5,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 6759.39,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 3808.97,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 7,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 13997.23,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 8,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 4802.43,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "langgraph",
+    "task": "rag",
+    "failure_type": "api_error",
+    "success": true,
+    "latency_ms": 12404.35,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  }
+]

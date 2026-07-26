@@ -1,0 +1,11 @@
+run_id,framework,task,failure_type,success,latency_ms,failure_category,exception_type,recovered,recovery_latency_ms
+0,langgraph,tool_use,malformed_output,True,2241.29,none,,False,0.0
+1,langgraph,tool_use,malformed_output,False,1915.92,tool_call,ToolCallMalformedOutput,True,17286.78
+2,langgraph,tool_use,malformed_output,True,2371.64,none,,False,0.0
+3,langgraph,tool_use,malformed_output,True,9049.97,none,,False,0.0
+4,langgraph,tool_use,malformed_output,True,13852.6,none,,False,0.0
+5,langgraph,tool_use,malformed_output,True,2335.8,none,,False,0.0
+6,langgraph,tool_use,malformed_output,False,2169.86,tool_call,ToolCallMalformedOutput,True,18851.67
+7,langgraph,tool_use,malformed_output,False,1488.51,tool_call,ToolCallMalformedOutput,True,2387.24
+8,langgraph,tool_use,malformed_output,True,9731.48,none,,False,0.0
+9,langgraph,tool_use,malformed_output,False,1667.11,tool_call,ToolCallMalformedOutput,False,0.0

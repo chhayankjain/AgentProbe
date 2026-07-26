@@ -1,0 +1,11 @@
+run_id,framework,task,failure_type,success,latency_ms,failure_category,exception_type,recovered,recovery_latency_ms
+0,langgraph,multi_agent,rate_limit,True,15149.33,none,,False,0.0
+1,langgraph,multi_agent,rate_limit,False,2045.2,tool_call,ToolCallRateLimited,True,20153.38
+2,langgraph,multi_agent,rate_limit,True,4529.0,none,,False,0.0
+3,langgraph,multi_agent,rate_limit,True,17677.0,none,,False,0.0
+4,langgraph,multi_agent,rate_limit,True,10720.55,none,,False,0.0
+5,langgraph,multi_agent,rate_limit,True,14676.74,none,,False,0.0
+6,langgraph,multi_agent,rate_limit,True,19934.06,none,,False,0.0
+7,langgraph,multi_agent,rate_limit,True,4519.55,none,,False,0.0
+8,langgraph,multi_agent,rate_limit,True,19986.37,none,,False,0.0
+9,langgraph,multi_agent,rate_limit,True,12153.44,none,,False,0.0
