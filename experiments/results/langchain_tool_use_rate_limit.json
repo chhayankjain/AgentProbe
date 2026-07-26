@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 2384.57,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "rate_limit",
+    "success": false,
+    "latency_ms": 2085.49,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallRateLimited",
+    "recovered": true,
+    "recovery_latency_ms": 15891.48
+  },
+  {
+    "run_id": 2,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 2156.54,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 7734.06,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 11722.87,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 5,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 2039.7,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "rate_limit",
+    "success": false,
+    "latency_ms": 1797.41,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallRateLimited",
+    "recovered": true,
+    "recovery_latency_ms": 15686.55
+  },
+  {
+    "run_id": 7,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "rate_limit",
+    "success": false,
+    "latency_ms": 1296.15,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallRateLimited",
+    "recovered": true,
+    "recovery_latency_ms": 2221.47
+  },
+  {
+    "run_id": 8,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 7658.01,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "rate_limit",
+    "success": false,
+    "latency_ms": 1659.65,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallRateLimited",
+    "recovered": true,
+    "recovery_latency_ms": 11583.9
+  }
+]

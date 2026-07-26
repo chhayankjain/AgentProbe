@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 1651.3,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "malformed_output",
+    "success": false,
+    "latency_ms": 1327.98,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallMalformedOutput",
+    "recovered": true,
+    "recovery_latency_ms": 12098.47
+  },
+  {
+    "run_id": 2,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 1673.06,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 6341.51,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 9569.17,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 5,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 1578.85,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "malformed_output",
+    "success": false,
+    "latency_ms": 1501.6,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallMalformedOutput",
+    "recovered": true,
+    "recovery_latency_ms": 14983.42
+  },
+  {
+    "run_id": 7,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "malformed_output",
+    "success": false,
+    "latency_ms": 1109.21,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallMalformedOutput",
+    "recovered": true,
+    "recovery_latency_ms": 1941.29
+  },
+  {
+    "run_id": 8,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 7634.54,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "langchain",
+    "task": "tool_use",
+    "failure_type": "malformed_output",
+    "success": false,
+    "latency_ms": 1707.24,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallMalformedOutput",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  }
+]

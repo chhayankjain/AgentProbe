@@ -124,7 +124,7 @@ def build_agent(framework: str, llm: Any, failure_config: ToolFailureConfig | No
     elif framework == "autogen":
         from agentprobe.agents.autogen_agent import AutoGenToolAgent
         llm_config = {
-            "config_list": [{"model": "llama3", "base_url": "http://localhost:11434/v1", "api_key": "ollama"}]
+            "config_list": [{"model": "llama3.1", "base_url": "http://localhost:11434/v1", "api_key": "ollama"}]
         }
         return AutoGenToolAgent(llm_config=llm_config, failure_config=failure_config)
     else:
@@ -224,7 +224,7 @@ def main() -> None:
     )
     parser.add_argument("--n-runs", type=int, default=30)
     parser.add_argument("--llm", default="ollama", choices=["ollama", "openai", "anthropic"])
-    parser.add_argument("--model", default="llama3")
+    parser.add_argument("--model", default="llama3.1")
     parser.add_argument("--baseline-only", action="store_true")
     parser.add_argument("--save-results", action="store_true")
 

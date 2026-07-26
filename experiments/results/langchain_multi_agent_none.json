@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 12662.72,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 17442.91,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 2,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 4416.65,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 15093.21,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 9905.27,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 5,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 11935.47,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 17219.93,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 7,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 4217.95,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 8,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 14681.52,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 9854.17,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  }
+]

@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "langchain",
+    "task": "rag",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 5983.63,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "langchain",
+    "task": "rag",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 2607.03,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 2,
+    "framework": "langchain",
+    "task": "rag",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 12345.65,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "langchain",
+    "task": "rag",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 5375.79,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "langchain",
+    "task": "rag",
+    "failure_type": "rate_limit",
+    "success": false,
+    "latency_ms": 1533.32,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallRateLimited",
+    "recovered": true,
+    "recovery_latency_ms": 10965.35
+  },
+  {
+    "run_id": 5,
+    "framework": "langchain",
+    "task": "rag",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 6031.28,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "langchain",
+    "task": "rag",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 2695.94,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 7,
+    "framework": "langchain",
+    "task": "rag",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 12599.27,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 8,
+    "framework": "langchain",
+    "task": "rag",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 4868.54,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "langchain",
+    "task": "rag",
+    "failure_type": "rate_limit",
+    "success": true,
+    "latency_ms": 11048.45,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  }
+]

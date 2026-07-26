@@ -1,0 +1,11 @@
+run_id,framework,task,failure_type,success,latency_ms,failure_category,exception_type,recovered,recovery_latency_ms
+0,langchain,multi_agent,api_error,True,9773.75,none,,False,0.0
+1,langchain,multi_agent,api_error,False,1010.04,tool_call,ToolCallAPIError,True,14039.76
+2,langchain,multi_agent,api_error,True,3522.0,none,,False,0.0
+3,langchain,multi_agent,api_error,True,12275.6,none,,False,0.0
+4,langchain,multi_agent,api_error,True,8996.03,none,,False,0.0
+5,langchain,multi_agent,api_error,True,10018.85,none,,False,0.0
+6,langchain,multi_agent,api_error,True,14261.67,none,,False,0.0
+7,langchain,multi_agent,api_error,True,3599.92,none,,False,0.0
+8,langchain,multi_agent,api_error,True,12882.82,none,,False,0.0
+9,langchain,multi_agent,api_error,True,8553.42,none,,False,0.0

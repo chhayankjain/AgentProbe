@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 12080.95,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": false,
+    "latency_ms": 1248.29,
+    "failure_category": "tool_call",
+    "exception_type": "ToolCallMalformedOutput",
+    "recovered": true,
+    "recovery_latency_ms": 16291.11
+  },
+  {
+    "run_id": 2,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 3983.36,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 14136.26,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 9139.27,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 5,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 10717.01,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 15095.06,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 7,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 3604.16,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 8,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 12662.82,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "langchain",
+    "task": "multi_agent",
+    "failure_type": "malformed_output",
+    "success": true,
+    "latency_ms": 8428.41,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  }
+]
