@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "autogen",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 2968.06,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "autogen",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 34786.34,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 2,
+    "framework": "autogen",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 6222.79,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "autogen",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 10297.24,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "autogen",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 12242.27,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 5,
+    "framework": "autogen",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 10.07,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "autogen",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 8.1,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 7,
+    "framework": "autogen",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 7.72,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 8,
+    "framework": "autogen",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 6.83,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "autogen",
+    "task": "tool_use",
+    "failure_type": "none",
+    "success": true,
+    "latency_ms": 6.33,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  }
+]

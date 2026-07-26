@@ -1,0 +1,11 @@
+run_id,framework,task,failure_type,success,latency_ms,failure_category,exception_type,recovered,recovery_latency_ms
+0,autogen,multi_agent,malformed_output,True,3.96,none,,False,0.0
+1,autogen,multi_agent,malformed_output,True,3.94,none,,False,0.0
+2,autogen,multi_agent,malformed_output,True,3.95,none,,False,0.0
+3,autogen,multi_agent,malformed_output,True,4.47,none,,False,0.0
+4,autogen,multi_agent,malformed_output,True,3.97,none,,False,0.0
+5,autogen,multi_agent,malformed_output,True,4.07,none,,False,0.0
+6,autogen,multi_agent,malformed_output,True,4.43,none,,False,0.0
+7,autogen,multi_agent,malformed_output,True,4.02,none,,False,0.0
+8,autogen,multi_agent,malformed_output,True,4.43,none,,False,0.0
+9,autogen,multi_agent,malformed_output,True,3.99,none,,False,0.0

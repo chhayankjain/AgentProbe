@@ -1,0 +1,11 @@
+run_id,framework,task,failure_type,success,latency_ms,failure_category,exception_type,recovered,recovery_latency_ms
+0,autogen,multi_agent,none,True,55993.35,none,,False,0.0
+1,autogen,multi_agent,none,True,51438.21,none,,False,0.0
+2,autogen,multi_agent,none,True,28590.91,none,,False,0.0
+3,autogen,multi_agent,none,True,78279.61,none,,False,0.0
+4,autogen,multi_agent,none,True,72258.11,none,,False,0.0
+5,autogen,multi_agent,none,True,10.28,none,,False,0.0
+6,autogen,multi_agent,none,True,8.96,none,,False,0.0
+7,autogen,multi_agent,none,True,8.49,none,,False,0.0
+8,autogen,multi_agent,none,True,7.2,none,,False,0.0
+9,autogen,multi_agent,none,True,6.45,none,,False,0.0

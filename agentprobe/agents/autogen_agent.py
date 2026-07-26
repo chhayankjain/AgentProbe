@@ -60,7 +60,7 @@ class AutoGenToolAgent:
         self,
         llm_config: dict[str, Any],
         failure_config: ToolFailureConfig | None = None,
-        max_turns: int = 5,
+        max_turns: int = 2,
     ) -> None:
         self._llm_config = llm_config
         self._max_turns = max_turns
@@ -85,7 +85,7 @@ class AutoGenToolAgent:
                 query = f"Context:\n{context}\n\nQuestion: {query}"
 
             user_proxy, assistant = self._agents
-            chat_result = user_proxy.initiate_chat(
+            user_proxy.initiate_chat(
                 assistant,
                 message=query,
                 max_turns=self._max_turns,
@@ -93,10 +93,13 @@ class AutoGenToolAgent:
             latency_ms = (time.perf_counter() - start) * 1000
             span.set_attribute("latency_ms", latency_ms)
 
-            # Extract last assistant message as output
-            messages = getattr(chat_result, "chat_history", []) or []
+            # In old pyautogen, chat_messages stores messages from the
+            # other agent's perspective — assistant replies appear as "user" role
+            messages = user_proxy.chat_messages.get(assistant, [])
+            # Get first substantive reply (role="user" = assistant's message in this view)
             output = next(
-                (m.get("content", "") for m in reversed(messages) if m.get("role") == "assistant"),
+                (m.get("content", "") for m in messages
+                 if m.get("role") == "user" and len(m.get("content", "") or "") > 5),
                 "",
             )
             return {
@@ -134,36 +137,63 @@ class AutoGenToolAgent:
                     return self._injector.call(fn, expression)
                 return fn(expression)
 
+            # Define function schemas for LLM
+            functions = [
+                {
+                    "name": "web_search",
+                    "description": "Search the web for current information.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string", "description": "Search query"}},
+                        "required": ["query"],
+                    },
+                },
+                {
+                    "name": "calculator",
+                    "description": "Evaluate a mathematical expression.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"expression": {"type": "string", "description": "Math expression"}},
+                        "required": ["expression"],
+                    },
+                },
+            ]
+
+            llm_config_with_functions = {
+                **self._llm_config,
+                "functions": functions,
+            }
+
             assistant = autogen.AssistantAgent(
                 name="assistant",
-                llm_config=self._llm_config,
+                llm_config=llm_config_with_functions,
                 system_message=(
                     "You are a reliable AI assistant. Use the provided functions to "
                     "answer questions. If a tool call fails, acknowledge and try another approach."
                 ),
             )
 
+            function_map = {
+                "web_search": _web_search,
+                "calculator": _calculator,
+            }
+
+            def _is_termination(msg: dict) -> bool:
+                content = msg.get("content", "") or ""
+                # Terminate if assistant gives a substantive reply without function call
+                return (
+                    msg.get("role") == "assistant"
+                    and len(content) > 10
+                    and "function_call" not in msg
+                )
+
             user_proxy = autogen.UserProxyAgent(
                 name="user_proxy",
+                is_termination_msg=_is_termination,
                 human_input_mode="NEVER",
                 max_consecutive_auto_reply=self._max_turns,
                 code_execution_config=False,
-            )
-
-            # Register tools
-            autogen.register_function(
-                _web_search,
-                caller=assistant,
-                executor=user_proxy,
-                name="web_search",
-                description="Search the web for current information.",
-            )
-            autogen.register_function(
-                _calculator,
-                caller=assistant,
-                executor=user_proxy,
-                name="calculator",
-                description="Evaluate a mathematical expression.",
+                function_map=function_map,
             )
 
             return user_proxy, assistant

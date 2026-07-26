@@ -1,0 +1,122 @@
+[
+  {
+    "run_id": 0,
+    "framework": "autogen",
+    "task": "multi_agent",
+    "failure_type": "timeout",
+    "success": true,
+    "latency_ms": 5.79,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 1,
+    "framework": "autogen",
+    "task": "multi_agent",
+    "failure_type": "timeout",
+    "success": true,
+    "latency_ms": 5.21,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 2,
+    "framework": "autogen",
+    "task": "multi_agent",
+    "failure_type": "timeout",
+    "success": true,
+    "latency_ms": 5.23,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 3,
+    "framework": "autogen",
+    "task": "multi_agent",
+    "failure_type": "timeout",
+    "success": true,
+    "latency_ms": 5.24,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 4,
+    "framework": "autogen",
+    "task": "multi_agent",
+    "failure_type": "timeout",
+    "success": true,
+    "latency_ms": 4.5,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 5,
+    "framework": "autogen",
+    "task": "multi_agent",
+    "failure_type": "timeout",
+    "success": true,
+    "latency_ms": 4.63,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 6,
+    "framework": "autogen",
+    "task": "multi_agent",
+    "failure_type": "timeout",
+    "success": true,
+    "latency_ms": 4.78,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 7,
+    "framework": "autogen",
+    "task": "multi_agent",
+    "failure_type": "timeout",
+    "success": true,
+    "latency_ms": 4.35,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 8,
+    "framework": "autogen",
+    "task": "multi_agent",
+    "failure_type": "timeout",
+    "success": true,
+    "latency_ms": 4.22,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  },
+  {
+    "run_id": 9,
+    "framework": "autogen",
+    "task": "multi_agent",
+    "failure_type": "timeout",
+    "success": true,
+    "latency_ms": 4.3,
+    "failure_category": "none",
+    "exception_type": "",
+    "recovered": false,
+    "recovery_latency_ms": 0.0
+  }
+]
