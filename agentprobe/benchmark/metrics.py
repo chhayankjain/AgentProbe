@@ -124,16 +124,23 @@ class MetricsCalculator:
 
         # Infer labels from first run if not provided
         first = runs[0]
-        fw = framework or getattr(first, "framework", "unknown")
-        tk = task or getattr(first, "task", "unknown")
-        ft = failure_type or getattr(first, "failure_type", "none")
+        _g = lambda obj, key, default="": obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)  # noqa: E731
+        fw = framework or _g(first, "framework", "unknown")
+        tk = task or _g(first, "task", "unknown")
+        ft = failure_type or _g(first, "failure_type", "none")
 
-        successes = [r for r in runs if getattr(r, "success", False)]
-        failures = [r for r in runs if not getattr(r, "success", False)]
-        recovered = [r for r in failures if getattr(r, "recovered", False)]
+        def _get(obj: Any, key: str, default: Any = None) -> Any:
+            """Get attribute from object or dict."""
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return getattr(obj, key, default)
 
-        latencies = [getattr(r, "latency_ms", 0.0) for r in runs]
-        recovery_latencies = [getattr(r, "recovery_latency_ms", 0.0) for r in recovered]
+        successes = [r for r in runs if _get(r, "success", False)]
+        failures = [r for r in runs if not _get(r, "success", False)]
+        recovered = [r for r in failures if _get(r, "recovered", False)]
+
+        latencies = [_get(r, "latency_ms", 0.0) for r in runs]
+        recovery_latencies = [_get(r, "recovery_latency_ms", 0.0) for r in recovered]
 
         n = len(runs)
         failure_rate = len(failures) / n
@@ -187,7 +194,7 @@ class MetricsCalculator:
     def _count_by_category(self, failures: list[Any]) -> dict[str, int]:
         counts: dict[str, int] = {}
         for r in failures:
-            cat = getattr(r, "failure_category", "unknown")
+            cat = r.get("failure_category", "unknown") if isinstance(r, dict) else getattr(r, "failure_category", "unknown")
             counts[cat] = counts.get(cat, 0) + 1
         return counts
 
