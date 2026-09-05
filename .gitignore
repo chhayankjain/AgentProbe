@@ -34,6 +34,8 @@ experiments/results/*.csv
 experiments/results/*.json
 experiments/results/*.parquet
 !experiments/results/.gitkeep
+!experiments/results/combined_summary.json
+!experiments/results/experiment_metadata.json
 
 # Secrets / API keys
 .env
