@@ -36,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from rich.console import Console
 from rich.table import Table
 
+from agentprobe.benchmark.metadata import capture_metadata
 from agentprobe.benchmark.metrics import MetricsCalculator
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
@@ -114,7 +115,13 @@ def build_llm(llm_backend: str, model: str) -> Any:
         raise ValueError(f"Unknown LLM backend: {llm_backend}")
 
 
-def build_agent(framework: str, llm: Any, failure_config: ToolFailureConfig | None) -> Any:
+def build_agent(
+    framework: str,
+    llm: Any,
+    failure_config: ToolFailureConfig | None,
+    model: str = "llama3.1",
+    ollama_base_url: str = "http://localhost:11434/v1",
+) -> Any:
     if framework == "langgraph":
         from agentprobe.agents.langgraph_agent import LangGraphToolAgent
         return LangGraphToolAgent(llm=llm, failure_config=failure_config)
@@ -124,7 +131,11 @@ def build_agent(framework: str, llm: Any, failure_config: ToolFailureConfig | No
     elif framework == "autogen":
         from agentprobe.agents.autogen_agent import AutoGenToolAgent
         llm_config = {
-            "config_list": [{"model": "llama3", "base_url": "http://localhost:11434/v1", "api_key": "ollama"}]
+            "config_list": [{
+                "model": model,
+                "base_url": ollama_base_url,
+                "api_key": "ollama",
+            }]
         }
         return AutoGenToolAgent(llm_config=llm_config, failure_config=failure_config)
     else:
@@ -155,7 +166,7 @@ def run_matrix(
         for task in tasks:
             for ft_name in failure_types:
                 failure_config = FAILURE_CONFIGS[ft_name]
-                agent = build_agent(framework, llm, failure_config)
+                agent = build_agent(framework, llm, failure_config, model=model)
 
                 save_path = (
                     str(RESULTS_DIR / f"{framework}_{task}_{ft_name}")
@@ -224,7 +235,7 @@ def main() -> None:
     )
     parser.add_argument("--n-runs", type=int, default=30)
     parser.add_argument("--llm", default="ollama", choices=["ollama", "openai", "anthropic"])
-    parser.add_argument("--model", default="llama3")
+    parser.add_argument("--model", default="llama3.1")
     parser.add_argument("--baseline-only", action="store_true")
     parser.add_argument("--save-results", action="store_true")
 
@@ -254,6 +265,19 @@ def main() -> None:
         with open(summary_path, "w") as f:
             json.dump(all_metrics, f, indent=2)
         _console.print(f"\n[green]Summary saved to {summary_path}[/green]")
+
+        # Save experiment metadata for reproducibility
+        meta = capture_metadata(
+            model=args.model,
+            llm_backend=args.llm,
+            frameworks=args.frameworks,
+            n_runs_per_cell=args.n_runs,
+            seed=42,
+        )
+        meta_path = RESULTS_DIR / "experiment_metadata.json"
+        with open(meta_path, "w") as f:
+            json.dump(meta.to_dict(), f, indent=2)
+        _console.print(f"[green]Metadata saved to {meta_path}[/green]")
 
 
 if __name__ == "__main__":
