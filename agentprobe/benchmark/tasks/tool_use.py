@@ -85,6 +85,101 @@ TOOL_USE_QUERIES: list[ToolUseQuery] = [
         required_tools=["web_search"],
         expected_answer_keywords=["llama", "mistral", "huggingface"],
     ),
+    # --- Expanded queries (tu_011 – tu_025) ---
+    ToolUseQuery(
+        query_id="tu_011",
+        input="What is the molecular weight of caffeine in g/mol?",
+        required_tools=["web_search"],
+        expected_answer_keywords=["194", "caffeine", "molecular"],
+    ),
+    ToolUseQuery(
+        query_id="tu_012",
+        input="Calculate the factorial of 12.",
+        required_tools=["calculator"],
+        expected_answer_keywords=["479001600"],
+    ),
+    ToolUseQuery(
+        query_id="tu_013",
+        input="What is the distance in kilometers between the Earth and Mars at closest approach?",
+        required_tools=["web_search"],
+        expected_answer_keywords=["million", "km", "mars"],
+    ),
+    ToolUseQuery(
+        query_id="tu_014",
+        input="Calculate the monthly payment on a $300,000 mortgage at 6.5% APR over 30 years.",
+        required_tools=["calculator"],
+        expected_answer_keywords=["1896", "monthly", "payment"],
+    ),
+    ToolUseQuery(
+        query_id="tu_015",
+        input="What is the GDP per capita of Switzerland in 2024 USD?",
+        required_tools=["web_search"],
+        expected_answer_keywords=["switzerland", "gdp", "per capita"],
+    ),
+    ToolUseQuery(
+        query_id="tu_016",
+        input="Search for the boiling point of ethanol and then convert it from Celsius to Fahrenheit.",
+        required_tools=["web_search", "calculator"],
+        expected_answer_keywords=["173", "ethanol", "fahrenheit"],
+    ),
+    ToolUseQuery(
+        query_id="tu_017",
+        input="What programming language was used to write the first version of Git?",
+        required_tools=["web_search"],
+        expected_answer_keywords=["c", "git", "torvalds"],
+    ),
+    ToolUseQuery(
+        query_id="tu_018",
+        input="Calculate the area of a circle with radius 7.5 meters.",
+        required_tools=["calculator"],
+        expected_answer_keywords=["176.7", "area", "circle"],
+    ),
+    ToolUseQuery(
+        query_id="tu_019",
+        input="What year did the Byzantine Empire fall, and what was the conquering force?",
+        required_tools=["web_search"],
+        expected_answer_keywords=["1453", "ottoman", "constantinople"],
+    ),
+    ToolUseQuery(
+        query_id="tu_020",
+        input="Find the current price of gold per troy ounce in USD and calculate the value of 3.5 ounces.",
+        required_tools=["web_search", "calculator"],
+        expected_answer_keywords=["gold", "ounce", "usd"],
+    ),
+    ToolUseQuery(
+        query_id="tu_021",
+        input="What is the deepest point in the ocean and how deep is it in meters?",
+        required_tools=["web_search"],
+        expected_answer_keywords=["mariana", "challenger", "10"],
+    ),
+    ToolUseQuery(
+        query_id="tu_022",
+        input="Calculate the sum of all prime numbers less than 50.",
+        required_tools=["calculator"],
+        expected_answer_keywords=["328"],
+    ),
+    ToolUseQuery(
+        query_id="tu_023",
+        input="Which country has the most UNESCO World Heritage Sites as of 2024?",
+        required_tools=["web_search"],
+        expected_answer_keywords=["italy", "china", "heritage"],
+    ),
+    ToolUseQuery(
+        query_id="tu_024",
+        input=(
+            "Look up the population of both India and China, "
+            "then calculate which country has a higher population density "
+            "given India is 3.287 million km2 and China is 9.597 million km2."
+        ),
+        required_tools=["web_search", "calculator"],
+        expected_answer_keywords=["india", "density", "higher"],
+    ),
+    ToolUseQuery(
+        query_id="tu_025",
+        input="What is the time complexity of merge sort and why is it considered efficient?",
+        required_tools=["web_search"],
+        expected_answer_keywords=["n log n", "merge", "sort", "divide"],
+    ),
 ]
 
 
