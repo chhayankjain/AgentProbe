@@ -134,36 +134,63 @@ class AutoGenToolAgent:
                     return self._injector.call(fn, expression)
                 return fn(expression)
 
+            # Define function schemas for the LLM
+            functions = [
+                {
+                    "name": "web_search",
+                    "description": "Search the web for current information.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "The search query",
+                            }
+                        },
+                        "required": ["query"],
+                    },
+                },
+                {
+                    "name": "calculator",
+                    "description": "Evaluate a mathematical expression.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "expression": {
+                                "type": "string",
+                                "description": "The mathematical expression to evaluate",
+                            }
+                        },
+                        "required": ["expression"],
+                    },
+                },
+            ]
+
+            # Add function definitions to llm_config
+            llm_config_with_functions = {
+                **self._llm_config,
+                "functions": functions,
+            }
+
             assistant = autogen.AssistantAgent(
                 name="assistant",
-                llm_config=self._llm_config,
+                llm_config=llm_config_with_functions,
                 system_message=(
                     "You are a reliable AI assistant. Use the provided functions to "
                     "answer questions. If a tool call fails, acknowledge and try another approach."
                 ),
             )
 
+            # Register functions on the user_proxy so it can execute them
             user_proxy = autogen.UserProxyAgent(
                 name="user_proxy",
                 human_input_mode="NEVER",
                 max_consecutive_auto_reply=self._max_turns,
                 code_execution_config=False,
-            )
-
-            # Register tools
-            autogen.register_function(
-                _web_search,
-                caller=assistant,
-                executor=user_proxy,
-                name="web_search",
-                description="Search the web for current information.",
-            )
-            autogen.register_function(
-                _calculator,
-                caller=assistant,
-                executor=user_proxy,
-                name="calculator",
-                description="Evaluate a mathematical expression.",
+                function_map={
+                    "web_search": _web_search,
+                    "calculator": _calculator,
+                },
             )
 
             return user_proxy, assistant

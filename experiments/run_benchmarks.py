@@ -133,7 +133,7 @@ def build_agent(
         llm_config = {
             "config_list": [{
                 "model": model,
-                "base_url": ollama_base_url,
+                "api_base": ollama_base_url,
                 "api_key": "ollama",
             }]
         }
