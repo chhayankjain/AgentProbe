@@ -251,11 +251,12 @@ def plot_summary_dashboard(results: list[dict]) -> None:
     ax.set_ylim(0, 110)
     ax.grid(axis="y", alpha=0.3)
 
-    # Panel 3: Mean latency
+    # Panel 3: Mean latency (baseline only — injection latency is not comparable
+    # for AutoGen because it short-circuits without LLM inference)
     ax = axes[1, 0]
     mean_latencies = []
     for fw in frameworks:
-        matching = [r for r in results if r["framework"] == fw and r["mean_latency_ms"] > 0]
+        matching = [r for r in results if r["framework"] == fw and r["failure_type"] == "none"]
         if matching:
             mean_latencies.append(np.mean([r["mean_latency_ms"] for r in matching]))
         else:
@@ -265,13 +266,13 @@ def plot_summary_dashboard(results: list[dict]) -> None:
                   color=colors_list[:len(frameworks)], edgecolor="white")
     for bar in bars:
         h = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width() / 2., h + 100,
-                f"{h:.0f}ms", ha="center", va="bottom", fontsize=10)
+        ax.text(bar.get_x() + bar.get_width() / 2., h + 300,
+                f"{h/1000:.1f}s", ha="center", va="bottom", fontsize=10)
     ax.set_ylabel("Mean Latency (ms)")
-    ax.set_title("(c) Mean Latency", fontweight="bold")
+    ax.set_title("(c) Mean Latency (Baseline, No Injection)", fontweight="bold")
     ax.grid(axis="y", alpha=0.3)
 
-    # Panel 4: P99 latency by task
+    # Panel 4: P99 latency by task (baseline only)
     ax = axes[1, 1]
     tasks = sorted(set(r["task"] for r in results))
     x = np.arange(len(tasks))
@@ -279,15 +280,15 @@ def plot_summary_dashboard(results: list[dict]) -> None:
     for i, fw in enumerate(frameworks):
         p99s = []
         for task in tasks:
-            matching = [r for r in results if r["framework"] == fw and r["task"] == task and r["p99_latency_ms"] > 0]
+            matching = [r for r in results if r["framework"] == fw and r["task"] == task and r["failure_type"] == "none"]
             if matching:
                 p99s.append(np.mean([r["p99_latency_ms"] for r in matching]))
             else:
                 p99s.append(0)
         ax.bar(x + i * width, p99s, width, label=fw.capitalize(),
                color=colors_list[i], edgecolor="white")
-    ax.set_ylabel("Mean P99 Latency (ms)")
-    ax.set_title("(d) P99 Latency by Task", fontweight="bold")
+    ax.set_ylabel("P99 Latency (ms)")
+    ax.set_title("(d) P99 Latency by Task (Baseline)", fontweight="bold")
     ax.set_xticks(x + width)
     ax.set_xticklabels([t.replace("_", " ").title() for t in tasks])
     ax.legend(fontsize=9)

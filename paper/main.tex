@@ -211,7 +211,7 @@ Consistency   & non\_deterministic                              & 1 & classifier
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{../experiments/plots/summary_dashboard.png}
-  \caption{Summary dashboard showing cross-framework reliability comparison: (a)~overall failure rate, (b)~recovery rate under injection conditions, (c)~mean latency, and (d)~P99 latency by task type. Based on 1{,}050 runs across LangGraph, LangChain, and AutoGen with Llama~3.1 via Ollama.}\label{fig:architecture}
+  \caption{Summary dashboard showing cross-framework reliability comparison: (a)~overall failure rate, (b)~recovery rate under injection conditions, (c)~mean baseline latency (no injection), and (d)~P99 baseline latency by task type. Panels (c) and (d) use baseline-only data to avoid conflating real LLM inference latency with AutoGen's near-zero injection latency caused by tool bypass. Based on 1{,}050 runs across LangGraph, LangChain, and AutoGen with Llama~3.1 via Ollama.}\label{fig:architecture}
 \end{figure}
 
 \subsection{Fault Injection Layer}
@@ -388,7 +388,7 @@ For LangGraph and LangChain, recovery rates differ by failure type. Rate limit a
   \caption{P99 latency distribution across frameworks. The omnibus Kruskal--Wallis test indicates a significant difference ($H = 11.65$, $p = 0.003$), driven by AutoGen's high variance in baseline conditions.}\label{fig:latency}
 \end{figure}
 
-Mean latency is comparable across frameworks (AutoGen: 7{,}663\,ms, LangChain: 7{,}492\,ms, LangGraph: 7{,}702\,ms), but the omnibus Kruskal--Wallis test reveals a significant difference in latency distributions ($H = 11.65$, $p = 0.003$). This is driven primarily by AutoGen's bimodal latency profile: near-zero P99 under injection conditions (where tool bypass produces fast but ungrounded responses) versus very high P99 under baseline conditions (149\,s for multi-agent tasks, where the conversation protocol incurs overhead without tool execution to anchor the interaction).
+Under baseline conditions (no injection), latency differs substantially across frameworks. LangGraph and LangChain exhibit similar mean latencies (8.6\,s and 9.4\,s respectively), while AutoGen is significantly slower (38.3\,s mean), with P99 reaching 149\,s for multi-agent tasks. The omnibus Kruskal--Wallis test confirms a significant difference in latency distributions ($H = 11.65$, $p = 0.003$). AutoGen's conversation-based protocol incurs substantial overhead for real LLM inference. Under injection conditions, AutoGen exhibits near-zero latency (6--27\,ms) because the agent bypasses tool execution entirely, producing fast but ungrounded responses---a further manifestation of the silent failure phenomenon.
 
 \subsection{Summary of Statistical Comparisons}
 
