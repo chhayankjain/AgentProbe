@@ -60,3 +60,14 @@ grafana_data/
 
 # OpenTelemetry collector local data
 otel-collector-data/
+
+# LaTeX build artifacts
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.pdf
+paper/*.bbl
+paper/*.blg
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
