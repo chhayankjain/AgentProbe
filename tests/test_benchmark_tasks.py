@@ -12,6 +12,7 @@ from agentprobe.benchmark.tasks.multi_agent import MultiAgentTask, MULTI_AGENT_Q
 class TestToolUseTask:
     def test_default_has_all_queries(self):
         task = ToolUseTask()
+        assert len(task) == 25
         assert len(task) == len(TOOL_USE_QUERIES)
 
     def test_subset_by_query_ids(self):
@@ -52,14 +53,41 @@ class TestToolUseTask:
         task = ToolUseTask()
         assert task.grade("tu_008", "2^32 = 4294967296")
 
+    def test_unique_query_ids(self):
+        ids = [q.query_id for q in TOOL_USE_QUERIES]
+        assert len(ids) == len(set(ids)), "Duplicate query IDs found"
+
+    def test_multi_tool_queries_exist(self):
+        multi = [q for q in TOOL_USE_QUERIES if len(q.required_tools) > 1]
+        assert len(multi) >= 3, "Expected at least 3 multi-tool queries"
+
+    def test_grade_factorial_query(self):
+        task = ToolUseTask()
+        assert task.grade("tu_012", "The factorial of 12 is 479001600.")
+
+    def test_grade_multi_step_density_query(self):
+        task = ToolUseTask()
+        assert task.grade(
+            "tu_024",
+            "India has a higher population density than China."
+        )
+
+    def test_grade_merge_sort_query(self):
+        task = ToolUseTask()
+        assert task.grade(
+            "tu_025",
+            "Merge sort has O(n log n) time complexity using divide and conquer."
+        )
+
 
 class TestRAGTask:
     def test_has_correct_query_count(self):
         task = RAGTask()
+        assert len(task) == 15
         assert len(task) == len(RAG_QUERIES)
 
     def test_corpus_has_documents(self):
-        assert len(CORPUS) >= 3
+        assert len(CORPUS) == 10
 
     def test_retrieve_returns_top_k_docs(self):
         task = RAGTask()
@@ -103,10 +131,43 @@ class TestRAGTask:
         doc_ids = [d["doc_id"] for d in docs]
         assert "agentprobe_s2" in doc_ids
 
+    def test_unique_query_ids(self):
+        ids = [q.query_id for q in RAG_QUERIES]
+        assert len(ids) == len(set(ids)), "Duplicate RAG query IDs found"
+
+    def test_unique_doc_ids(self):
+        ids = [d["doc_id"] for d in CORPUS]
+        assert len(ids) == len(set(ids)), "Duplicate corpus doc IDs found"
+
+    def test_grade_fault_injection_query(self):
+        task = RAGTask()
+        assert task.grade(
+            "rag_006",
+            "AgentProbe injects faults via timeout delays, malformed JSON, and rate-limit errors at the injection boundary."
+        )
+
+    def test_grade_chaos_engineering_query(self):
+        task = RAGTask()
+        assert task.grade(
+            "rag_009",
+            "Chaos engineering uses a steady-state hypothesis and perturbation to test blast radius."
+        )
+
+    def test_multi_doc_query_exists(self):
+        multi = [q for q in RAG_QUERIES if len(q.relevant_doc_ids) > 1]
+        assert len(multi) >= 3, "Expected at least 3 multi-doc queries"
+
+    def test_retrieval_relevance_for_chaos_query(self):
+        task = RAGTask()
+        docs = task.retrieve("chaos engineering steady-state blast radius")
+        doc_ids = [d["doc_id"] for d in docs]
+        assert "agentprobe_s9" in doc_ids
+
 
 class TestMultiAgentTask:
     def test_has_correct_query_count(self):
         task = MultiAgentTask()
+        assert len(task) == 15
         assert len(task) == len(MULTI_AGENT_QUERIES)
 
     def test_get_inputs_returns_dicts(self):
@@ -138,3 +199,25 @@ class TestMultiAgentTask:
     def test_all_queries_have_expected_keywords(self):
         for q in MULTI_AGENT_QUERIES:
             assert len(q.expected_output_keywords) >= 1
+
+    def test_unique_query_ids(self):
+        ids = [q.query_id for q in MULTI_AGENT_QUERIES]
+        assert len(ids) == len(set(ids)), "Duplicate multi-agent query IDs found"
+
+    def test_multi_tool_researcher_exists(self):
+        multi = [q for q in MULTI_AGENT_QUERIES if len(q.researcher_tools) > 1]
+        assert len(multi) >= 2, "Expected at least 2 queries with multi-tool researchers"
+
+    def test_grade_protein_query(self):
+        task = MultiAgentTask()
+        assert task.grade(
+            "ma_006",
+            "AlphaFold revolutionized protein structure prediction."
+        )
+
+    def test_grade_healthcare_query(self):
+        task = MultiAgentTask()
+        assert task.grade(
+            "ma_015",
+            "Autonomous AI in healthcare has both benefit and risk considerations."
+        )

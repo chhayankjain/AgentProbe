@@ -55,6 +55,103 @@ MULTI_AGENT_QUERIES: list[MultiAgentQuery] = [
         researcher_tools=["web_search"],
         expected_output_keywords=["mlsys", "workshop", "abstract"],
     ),
+    # --- Expanded queries (ma_006 – ma_015) ---
+    MultiAgentQuery(
+        query_id="ma_006",
+        input=(
+            "Research the latest advances in protein structure prediction "
+            "and write a technical blog post suitable for a machine learning audience."
+        ),
+        researcher_tools=["web_search"],
+        expected_output_keywords=["protein", "alphafold", "structure", "prediction"],
+    ),
+    MultiAgentQuery(
+        query_id="ma_007",
+        input=(
+            "Analyze the S&P 500 performance over the last quarter "
+            "and produce a risk assessment report with key takeaways."
+        ),
+        researcher_tools=["web_search", "calculator"],
+        expected_output_keywords=["s&p", "return", "risk", "quarter"],
+    ),
+    MultiAgentQuery(
+        query_id="ma_008",
+        input=(
+            "Research climate change mitigation strategies in urban areas "
+            "and draft a policy brief with three actionable recommendations."
+        ),
+        researcher_tools=["web_search"],
+        expected_output_keywords=["climate", "urban", "mitigation", "recommendation"],
+    ),
+    MultiAgentQuery(
+        query_id="ma_009",
+        input=(
+            "Find the top 5 most cited papers on prompt engineering in 2024 "
+            "and write a literature review section summarizing their contributions."
+        ),
+        researcher_tools=["web_search"],
+        expected_output_keywords=["prompt", "engineering", "cited", "review"],
+    ),
+    MultiAgentQuery(
+        query_id="ma_010",
+        input=(
+            "Research the trade-offs between fine-tuning and retrieval-augmented "
+            "generation for domain-specific tasks, then produce a decision matrix "
+            "that a practitioner could use to choose between them."
+        ),
+        researcher_tools=["web_search"],
+        expected_output_keywords=["fine-tuning", "rag", "trade-off", "decision"],
+    ),
+    MultiAgentQuery(
+        query_id="ma_011",
+        input=(
+            "One agent should propose a software architecture for a real-time "
+            "fraud detection system, and another agent should critique the design "
+            "and suggest improvements."
+        ),
+        researcher_tools=["web_search"],
+        expected_output_keywords=["fraud", "architecture", "critique", "improvement"],
+    ),
+    MultiAgentQuery(
+        query_id="ma_012",
+        input=(
+            "Plan a three-phase rollout strategy for deploying an LLM-powered "
+            "customer support chatbot, then write a risk register for each phase."
+        ),
+        researcher_tools=["web_search"],
+        expected_output_keywords=["rollout", "phase", "risk", "chatbot"],
+    ),
+    MultiAgentQuery(
+        query_id="ma_013",
+        input=(
+            "Research the energy consumption of training large language models "
+            "and draft an executive summary with both environmental costs "
+            "and proposed efficiency improvements."
+        ),
+        researcher_tools=["web_search", "calculator"],
+        expected_output_keywords=["energy", "training", "efficiency", "carbon"],
+    ),
+    MultiAgentQuery(
+        query_id="ma_014",
+        input=(
+            "A researcher agent must gather data on global semiconductor supply "
+            "chain disruptions in 2024, while a writer agent must produce a "
+            "concise briefing document with sourced claims. The writer should "
+            "flag any claims that lack sufficient evidence."
+        ),
+        researcher_tools=["web_search"],
+        expected_output_keywords=["semiconductor", "supply chain", "disruption", "source"],
+    ),
+    MultiAgentQuery(
+        query_id="ma_015",
+        input=(
+            "Research both the benefits and risks of autonomous AI agents "
+            "in healthcare diagnostics, then produce a balanced position paper "
+            "with arguments for and against deployment."
+        ),
+        researcher_tools=["web_search"],
+        expected_output_keywords=["healthcare", "autonomous", "benefit", "risk"],
+    ),
 ]
 
 
