@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents"
+authors:
+  - family-names: Jain
+    given-names: Chhayank
+    affiliation: Arizona State University
+    orcid: ""
+  - family-names: Pattnaik
+    given-names: Sarthak
+    affiliation: Boston University
+  - family-names: Pinsky
+    given-names: Eugene
+    affiliation: Boston University
+version: "1.0.0"
+date-released: "2026-09-13"
+license: MIT
+repository-code: "https://github.com/chhayankjain/AgentProbe"
+keywords:
+  - llm-agents
+  - fault-injection
+  - benchmarking
+  - observability
+  - reliability
+  - chaos-engineering
+  - langchain
+  - langgraph
+  - autogen
+  - opentelemetry
+abstract: >-
+  AgentProbe is an open-source fault-injection and observability toolkit
+  for systematically evaluating the reliability of LLM-based intelligent
+  agents. It implements a five-category failure taxonomy with configurable
+  injectors, OpenTelemetry-based tracing, and 55 standardized benchmark
+  tasks spanning tool use, retrieval-augmented generation, and multi-agent
+  coordination.
