@@ -54,6 +54,10 @@ Thumbs.db
 *.swp
 *.swo
 
+# Local caches
+.claude/
+.cache/
+
 # Prometheus / Grafana local data
 prometheus_data/
 grafana_data/

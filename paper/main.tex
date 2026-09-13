@@ -42,15 +42,16 @@
 % ==============================================================================
 \Title{AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents}
 
-\Author{Chhayank Jain $^{1,*}$}
+\Author{Chhayank Jain $^{1,*}$, Sarthak Pattnaik $^{2}$ and Eugene Pinsky $^{2}$}
 
-\AuthorNames{Chhayank Jain}
+\AuthorNames{Chhayank Jain, Sarthak Pattnaik and Eugene Pinsky}
 
 \address{%
-  $^{1}$ \quad Independent Researcher
+  $^{1}$ \quad Arizona State University, Tempe, AZ, USA; cjain10@asu.edu\\
+  $^{2}$ \quad Boston University, Boston, MA, USA; spattna1@bu.edu (S.P.); epinsky@bu.edu (E.P.)
 }
 
-\corres{Correspondence: chhayank44@gmail.com}
+\corres{Correspondence: cjain10@asu.edu}
 
 % ==============================================================================
 % Abstract — keep it simple (no custom macros) so hyperref PDF metadata works
@@ -206,13 +207,7 @@ Consistency   & non\_deterministic                              & 1 & classifier
 \section{System Architecture}\label{sec:system}
 % ============================================================================
 
-\agentprobe{} is designed as a modular Python toolkit with three core layers: fault injection, observability, and benchmarking. \Cref{fig:architecture} illustrates the overall system architecture.
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{../experiments/plots/summary_dashboard.png}
-  \caption{Summary dashboard showing cross-framework reliability comparison: (a)~overall failure rate, (b)~recovery rate under injection conditions, (c)~mean baseline latency (no injection), and (d)~P99 baseline latency by task type. Panels (c) and (d) use baseline-only data to avoid conflating real LLM inference latency with AutoGen's near-zero injection latency caused by tool bypass. Based on 1{,}050 runs across LangGraph, LangChain, and AutoGen with Llama~3.1 via Ollama.}\label{fig:architecture}
-\end{figure}
+\agentprobe{} is designed as a modular Python toolkit with three core layers: fault injection, observability, and benchmarking.
 
 \subsection{Fault Injection Layer}
 
@@ -346,11 +341,17 @@ We report 95\% confidence intervals for all metrics: Wilson score intervals for 
 \section{Results}\label{sec:results}
 % ============================================================================
 
-A total of 1{,}050 experiment runs were completed across all conditions. Full results data and analysis scripts are available in the project repository.
+A total of 1{,}050 experiment runs were completed across all conditions. Full results data and analysis scripts are available in the project repository. \Cref{fig:dashboard} provides a high-level summary of the key results.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{../experiments/plots/summary_dashboard.png}
+  \caption{Summary dashboard showing cross-framework reliability comparison: (a)~overall failure rate, (b)~recovery rate under injection conditions, (c)~mean baseline latency (no injection), and (d)~P99 baseline latency by task type. Panels (c) and (d) use baseline-only data to avoid conflating real LLM inference latency with AutoGen's near-zero injection latency caused by tool bypass. Based on 1{,}050 runs across LangGraph, LangChain, and AutoGen with Llama~3.1 via Ollama.}\label{fig:dashboard}
+\end{figure}
 
 \subsection{Baseline Performance}
 
-Under baseline conditions (no fault injection), all three frameworks achieve a 0\% failure rate [95\%~CI: 0.0--4.1\%] across all task types ($n = 90$ per framework for LangGraph/LangChain, $n = 30$ for AutoGen). Mean latency varies by task: tool use is fastest (LangGraph: 5.9\,s, LangChain: 6.0\,s), followed by multi-agent (8.4\,s, 10.7\,s) and RAG (10.3\,s, 11.4\,s). AutoGen exhibits high variance, with mean latency ranging from 4.8\,s for tool use to 22.7\,s for multi-agent tasks.
+Under baseline conditions (no fault injection), all three frameworks achieve a 0\% failure rate [95\%~CI: 0.0--4.1\%] across all task types ($n = 90$ per framework for LangGraph/LangChain, $n = 30$ for AutoGen). Mean latency varies by task: tool use is fastest (LangGraph: 6.1\,s, LangChain: 6.0\,s), followed by RAG (8.0\,s, 11.4\,s) and multi-agent coordination (11.7\,s, 10.7\,s). AutoGen exhibits substantially higher and more variable latency, with mean latency ranging from 10.9\,s for tool use to 76.1\,s for multi-agent tasks, reflecting the overhead of its conversation-based protocol.
 
 \subsection{Fault Tolerance Comparison}
 
@@ -395,6 +396,7 @@ Under baseline conditions (no injection), latency differs substantially across f
 \begin{table}[htbp]
 \caption{Pairwise statistical comparisons between frameworks. Failure rate comparisons use the chi-squared test with Yates' correction; latency comparisons use the Mann--Whitney $U$ test.}\label{tab:pairwise}
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{llcccc}
 \toprule
 \textbf{Comparison} & \textbf{Metric} & \textbf{Test} & \textbf{$p$-value} & \textbf{Effect Size} & \textbf{Magnitude} \\
@@ -407,7 +409,8 @@ AutoGen vs LangChain   & Latency & Mann--Whitney $U$ & $0.004$ & $d = 0.01$ & Ne
 AutoGen vs LangGraph   & Latency & Mann--Whitney $U$ & $0.005$ & $d = 0.00$ & Negligible \\
 LangChain vs LangGraph & Latency & Mann--Whitney $U$ & $0.245$ & $d = 0.09$ & Negligible \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 
@@ -476,7 +479,7 @@ Several directions merit further investigation:
 % Supplementary Materials, Author Contributions, Funding, etc.
 % ============================================================================
 
-\authorcontributions{Conceptualization, methodology, software, investigation, writing---original draft preparation, C.J.}
+\authorcontributions{Conceptualization, methodology, software, investigation, writing---original draft preparation, C.J.; supervision, writing---review and editing, S.P. and E.P. All authors have read and agreed to the published version of the manuscript.}
 
 \funding{This research received no external funding.}
 

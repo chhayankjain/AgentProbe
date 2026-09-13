@@ -63,7 +63,7 @@ agentprobe = "agentprobe.cli:app"
 Homepage = "https://github.com/chhayankjain/AgentProbe"
 Repository = "https://github.com/chhayankjain/AgentProbe"
 Issues = "https://github.com/chhayankjain/AgentProbe/issues"
-Paper = "https://arxiv.org/abs/PLACEHOLDER"
+# Paper = "https://arxiv.org/abs/TBD"  # Will be updated upon publication
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

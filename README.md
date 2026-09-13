@@ -178,12 +178,10 @@ python experiments/run_benchmarks.py \
 
 ```bibtex
 @misc{jain2026agentprobe,
-  title={Failure Modes and Observability Patterns in Production Agentic LLM Systems: A Systematic Study},
-  author={Jain, Chhayank},
+  title={AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents},
+  author={Jain, Chhayank and Pattnaik, Sarthak and Pinsky, Eugene},
   year={2026},
-  eprint={PLACEHOLDER},
-  archivePrefix={arXiv},
-  primaryClass={cs.LG}
+  note={Manuscript under review}
 }
 ```
 

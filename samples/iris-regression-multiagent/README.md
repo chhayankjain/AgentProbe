@@ -1,6 +1,6 @@
 # iris-regression-multiagent
 
-A **multi-framework agentic system** for Iris linear regression, designed as a test target for [AgentProbe](https://github.com/anthropics/agentprobe) — a reliability and observability benchmarking toolkit for production LLM agents.
+A **multi-framework agentic system** for Iris linear regression, designed as a test target for [AgentProbe](https://github.com/chhayankjain/AgentProbe) — a reliability and observability benchmarking toolkit for production LLM agents.
 
 ## Project Purpose
 
@@ -195,7 +195,7 @@ MIT
 
 ## Related
 
-- [AgentProbe](https://github.com/anthropics/agentprobe) — Benchmarking toolkit this repo targets
+- [AgentProbe](https://github.com/chhayankjain/AgentProbe) — Benchmarking toolkit this repo targets
 - [LangGraph Docs](https://langchain-ai.github.io/langgraph/) — Graph-based agent orchestration
 - [AutoGen/ag2 Docs](https://docs.ag2.ai/) — Conversational multi-agent framework
 - [CrewAI Docs](https://docs.crewai.com/) — Role/task-based agent crews
