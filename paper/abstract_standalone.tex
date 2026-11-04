@@ -1,0 +1,36 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{times}
+\usepackage{parskip}
+\usepackage{hyperref}
+
+\begin{document}
+
+\begin{center}
+{\Large\bfseries AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents}
+
+\vspace{1em}
+
+{\large Chhayank Jain\textsuperscript{1,*}, Sarthak Pattnaik\textsuperscript{2}, Eugene Pinsky\textsuperscript{2}}
+
+\vspace{0.5em}
+
+\textsuperscript{1} Arizona State University, Tempe, AZ, USA\\
+\textsuperscript{2} Boston University, Boston, MA, USA\\[0.3em]
+\textsuperscript{*} Correspondence: cjain10@asu.edu
+\end{center}
+
+\vspace{1.5em}
+
+\noindent\textbf{Abstract:}
+LLM-based intelligent agents are increasingly deployed in production systems, yet their reliability under adverse conditions remains poorly characterized. We present AgentProbe, an open-source fault-injection and observability toolkit for systematically evaluating agent resilience. AgentProbe implements a five-category failure taxonomy---tool call faults, orchestration errors, context degradation, latency anomalies, and output consistency violations---with configurable injectors, OpenTelemetry-based tracing, and 55 standardized benchmark tasks spanning tool use, retrieval-augmented generation, and multi-agent coordination. We apply AgentProbe to compare three agent frameworks---LangGraph, LangChain, and AutoGen---across 1,050 experiment runs (3 frameworks $\times$ 3 task types $\times$ 5 fault conditions $\times$ 10--30 runs) using Llama 3.1 8B via Ollama. Under fault injection, LangGraph and LangChain exhibit a 12.9\% failure rate [95\% CI: 10.1--16.3\%] with 79\% recovery, while AutoGen reports 0\% failures---a statistically significant difference ($p < 0.0001$, Cohen's $h = 0.73$). Trace analysis reveals that AutoGen's apparent resilience masks complete tool-execution bypass: the LLM responds without invoking tools, constituting a silent failure mode. LangGraph and LangChain show no significant difference ($p = 1.0$), recovering more effectively from rate-limit and API errors (86\%) than from timeouts and malformed outputs (73\%). These findings demonstrate that conventional pass/fail metrics can obscure critical architectural weaknesses, and that systematic fault injection is essential for evaluating agent reliability.
+
+\vspace{1em}
+
+\noindent\textbf{Keywords:} intelligent agents; multi-agent systems; agent-oriented architectures; Large Language Models (LLMs); Chain of Thought (CoT); reliability benchmarking; fault injection; observability; sub-symbolic artificial intelligence
+
+\vspace{1.5em}
+
+\noindent\textbf{Data Availability:} The AgentProbe toolkit, benchmark tasks, and experimental scripts are available as open-source software at \url{https://github.com/chhayankjain/AgentProbe}.
+
+\end{document}

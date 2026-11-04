@@ -85,7 +85,15 @@ class AutoGenToolAgent:
                 query = f"Context:\n{context}\n\nQuestion: {query}"
 
             user_proxy, assistant = self._agents
-            chat_result = user_proxy.initiate_chat(
+            # Clear conversation history and response cache between runs
+            user_proxy.reset()
+            assistant.reset()
+            try:
+                from autogen.oai.completion import Completion
+                Completion.clear_cache()
+            except (ImportError, Exception):
+                pass
+            user_proxy.initiate_chat(
                 assistant,
                 message=query,
                 max_turns=self._max_turns,
@@ -93,8 +101,9 @@ class AutoGenToolAgent:
             latency_ms = (time.perf_counter() - start) * 1000
             span.set_attribute("latency_ms", latency_ms)
 
-            # Extract last assistant message as output
-            messages = getattr(chat_result, "chat_history", []) or []
+            # Extract last assistant message from conversation history
+            # pyautogen 0.1.14 stores messages on the agent objects, not the return value
+            messages = assistant.chat_messages.get(user_proxy, [])
             output = next(
                 (m.get("content", "") for m in reversed(messages) if m.get("role") == "assistant"),
                 "",
