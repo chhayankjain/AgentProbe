@@ -35,6 +35,7 @@ dependencies = [
     "pandas>=2.0.0",
     "matplotlib>=3.8.0",
     "numpy>=1.26.0",
+    "scipy>=1.12.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
 ]
@@ -55,9 +56,6 @@ openai = [
 anthropic = [
     "langchain-anthropic>=0.2.0",
 ]
-
-[project.scripts]
-agentprobe = "agentprobe.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/chhayankjain/AgentProbe"

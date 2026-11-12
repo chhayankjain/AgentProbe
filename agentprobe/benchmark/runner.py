@@ -30,6 +30,7 @@ Usage::
 
 from __future__ import annotations
 
+import concurrent.futures
 import csv
 import json
 import time
@@ -38,6 +39,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from opentelemetry import context as otel_context
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 
@@ -55,6 +57,14 @@ _tracer = get_tracer(__name__)
 _console = Console()
 
 
+class _HarnessTimeout(Exception):
+    """Raised when the benchmark runner's wall-clock deadline is exceeded.
+
+    Distinct from ``TimeoutError`` so that upstream timeouts (e.g. pyautogen's
+    ``Completion.request_timeout``) are not misclassified as harness deadlines.
+    """
+
+
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
@@ -62,7 +72,16 @@ _console = Console()
 
 @dataclass
 class RunResult:
-    """Result of a single benchmark run (one agent invocation)."""
+    """Result of a single benchmark run (one agent invocation).
+
+    The ``status`` field distinguishes executed trials from those skipped
+    after a harness timeout aborted the condition:
+      - ``"completed"`` — trial was dispatched and finished (success or failure).
+      - ``"skipped"``   — trial was never dispatched (prior timeout lingering).
+
+    Only ``"completed"`` trials should be included in error-rate, recovery,
+    and latency calculations.
+    """
 
     run_id: int
     framework: str
@@ -70,11 +89,13 @@ class RunResult:
     failure_type: str
     success: bool
     latency_ms: float
+    status: str = "completed"
     failure_category: str = "none"
     exception_type: str = ""
     exception_msg: str = ""
     recovered: bool = False
     recovery_latency_ms: float = 0.0
+    recovery_output: str = ""
     output: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -84,12 +105,16 @@ class RunResult:
             "framework": self.framework,
             "task": self.task,
             "failure_type": self.failure_type,
+            "status": self.status,
             "success": self.success,
             "latency_ms": round(self.latency_ms, 2),
             "failure_category": self.failure_category,
             "exception_type": self.exception_type,
+            "exception_msg": self.exception_msg,
             "recovered": self.recovered,
             "recovery_latency_ms": round(self.recovery_latency_ms, 2),
+            "recovery_output": self.recovery_output,
+            "output": self.output,
         }
 
 
@@ -153,6 +178,7 @@ class BenchmarkRunner:
             self._classifier = FailureClassifier()
         except ImportError:
             pass  # classifier module not yet merged
+        self._invocation_hung = False
         self._injector: Any = None
         if self.config.failure_config is not None:
             try:
@@ -186,6 +212,21 @@ class BenchmarkRunner:
             )
 
             for run_id in range(cfg.n_runs):
+                if self._invocation_hung:
+                    results.append(RunResult(
+                        run_id=run_id,
+                        framework=cfg.framework,
+                        task=cfg.task,
+                        failure_type=failure_type,
+                        success=False,
+                        latency_ms=0.0,
+                        status="skipped",
+                        failure_category="harness_abort",
+                        exception_type="_HarnessTimeout",
+                        exception_msg="Skipped: prior trial timed out with lingering thread",
+                    ))
+                    progress.advance(task_bar)
+                    continue
                 result = self._run_single(run_id, failure_type)
                 results.append(result)
                 progress.advance(task_bar)
@@ -216,7 +257,7 @@ class BenchmarkRunner:
         ):
             start = time.perf_counter()
             try:
-                output = self.agent.invoke(task_input)
+                output = self._invoke_with_timeout(task_input)
                 latency_ms = (time.perf_counter() - start) * 1000
                 return RunResult(
                     run_id=run_id,
@@ -225,7 +266,7 @@ class BenchmarkRunner:
                     failure_type=failure_type,
                     success=True,
                     latency_ms=latency_ms,
-                    output=str(output)[:500],
+                    output=str(output),
                 )
             except Exception as exc:
                 latency_ms = (time.perf_counter() - start) * 1000
@@ -235,7 +276,7 @@ class BenchmarkRunner:
                     category = event.category.value
 
                 # Attempt recovery
-                recovered, recovery_latency_ms = self._attempt_recovery(task_input)
+                recovered, recovery_latency_ms, recovery_output = self._attempt_recovery(task_input)
 
                 return RunResult(
                     run_id=run_id,
@@ -249,36 +290,98 @@ class BenchmarkRunner:
                     exception_msg=str(exc)[:200],
                     recovered=recovered,
                     recovery_latency_ms=recovery_latency_ms,
+                    recovery_output=str(recovery_output) if recovery_output else "",
                 )
 
-    def _attempt_recovery(self, task_input: dict) -> tuple[bool, float]:
-        """Try to invoke the agent again after a failure. Returns (recovered, latency_ms)."""
+    def _invoke_with_timeout(self, task_input: dict) -> Any:
+        """Invoke agent with wall-clock timeout enforcement.
+
+        Uses a thread so that the agent's injector RNG, injection logs,
+        and all mutable state advance in-process (no fork/copy issues).
+        The current OpenTelemetry context is explicitly propagated into the
+        worker thread so that agent spans become children of the benchmark span.
+
+        Guarantees:
+        1. Upstream exceptions (including ``TimeoutError``) are propagated
+           with their original type and message.
+        2. Only genuine wall-clock deadline expiry raises ``_HarnessTimeout``.
+        3. After a harness timeout, ``self._invocation_hung`` is set to
+           ``True`` so that ``_attempt_recovery`` skips retry and
+           ``run()`` aborts remaining trials, preventing overlap between
+           the lingering thread and new invocations.
+
+        Limitation: Python threads cannot be forcibly killed.  A hung
+        thread may linger until the process exits.
+        """
+        timeout = self.config.timeout_per_run_seconds
+        ctx = otel_context.get_current()
+
+        def _worker() -> Any:
+            token = otel_context.attach(ctx)
+            try:
+                return self.agent.invoke(task_input)
+            finally:
+                otel_context.detach(token)
+
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(_worker)
+        pool.shutdown(wait=False)
+
+        try:
+            return future.result(timeout=timeout)
+        except Exception:
+            if future.done():
+                # Worker finished (possibly with an exception) before
+                # the deadline — propagate the original exception as-is.
+                return future.result()  # re-raises the worker exception
+            # Worker still running — genuine deadline miss.
+            self._invocation_hung = True
+            raise _HarnessTimeout(
+                f"Agent invocation exceeded {timeout}s wall-clock timeout"
+            )
+
+    def _attempt_recovery(self, task_input: dict) -> tuple[bool, float, Any]:
+        """Try to invoke the agent again after a failure.
+
+        If the prior invocation is still running (hung thread after a
+        harness timeout), recovery is skipped entirely to prevent two
+        concurrent invocations on the same agent.
+
+        Returns (recovered, latency_ms, output).
+        """
         if self.config.recovery_attempts == 0:
-            return False, 0.0
-        # Temporarily remove injector by running with a clean-probability injector
-        # Recovery uses reduced failure probability (simulating retry logic)
+            return False, 0.0, None
+        if self._invocation_hung:
+            return False, 0.0, None
         for attempt in range(self.config.recovery_attempts):
             start = time.perf_counter()
             try:
-                self.agent.invoke(task_input)
-                return True, (time.perf_counter() - start) * 1000
+                output = self._invoke_with_timeout(task_input)
+                return True, (time.perf_counter() - start) * 1000, output
             except Exception:
+                if self._invocation_hung:
+                    break  # recovery attempt itself timed out; stop retrying
                 continue
-        return False, 0.0
+        return False, 0.0, None
 
     def _summary_line(self, results: list[RunResult]) -> str:
-        total = len(results)
-        failures = sum(1 for r in results if not r.success)
+        executed = [r for r in results if r.status == "completed"]
+        skipped = len(results) - len(executed)
+        total = len(executed)
+        failures = sum(1 for r in executed if not r.success)
         rate = failures / total if total > 0 else 0.0
-        recovered = sum(1 for r in results if r.recovered)
-        latencies = [r.latency_ms for r in results]
+        recovered = sum(1 for r in executed if r.recovered)
+        latencies = [r.latency_ms for r in executed]
         p99 = sorted(latencies)[min(int(total * 0.99), total - 1)] if latencies else 0.0
-        return (
-            f"[green]Done[/green] — {total} runs | "
+        line = (
+            f"[green]Done[/green] — {total} executed | "
             f"failure_rate={rate:.1%} | "
             f"recovered={recovered}/{failures} | "
             f"P99={p99:.0f}ms"
         )
+        if skipped:
+            line += f" | [yellow]{skipped} skipped (condition incomplete)[/yellow]"
+        return line
 
     def _save(self, results: list[RunResult], path: str) -> None:
         p = Path(path)
