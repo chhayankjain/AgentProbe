@@ -1,0 +1,19 @@
+{
+  "batch_id": "20261111_233435",
+  "result_files": [
+    "autogen_tool_use_none.csv",
+    "langchain_tool_use_api_error.csv",
+    "langchain_tool_use_malformed_output.csv",
+    "langchain_tool_use_none.csv",
+    "langchain_tool_use_rate_limit.csv",
+    "langchain_tool_use_timeout.csv",
+    "langgraph_tool_use_api_error.csv",
+    "langgraph_tool_use_malformed_output.csv",
+    "langgraph_tool_use_none.csv",
+    "langgraph_tool_use_rate_limit.csv",
+    "langgraph_tool_use_timeout.csv"
+  ],
+  "n_records": 330,
+  "n_conditions": 11,
+  "checksum": "f5dc20714e5a3d0faceaff88257abb91befe8f623fc8e5573563dcfc08fc405d"
+}

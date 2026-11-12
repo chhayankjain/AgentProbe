@@ -1,0 +1,36 @@
+{
+  "timestamp_utc": "2026-11-12T01:04:51.997810+00:00",
+  "batch_dir": "/Users/chhayankjain/Desktop/Github/AgentProbe/experiments/results_v2/20261112_063451",
+  "model": "qwen2.5:7b",
+  "ollama_version": "0.31.1",
+  "model_digest": "unknown",
+  "frameworks": [
+    "autogen"
+  ],
+  "n_runs_per_condition": 30,
+  "seed": 42,
+  "injection_probability": 0.2,
+  "failure_types": [
+    "none",
+    "timeout",
+    "malformed_output",
+    "rate_limit",
+    "api_error"
+  ],
+  "python_version": "3.14.6",
+  "platform": "Darwin 27.0.0",
+  "cpu": "arm",
+  "ram_gb": 16.0,
+  "git_hash": "91d084d635cadc39db8bfc4d049fd6bd0f3cde4e",
+  "git_dirty": true,
+  "package_versions": {
+    "langchain": "1.3.1",
+    "langchain-core": "1.4.0",
+    "langgraph": "1.2.0",
+    "pyautogen": "0.1.14",
+    "langchain-ollama": "1.1.0",
+    "opentelemetry-api": "1.42.0",
+    "scipy": "1.17.1",
+    "openai": "0.28.1"
+  }
+}

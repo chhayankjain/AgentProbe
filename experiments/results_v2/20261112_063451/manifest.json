@@ -1,0 +1,13 @@
+{
+  "batch_id": "20261112_063451",
+  "result_files": [
+    "autogen_tool_use_api_error.csv",
+    "autogen_tool_use_malformed_output.csv",
+    "autogen_tool_use_none.csv",
+    "autogen_tool_use_rate_limit.csv",
+    "autogen_tool_use_timeout.csv"
+  ],
+  "n_records": 150,
+  "n_conditions": 5,
+  "checksum": "d409c5b61ab605dcb16c9a61ce3180ec121a912f5b36ebf00aa2d77a7ec64c6f"
+}

@@ -1,6 +1,7 @@
 """Statistical analysis of AgentProbe benchmark results.
 
-Reads combined_summary.json (or individual framework JSONs) and produces:
+Loads per-run CSV files from experiments/results/ for raw latency data,
+and combined_summary.json for aggregate counts.  Produces:
   - Pairwise statistical comparisons between frameworks
   - Confidence intervals for all metrics
   - Effect sizes (Cohen's h for proportions, Cohen's d for latencies)
@@ -14,6 +15,7 @@ Usage::
 
 from __future__ import annotations
 
+import csv
 import json
 import sys
 from pathlib import Path
@@ -44,29 +46,52 @@ def load_results(path: Path | None = None) -> list[dict]:
         return json.load(f)
 
 
+def load_raw_runs() -> list[dict]:
+    """Load all per-run records from individual CSV files.
+
+    Returns a flat list of dicts with keys: framework, task, failure_type,
+    success, latency_ms, recovered, recovery_latency_ms, etc.
+    """
+    rows: list[dict] = []
+    for csv_path in sorted(RESULTS_DIR.glob("*.csv")):
+        with open(csv_path) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Coerce types
+                row["latency_ms"] = float(row.get("latency_ms", 0))
+                row["recovery_latency_ms"] = float(row.get("recovery_latency_ms", 0))
+                row["success"] = row.get("success", "").strip() == "True"
+                row["recovered"] = row.get("recovered", "").strip() == "True"
+                rows.append(row)
+    return rows
+
+
 def analyze_failure_rates(results: list[dict]) -> None:
-    """Compare failure rates across frameworks with CIs."""
+    """Compare failure rates across frameworks with CIs (injection only, excluding baseline)."""
     print("\n" + "=" * 70)
-    print("FAILURE RATE ANALYSIS (with 95% Confidence Intervals)")
+    print("FAILURE RATE ANALYSIS — INJECTION ONLY (with 95% Confidence Intervals)")
     print("=" * 70)
 
-    # Group by framework
-    frameworks = {}
-    for r in results:
-        fw = r["framework"]
-        if fw not in frameworks:
-            frameworks[fw] = {"failures": 0, "total": 0, "latencies": []}
-        frameworks[fw]["failures"] += r["n_failures"]
-        frameworks[fw]["total"] += r["n_runs"]
-        if r["mean_latency_ms"] > 0:
-            frameworks[fw]["latencies"].append(r["mean_latency_ms"])
+    # Separate baseline and injection
+    injection_results = [r for r in results if r["failure_type"] != "none"]
+    baseline_results = [r for r in results if r["failure_type"] == "none"]
 
-    for fw, data in sorted(frameworks.items()):
-        lo, hi = proportion_ci(data["failures"], data["total"])
-        rate = data["failures"] / data["total"] if data["total"] > 0 else 0
-        print(f"\n  {fw}:")
-        print(f"    Overall failure rate: {rate:.1%} [{lo:.1%}, {hi:.1%}]")
-        print(f"    Total runs: {data['total']}, failures: {data['failures']}")
+    for label, subset in [("Injection", injection_results), ("Baseline", baseline_results)]:
+        print(f"\n  --- {label} ---")
+        frameworks = {}
+        for r in subset:
+            fw = r["framework"]
+            if fw not in frameworks:
+                frameworks[fw] = {"failures": 0, "total": 0}
+            frameworks[fw]["failures"] += r["n_failures"]
+            frameworks[fw]["total"] += r["n_runs"]
+
+        for fw, data in sorted(frameworks.items()):
+            lo, hi = proportion_ci(data["failures"], data["total"])
+            rate = data["failures"] / data["total"] if data["total"] > 0 else 0
+            print(f"\n    {fw}:")
+            print(f"      Failure rate: {rate:.1%} [{lo:.1%}, {hi:.1%}]")
+            print(f"      Runs: {data['total']}, failures: {data['failures']}")
 
 
 def analyze_by_failure_type(results: list[dict]) -> None:
@@ -96,50 +121,87 @@ def analyze_by_failure_type(results: list[dict]) -> None:
         print(f"  {fw:<12} {ft:<18} {rate:>7.1%} [{lo:.1%}, {hi:.1%}]{data['total']:>10}")
 
 
-def analyze_latencies(results: list[dict]) -> None:
-    """Compare latency distributions across frameworks."""
+def analyze_latencies(raw_runs: list[dict]) -> None:
+    """Compare latency distributions across frameworks using per-run raw data."""
     print("\n" + "=" * 70)
-    print("LATENCY ANALYSIS (ms)")
+    print("LATENCY ANALYSIS (ms) — baseline only, per-run data")
     print("=" * 70)
 
-    # Group by framework, collect all latencies
-    fw_latencies = {}
-    for r in results:
+    # Use baseline conditions only (uncontaminated by injection)
+    baseline = [r for r in raw_runs if r["failure_type"] == "none"]
+
+    fw_latencies: dict[str, list[float]] = {}
+    for r in baseline:
         fw = r["framework"]
         if fw not in fw_latencies:
-            fw_latencies[fw] = {"means": [], "p99s": []}
-        if r["mean_latency_ms"] > 0:
-            fw_latencies[fw]["means"].append(r["mean_latency_ms"])
-            fw_latencies[fw]["p99s"].append(r["p99_latency_ms"])
+            fw_latencies[fw] = []
+        fw_latencies[fw].append(r["latency_ms"])
 
-    for fw, data in sorted(fw_latencies.items()):
-        if not data["means"]:
+    for fw, latencies in sorted(fw_latencies.items()):
+        if not latencies:
             continue
-        mean_lo, mean_hi = mean_ci(data["means"])
-        p99_lo, p99_hi = mean_ci(data["p99s"])
-        avg_mean = sum(data["means"]) / len(data["means"])
-        avg_p99 = sum(data["p99s"]) / len(data["p99s"])
-        print(f"\n  {fw}:")
-        print(f"    Mean latency:  {avg_mean:>8.0f}ms  [{mean_lo:.0f}, {mean_hi:.0f}]")
-        print(f"    Mean P99:      {avg_p99:>8.0f}ms  [{p99_lo:.0f}, {p99_hi:.0f}]")
+        lo, hi = mean_ci(latencies)
+        avg = sum(latencies) / len(latencies)
+        latencies_sorted = sorted(latencies)
+        p99_idx = min(int(len(latencies_sorted) * 0.99), len(latencies_sorted) - 1)
+        p99 = latencies_sorted[p99_idx]
+        print(f"\n  {fw} (n={len(latencies)} runs):")
+        print(f"    Mean latency:  {avg:>8.0f}ms  [{lo:.0f}, {hi:.0f}]")
+        print(f"    P99 latency:   {p99:>8.0f}ms")
 
 
-def run_pairwise_comparisons(results: list[dict]) -> None:
-    """Run full statistical comparison between frameworks."""
+def analyze_baseline_latency_comparison(raw_runs: list[dict]) -> None:
+    """Omnibus latency test on baseline runs — matches the paper's reported H statistic."""
     print("\n" + "=" * 70)
-    print("PAIRWISE STATISTICAL COMPARISONS")
+    print("BASELINE LATENCY OMNIBUS TEST (Kruskal-Wallis)")
     print("=" * 70)
 
-    # Build FrameworkData for each framework
-    fw_data = {}
-    for r in results:
+    baseline = [r for r in raw_runs if r["failure_type"] == "none"]
+    fw_latencies: dict[str, list[float]] = {}
+    for r in baseline:
+        fw = r["framework"]
+        if fw not in fw_latencies:
+            fw_latencies[fw] = []
+        fw_latencies[fw].append(r["latency_ms"])
+
+    if len(fw_latencies) < 2:
+        print("  Need at least 2 frameworks for comparison.")
+        return
+
+    from scipy import stats
+    groups = list(fw_latencies.values())
+    names = list(fw_latencies.keys())
+    h_stat, p_val = stats.kruskal(*groups)
+    sig = "SIGNIFICANT" if p_val < 0.05 else "not significant"
+    total_n = sum(len(g) for g in groups)
+    print(f"\n  Frameworks: {', '.join(f'{n} (n={len(fw_latencies[n])})' for n in names)}")
+    print(f"  Total baseline runs: {total_n}")
+    print(f"  Kruskal-Wallis H = {h_stat:.6f}, p = {p_val:.6f}, {sig}")
+
+
+def run_pairwise_comparisons(results: list[dict], raw_runs: list[dict]) -> None:
+    """Run full statistical comparison between frameworks (injection conditions only)."""
+    print("\n" + "=" * 70)
+    print("PAIRWISE STATISTICAL COMPARISONS — INJECTION ERROR RATES")
+    print("=" * 70)
+
+    # Use summary for counts, raw runs for latencies
+    injection_summary = [r for r in results if r["failure_type"] != "none"]
+    injection_raw = [r for r in raw_runs if r["failure_type"] != "none"]
+
+    # Build FrameworkData — counts from summary, latencies from raw
+    fw_data: dict[str, dict] = {}
+    for r in injection_summary:
         fw = r["framework"]
         if fw not in fw_data:
             fw_data[fw] = {"successes": 0, "total": 0, "latencies": []}
         fw_data[fw]["successes"] += r["n_successes"]
         fw_data[fw]["total"] += r["n_runs"]
-        if r["mean_latency_ms"] > 0:
-            fw_data[fw]["latencies"].append(r["mean_latency_ms"])
+
+    for r in injection_raw:
+        fw = r["framework"]
+        if fw in fw_data:
+            fw_data[fw]["latencies"].append(r["latency_ms"])
 
     framework_data = {}
     for fw, data in fw_data.items():
@@ -218,12 +280,15 @@ def main() -> None:
     args = parser.parse_args()
 
     results = load_results(args.results)
-    print(f"Loaded {len(results)} result rows from {len(set(r['framework'] for r in results))} frameworks")
+    raw_runs = load_raw_runs()
+    print(f"Loaded {len(results)} summary rows from {len(set(r['framework'] for r in results))} frameworks")
+    print(f"Loaded {len(raw_runs)} per-run records from CSV files")
 
     analyze_failure_rates(results)
     analyze_by_failure_type(results)
-    analyze_latencies(results)
-    run_pairwise_comparisons(results)
+    analyze_latencies(raw_runs)
+    analyze_baseline_latency_comparison(raw_runs)
+    run_pairwise_comparisons(results, raw_runs)
     generate_latex_table(results)
 
 
