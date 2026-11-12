@@ -21,6 +21,8 @@
 \usepackage{listings}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\setlength{\headheight}{23.7pt}  % suppress fancyhdr warning
+\graphicspath{{plots/}}
 
 % ---- Code listing style ------------------------------------------------------
 \lstset{
@@ -35,14 +37,25 @@
   language=Python
 }
 
-% ---- Draft helpers -----------------------------------------------------------
-\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
-\newcommand{\agentprobe}{\textsc{AgentProbe}}
+% ---- Helpers -----------------------------------------------------------------
+\providecommand{\agentprobe}{\textsc{AgentProbe}}
+
+% ---- Revision color markup (reviewer attribution) ---------------------------
+% xcolor is already loaded by mdpi.cls; do not reload
+\providecommand{\rone}[1]{\textcolor{magenta}{#1}}     % Reviewer 1
+\providecommand{\rtwo}[1]{\textcolor{blue}{#1}}        % Reviewer 2
+\providecommand{\rthree}[1]{\textcolor{green!50!black}{#1}} % Reviewer 3
+\providecommand{\rfour}[1]{\textcolor{orange!80!black}{#1}} % Reviewer 4
 
 % ==============================================================================
 \Title{AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents}
 
-\Author{Chhayank Jain $^{1,*}$, Sarthak Pattnaik $^{2}$ and Eugene Pinsky $^{2}$}
+\newcommand{\orcidauthorA}{0009-0004-4994-4800}
+\newcommand{\orcidauthorB}{0009-0006-6831-426X}
+\newcommand{\orcidauthorC}{0000-0002-3836-1851}
+
+\Author{Chhayank Jain$^{1}$\orcidB{}, Sarthak Pattnaik$^{2}$\orcidA{},
+and Eugene Pinsky$^{2,}$*\orcidC{}}
 
 \AuthorNames{Chhayank Jain, Sarthak Pattnaik and Eugene Pinsky}
 
@@ -51,15 +64,13 @@
   $^{2}$ \quad Boston University, Boston, MA, USA; spattna1@bu.edu (S.P.); epinsky@bu.edu (E.P.)
 }
 
-\corres{Correspondence: cjain10@asu.edu}
+\corres{Correspondence: epinsky@bu.edu}
 
 % ==============================================================================
-% Abstract — keep it simple (no custom macros) so hyperref PDF metadata works
+% Abstract
 % ==============================================================================
 \abstract{
-LLM-based intelligent agents are increasingly deployed in production systems, yet their reliability under adverse conditions remains poorly characterized. We present AgentProbe, an open-source fault-injection and observability toolkit for systematically evaluating agent resilience. AgentProbe implements a five-category failure taxonomy---tool call faults, orchestration errors, context degradation, latency anomalies, and output consistency violations---with configurable injectors, OpenTelemetry-based tracing, and 55 standardized benchmark tasks spanning tool use, retrieval-augmented generation, and multi-agent coordination.
-%
-We apply AgentProbe to compare three agent frameworks---LangGraph, LangChain, and AutoGen---across 1{,}050 experiment runs (3 frameworks $\times$ 3 task types $\times$ 5 fault conditions $\times$ 10--30 runs) using Llama~3.1 8B via Ollama. Under fault injection, LangGraph and LangChain exhibit a 12.9\% failure rate [95\% CI: 10.1--16.3\%] with 79\% recovery, while AutoGen reports 0\% failures---a statistically significant difference ($p < 0.0001$, Cohen's $h = 0.73$). Trace analysis reveals that AutoGen's apparent resilience masks complete tool-execution bypass: the LLM responds without invoking tools, constituting a silent failure mode. LangGraph and LangChain show no significant difference ($p = 1.0$), recovering more effectively from rate-limit and API errors (86\%) than from timeouts and malformed outputs (73\%). These findings demonstrate that conventional pass/fail metrics can obscure critical architectural weaknesses, and that systematic fault injection is essential for evaluating agent reliability.
+LLM-based intelligent agents are increasingly deployed in production, yet their fault tolerance is poorly understood. We present AgentProbe, an open-source fault-injection and observability toolkit with a five-category failure taxonomy, configurable injectors, and OpenTelemetry tracing. We compare three frameworks---LangGraph, LangChain, and AutoGen---using Llama~3.1 8B via Ollama in a two-phase study. Phase~1 (1{,}050~runs) reveals that AutoGen never invokes tools due to a legacy API-parameter mismatch silently ignored by Ollama. Phase~2 patches AutoGen and re-executes 450~runs (30 per condition; the four fault types share a single seed and produce identical LangGraph/LangChain failure/recovery patterns, so these cells are not independent replications) with matched injection probability ($p = 0.20$) and answer-presence grading. Under injection, LangGraph and LangChain exhibit a 23.3\% error rate [95\%~Wilson~CI: 11.8--40.9\%] with 71.4\% recovery. AutoGen achieves 0\% error rate---its conversation protocol absorbs tool exceptions---but the expected answer string appears in only 33.3\% of assessable baseline questions versus 100\% for LangGraph/LangChain ($n = 12$ each; Llama~3.1 figure uses the historical answer extractor---see Section~7.7). A qualification experiment with guaranteed injection ($p = 1.0$) validates the pipeline via linked traces. Cross-model validation on Mistral~7B and Qwen2.5~7B shows consistent framework-level patterns across three architectures on one local backend. These results show that pass/fail metrics can hide silent tool bypass and error absorption, making fault injection with trace-level observability essential for evaluation.
 }
 
 \keyword{
@@ -67,37 +78,44 @@ We apply AgentProbe to compare three agent frameworks---LangGraph, LangChain, an
   multi-agent systems;
   agent-oriented architectures;
   Large Language Models (LLMs);
-  Chain of Thought (CoT);
   reliability benchmarking;
   fault injection;
-  observability;
-  sub-symbolic artificial intelligence
+  observability
 }
 
 % ==============================================================================
 \begin{document}
 
+\noindent\fbox{\parbox{0.97\textwidth}{%
+\textbf{Revision Key:}
+\rone{Magenta = changes addressing Reviewer~1},
+\rtwo{Blue = changes addressing Reviewer~2},
+\rthree{Green = changes addressing Reviewer~3},
+\rfour{Orange = changes addressing Reviewer~4}.
+Changes addressing multiple reviewers use the color of the primary reviewer.}}
+\vspace{6pt}
+
 % ============================================================================
 \section{Introduction}\label{sec:introduction}
 % ============================================================================
 
-The concept of intelligent agents---autonomous software entities that perceive their environment and act upon it to achieve delegated goals---has been a central thread in artificial intelligence research since the foundational work of McCarthy and Minsky~\cite{wooldridge2009introduction}. The agent-oriented paradigm, consolidated in the mid-1990s after two periods of reduced AI research activity, established a rigorous framework in which agents are characterized by autonomy, reactivity, proactivity, and social ability~\cite{wooldridge1995intelligent}. The Beliefs--Desires--Intentions (BDI) architecture emerged as a dominant model for rational decision-making, grounding agent behavior in a formalism derived from practical reasoning~\cite{rao1995bdi}.
+Intelligent agents---autonomous software entities that perceive their environment and act to achieve delegated goals---have been a central thread in AI research since at least the 1950s~\cite{wooldridge2009introduction}. The agent-oriented paradigm, consolidated in the mid-1990s, characterizes agents by autonomy, reactivity, proactivity, and social ability~\cite{wooldridge1995intelligent}. The Beliefs--Desires--Intentions (BDI) architecture became the dominant model for rational decision-making, grounding agent behavior in practical reasoning~\cite{rao1995bdi}.
 
-A new generation of intelligent agents has emerged with the advent of Large Language Models (LLMs). These \emph{AI agents} employ LLMs as reasoning engines, using architectures such as ReAct~\cite{yao2023react} and Chain of Thought (CoT)~\cite{wei2022chain} prompting to interleave reasoning with action execution. Unlike their symbolic BDI predecessors, these sub-symbolic agents derive their capabilities from statistical patterns learned during pre-training, enabling remarkable flexibility but introducing novel failure modes that lack formal characterization.
+Large Language Models (LLMs) have given rise to a new generation of agents. These \emph{AI agents} use LLMs as reasoning engines, interleaving reasoning with action execution through architectures like ReAct~\cite{yao2023react} and Chain of Thought prompting~\cite{wei2022chain}. Unlike symbolic BDI agents, they derive their capabilities from statistical patterns learned during pre-training---gaining flexibility but introducing failure modes that have no formal characterization.
 
-The deployment of LLM-based agents in production Internet-facing systems has accelerated rapidly. Agent-oriented frameworks such as LangGraph~\cite{langgraph2024}, LangChain~\cite{langchain2023}, and AutoGen~\cite{wu2023autogen} enable developers to build sophisticated multi-agent systems that coordinate tool use, retrieval-augmented generation (RAG), and inter-agent communication. However, the reliability of these systems under adverse conditions remains poorly understood. Production incident reports reveal recurring failure patterns---API timeouts cascading through agent loops, context window overflow causing hallucinated histories, orchestration deadlocks in multi-agent handoffs---yet no systematic methodology exists for reproducing, measuring, and comparing these failure modes across frameworks.
+Deployment of these agents in production has accelerated rapidly. Frameworks like LangGraph~\cite{langgraph2024}, LangChain~\cite{langchain2023}, and AutoGen~\cite{wu2023autogen} let developers build multi-agent systems that coordinate tool use, retrieval-augmented generation (RAG), and inter-agent communication. But how reliable are these systems under adverse conditions? Production incident reports point to recurring patterns: API timeouts cascading through agent loops, context overflow triggering hallucinated histories, and orchestration deadlocks in multi-agent handoffs. Systematic methodologies for reproducing and comparing these failures across frameworks remain scarce, and to our knowledge no existing open-source toolkit combines runtime fault injection with distributed tracing for LLM agent evaluation.
 
-This paper addresses this gap with three contributions:
+We address this gap with three contributions:
 
 \begin{enumerate}
   \item \textbf{A failure taxonomy for LLM-based agents.} We propose a five-category classification of failure modes observed in production agent systems: tool call faults, orchestration errors, context degradation, latency anomalies, and output consistency violations (\Cref{sec:taxonomy}).
 
-  \item \textbf{The \agentprobe{} toolkit.} We present an open-source Python toolkit that provides configurable fault injectors for each failure category, an observability layer built on OpenTelemetry~\cite{opentelemetry2024} for distributed tracing and metrics collection, and standardized benchmark tasks for reproducible evaluation (\Cref{sec:system}).
+  \item \textbf{The \agentprobe{} toolkit.} We present an open-source Python toolkit that provides configurable fault injectors for four injectable categories (consistency violations are detected, not injected), an observability layer built on OpenTelemetry~\cite{opentelemetry2024} for distributed tracing and metrics collection, and standardized benchmark tasks for reproducible evaluation (\Cref{sec:system}).
 
-  \item \textbf{A comparative empirical study.} We apply \agentprobe{} to evaluate three prominent agent-oriented frameworks---LangGraph, LangChain, and AutoGen---under controlled fault injection, revealing significant architectural differences in resilience and recovery behavior (\Cref{sec:experiments,sec:results}).
+  \item \textbf{A comparative empirical study.} We apply \agentprobe{} in a two-phase experiment to evaluate three prominent agent-oriented frameworks---LangGraph, LangChain, and AutoGen---under controlled fault injection, revealing an integration-level silent failure in Phase~1 and characterizing error-absorption behavior and answer-presence gaps after patching in Phase~2 (\Cref{sec:experiments,sec:results}).
 \end{enumerate}
 
-The remainder of this paper is organized as follows. \Cref{sec:related} reviews related work on agent reliability, fault injection, and LLM evaluation. \Cref{sec:taxonomy} presents our failure taxonomy. \Cref{sec:system} describes the \agentprobe{} system architecture. \Cref{sec:experiments} details our experimental methodology. \Cref{sec:results} presents and analyzes results. \Cref{sec:discussion} discusses implications for agent-oriented system design. \Cref{sec:conclusion} concludes with future directions.
+\Cref{sec:related} reviews related work. \Cref{sec:taxonomy} presents the failure taxonomy. \Cref{sec:system} describes \agentprobe{}'s architecture. \Cref{sec:experiments,sec:results} detail the experimental methodology and results. \Cref{sec:discussion} discusses implications for agent design, and \Cref{sec:conclusion} concludes with future directions.
 
 
 % ============================================================================
@@ -106,34 +124,40 @@ The remainder of this paper is organized as follows. \Cref{sec:related} reviews 
 
 \subsection{Agent-Oriented Architectures: From BDI to LLM Agents}
 
-The BDI model, formalized by Rao and Georgeff~\cite{rao1995bdi}, provides a theoretical foundation for rational agency based on mental attitudes. Implementations such as Jason~\cite{bordini2007programming} and JACK~\cite{winikoff2005jack} demonstrated the viability of symbolic agent architectures in multi-agent systems. These systems benefit from formal verification properties but struggle with the flexibility required for open-domain environments.
+The BDI model~\cite{rao1995bdi} provides a theoretical foundation for rational agency based on mental attitudes. Implementations like Jason~\cite{bordini2007programming} and JACK~\cite{winikoff2005jack} showed that symbolic agent architectures work in multi-agent settings. They benefit from formal verification but struggle with the flexibility that open-domain environments require.
 
-The emergence of LLM-based agents represents a paradigm shift from symbolic to sub-symbolic reasoning. The ReAct framework~\cite{yao2023react} demonstrated that LLMs can interleave reasoning traces with action execution, while Chain of Thought prompting~\cite{wei2022chain} showed that explicit reasoning steps improve task performance. Modern agent frameworks operationalize these ideas: LangGraph provides a stateful graph-based orchestration model, LangChain offers a composable chain abstraction, and AutoGen enables conversational multi-agent coordination~\cite{wu2023autogen}.
+LLM-based agents shift the paradigm from symbolic to sub-symbolic reasoning. ReAct~\cite{yao2023react} showed that LLMs can interleave reasoning traces with action execution; Chain of Thought prompting~\cite{wei2022chain} showed that explicit reasoning steps improve task performance. Modern frameworks operationalize these ideas: LangGraph provides stateful graph-based orchestration, LangChain offers composable chain abstractions, and AutoGen enables conversational multi-agent coordination~\cite{wu2023autogen}.
 
-Despite their flexibility, LLM-based agents lack the formal guarantees that BDI architectures provide. Stoyanov et al.\ have argued for integrating symbolic and sub-symbolic approaches to combine the strengths of both paradigms~\cite{stoyanov2024agents}. Our work contributes empirical evidence about where sub-symbolic agents fail, informing the design of such hybrid architectures.
+Despite their flexibility, LLM-based agents lack the formal guarantees of BDI architectures. Several authors have argued for integrating symbolic and sub-symbolic approaches~\cite{wooldridge2009introduction,garcez2023neurosymbolic}. Our experiments show concretely where sub-symbolic agents break down, providing data that can inform the design of such hybrid systems.
 
 \subsection{Reliability and Fault Injection}
 
-Fault injection has a long history in distributed systems research, from early work on hardware fault simulation~\cite{hsueh1997fault} to modern chaos engineering practices popularized by Netflix's Chaos Monkey~\cite{basiri2016chaos}. In the software domain, tools such as Chaos Toolkit~\cite{chaostoolkit2024} and Gremlin provide programmable fault injection for microservices architectures.
+Fault injection has a long history in distributed systems, from hardware fault simulation~\cite{hsueh1997fault} to chaos engineering as popularized by Netflix's Chaos Monkey~\cite{basiri2016chaos}. Tools like Chaos Toolkit~\cite{chaostoolkit2024} and Gremlin provide programmable fault injection for microservices.
 
-The application of fault injection to AI systems is comparatively nascent. Existing work has focused on adversarial robustness of neural networks~\cite{goodfellow2015explaining} and test-time perturbations for model evaluation~\cite{ribeiro2020beyond}. However, fault injection at the \emph{system level}---targeting the tools, orchestration logic, and infrastructure that surround the LLM---has received limited attention. \agentprobe{} fills this gap by providing fault injectors that operate at the agent-system boundary rather than at the model level.
+Applying these ideas to AI systems is comparatively new. Prior work has focused on adversarial robustness of neural networks~\cite{goodfellow2015explaining} and test-time perturbations~\cite{ribeiro2020beyond}. Fault injection at the \emph{system level}---targeting the tools, orchestration logic, and infrastructure that surround the LLM---has received little attention. \agentprobe{} addresses this by injecting faults at the agent-system boundary rather than at the model level. ToolEmu~\cite{ruan2024toolemu} takes a complementary approach, using an LLM to emulate tool execution in a sandbox for safety evaluation; it targets risk assessment rather than resilience under infrastructure faults.
 
 \subsection{LLM Evaluation and Benchmarking}
 
-Benchmarks for LLM capabilities have proliferated, including MMLU~\cite{hendrycks2021measuring}, HumanEval~\cite{chen2021evaluating}, and AgentBench~\cite{liu2023agentbench}. These focus primarily on task correctness under ideal conditions. Recent work on agent evaluation, such as $\tau$-bench~\cite{yao2024tau} and WebArena~\cite{zhou2024webarena}, introduces more realistic environments but does not systematically inject faults to assess resilience.
+Benchmarks for LLM capabilities have proliferated---MMLU~\cite{hendrycks2021measuring}, HumanEval~\cite{chen2021evaluating}, AgentBench~\cite{liu2023agentbench}---but they focus on task correctness under ideal conditions. Newer agent benchmarks like $\tau$-bench~\cite{yao2024tau}, WebArena~\cite{zhou2024webarena}, and the Berkeley Function Calling Leaderboard~\cite{patil2025bfcl} use realistic environments, yet to our knowledge none inject faults systematically to test resilience.
 
-Observability for LLM systems has been addressed by tools such as LangSmith, Weights \& Biases, and OpenLLMetry~\cite{openllmetry2024}, which provide tracing and logging. \agentprobe{} distinguishes itself by coupling observability with controlled fault injection, enabling causal analysis of failure modes rather than passive monitoring.
+{\color{magenta}Concurrently, Cemri et~al.~\cite{cemri2025mast} introduce MAST, an empirically grounded taxonomy of 14 multi-agent failure modes derived from 1{,}600+ annotated traces across seven MAS frameworks. Zhang et~al.~\cite{zhang2025failure} address the complementary problem of automated failure attribution in multi-agent systems. Their taxonomy emphasizes inter-agent coordination failures, complementing our taxonomy's focus on tool-call and infrastructure faults.}
+
+On the observability side, LangSmith, Weights \& Biases, and OpenLLMetry~\cite{openllmetry2024} provide tracing and logging for LLM systems.
+
+{\color{magenta}More recently, several concurrent efforts have begun addressing agent resilience directly. Gupta~\cite{reliabilitybench2026} introduces ReliabilityBench, which evaluates LLM agent reliability across consistency, robustness to perturbations, and fault tolerance under controlled tool/API failures, testing two models (Gemini~2.0 Flash, GPT-4o) across four domains. Iannillo et~al.~\cite{mcpinjector2026} provide MCP-Injector, a protocol-aware fault-injection middleware for Model Context Protocol stacks, and show in a 1{,}350-cell experiment that faults cause a 60\% drop in task-completion scores across two backbone sizes and three agent stacks. Mazumder and Lia~\cite{mazumder2026agentcheck} present AgentCheck, a reproduce--intervene--mitigate workbench for LLM agents over MCP. Jia et~al.~\cite{jia2026masfire} introduce MAS-FIRE, a fault-injection and reliability-evaluation framework for LLM-based multi-agent systems. Kraishan~\cite{kraishan2026loud} studies fault detection and recovery in tool-using agents, distinguishing loud (exception-raising) from quiet (silently incorrect) failure modes and finding that agents over-trust plausible but wrong tool outputs.}
+
+{\color{magenta}\agentprobe{} shares the fault-injection motivation with these efforts but differs in three respects: (1)~it uses OpenTelemetry-based distributed tracing to link injected faults to their downstream effects through span IDs, going beyond aggregate metrics; (2)~it evaluates multiple agent frameworks (LangGraph, LangChain, AutoGen) under the same seeded per-call injection mechanism and tracing infrastructure; and (3)~it is fully open-source with both injector and observer exposed as composable Python modules. ReliabilityBench and MCP-Injector do not provide OpenTelemetry integration; Kraishan focuses on detection/recovery taxonomy rather than cross-framework comparison.}
 
 
 % ============================================================================
 \section{Failure Taxonomy}\label{sec:taxonomy}
 % ============================================================================
 
-We propose a five-category failure taxonomy for LLM-based intelligent agents, derived from analysis of production incident reports, framework documentation, and community discussions. Each category captures a distinct failure surface in the agent-system architecture.
+We organize LLM agent failures into five categories, drawn from production incident reports, framework documentation, and community discussions. Each category targets a distinct surface in the agent-system architecture.
 
 \subsection{Tool Call Faults}
 
-Tool call faults occur at the boundary between the agent and external services or APIs. These are the most common failure mode in production agent systems, as agents typically rely on multiple external tools (search engines, databases, code executors) that may fail independently.
+Tool call faults occur at the boundary between the agent and external services. They are the most common failure mode in practice, since agents typically depend on multiple tools (search engines, databases, code executors) that can fail independently.
 
 \begin{itemize}
   \item \textbf{API Timeout:} The external service does not respond within the expected time window, causing the agent to block or retry indefinitely.
@@ -144,7 +168,7 @@ Tool call faults occur at the boundary between the agent and external services o
 
 \subsection{Orchestration Errors}
 
-Orchestration errors arise in the control flow logic that governs agent execution, particularly in multi-agent systems where coordination between agents introduces additional complexity.
+Orchestration errors arise in the control flow logic governing agent execution, especially in multi-agent systems where coordination adds complexity.
 
 \begin{itemize}
   \item \textbf{Infinite Loop:} The agent enters a cycle of repeated actions without making progress toward the goal, often caused by ambiguous termination conditions.
@@ -155,17 +179,17 @@ Orchestration errors arise in the control flow logic that governs agent executio
 
 \subsection{Context Degradation}
 
-Context degradation failures relate to the finite context window of LLMs and the challenge of maintaining coherent state across long interactions.
+Context degradation stems from the finite context window of LLMs and the difficulty of maintaining coherent state across long interactions.
 
 \begin{itemize}
   \item \textbf{Window Overflow:} The accumulated context exceeds the model's maximum token limit, causing truncation of earlier information that may be critical for task completion.
   \item \textbf{Lost State:} Important information from earlier in the conversation is effectively forgotten, even when technically within the context window, due to attention dilution.
-  \item \textbf{Hallucinated History:} The agent fabricates events or tool results that did not actually occur, confabulating a history that diverges from reality.
+  \item \textbf{Hallucinated History:} The agent fabricates events or tool results that never took place, confabulating a history that diverges from reality.
 \end{itemize}
 
 \subsection{Latency Anomalies}
 
-Latency anomalies capture performance degradation patterns that, while not causing outright failures, significantly impact the usability and reliability of agent systems in production.
+Latency anomalies do not cause outright failures but can degrade usability and reliability in production.
 
 \begin{itemize}
   \item \textbf{P99 Spike:} Tail latency increases dramatically for a subset of requests, often due to complex reasoning chains or large context processing.
@@ -176,13 +200,15 @@ Latency anomalies capture performance degradation patterns that, while not causi
 
 \subsection{Output Consistency Violations}
 
-Output consistency violations address the non-deterministic nature of LLM-based agents, where identical inputs may produce semantically different outputs across executions.
+Output consistency violations reflect the non-deterministic nature of LLM-based agents: identical inputs may produce semantically different outputs across runs.
 
 \begin{itemize}
   \item \textbf{Non-deterministic Outputs:} Given the same input and tool responses, the agent produces different final answers or takes different action sequences across runs, complicating testing and validation.
 \end{itemize}
 
 \Cref{tab:taxonomy} summarizes the taxonomy with the number of sub-types per category and the corresponding \agentprobe{} component that addresses each.
+
+\paragraph{Scope of the empirical evaluation.} {\color{magenta}The taxonomy is a theoretical contribution intended to guide future fault-injection research across all five categories. The experiments in this paper evaluate only the \emph{tool call faults} category (four sub-types), which we prioritize because tool calls are the primary interaction boundary between agents and external systems and the most common failure surface reported in production incident discussions. Injectors for orchestration errors and context degradation are implemented in the toolkit but have not been experimentally validated; the latency injector is implemented but was not used in the experiments (latency differences are observed as a byproduct of fault injection rather than independently controlled); and output consistency is detected by a lexical-divergence classifier only. Extending the empirical evaluation to additional categories is the most important direction for future work.}
 
 \begin{table}[htbp]
 \caption{Failure taxonomy summary. Each category maps to an \agentprobe{} injector module and is detected by the observer layer's failure classifier.}\label{tab:taxonomy}
@@ -207,22 +233,25 @@ Consistency   & non\_deterministic                              & 1 & classifier
 \section{System Architecture}\label{sec:system}
 % ============================================================================
 
-\agentprobe{} is designed as a modular Python toolkit with three core layers: fault injection, observability, and benchmarking.
+\agentprobe{} is a modular Python toolkit with three layers: fault injection, observability, and benchmarking.
 
 \subsection{Fault Injection Layer}
 
 The fault injection layer provides four injector modules, one for each injectable failure category (consistency violations are detected but not injected, as they arise from inherent model non-determinism).
 
-Each injector is implemented as a Python class that wraps the target component (e.g., a tool function or orchestration step) and injects failures with a configurable probability $p \in [0, 1]$. This probabilistic approach enables statistical analysis across multiple runs while maintaining realistic failure patterns.
+Each injector wraps a target component (e.g., a tool function) and injects failures with configurable probability $p \in [0, 1]$. Probabilistic injection allows statistical analysis across many runs while keeping failure patterns realistic. Every call is logged with the tool name, injection decision, any resulting exception, call latency, and a linked OpenTelemetry span ID.
 
 \begin{lstlisting}[caption={Example: Injecting tool call failures with configurable probability.},label={lst:injector}]
-from agentprobe.injector import ToolFailureInjector
-
-injector = ToolFailureInjector(
-    failure_type="timeout",
-    probability=0.3,
-    timeout_seconds=30.0
+from agentprobe.injector.tool_failure import (
+    ToolFailureConfig, ToolFailureType, ToolFailureInjector,
 )
+
+config = ToolFailureConfig(
+    failure_type=ToolFailureType.TIMEOUT,
+    failure_probability=0.3,
+    timeout_seconds=5.0,  # default is 30.0
+)
+injector = ToolFailureInjector(config)
 
 # Wrap an existing tool function
 @injector.wrap
@@ -231,7 +260,7 @@ def search_web(query: str) -> str:
 \end{lstlisting}
 
 \paragraph{Tool Failure Injector.}
-Simulates API timeouts (via \texttt{time.sleep} or \texttt{TimeoutError}), malformed outputs (by corrupting the return value), rate limit responses (via \texttt{RateLimitError} exceptions), and generic API errors.
+Simulates API timeouts (via \texttt{time.sleep} followed by \texttt{TimeoutError}), malformed-output exceptions (via \texttt{ValueError}), rate-limit responses (via \texttt{RateLimitError}), and generic API errors. All four sub-types raise Python exceptions at the tool-call boundary; none injects corrupted data into the agent's context. The ``malformed output'' label describes the simulated \emph{cause} (a garbled upstream response), but the agent experiences it as an exception, making its effect equivalent to the other fault types. We note this scope limitation and discuss its implications in \Cref{sec:discussion}.
 
 \paragraph{Orchestration Failure Injector.}
 Injects infinite loop conditions (by manipulating termination flags), wrong branching (by altering routing decisions), state corruption (by modifying shared state dictionaries), and missing handoffs (by dropping inter-agent messages).
@@ -244,7 +273,7 @@ Introduces controlled delays to simulate P99 spikes (large random delays), casca
 
 \subsection{Observability Layer}
 
-The observability layer provides distributed tracing and metrics collection using the OpenTelemetry standard~\cite{opentelemetry2024}. It consists of two components:
+The observability layer provides distributed tracing and metrics collection via OpenTelemetry~\cite{opentelemetry2024}:
 
 \paragraph{Tracer.}
 The \texttt{AgentTracer} class instruments agent execution with OpenTelemetry spans, capturing:
@@ -255,47 +284,50 @@ The \texttt{AgentTracer} class instruments agent execution with OpenTelemetry sp
   \item Injected failures (type, timing, and recovery outcome)
 \end{itemize}
 
-Traces are exported via OTLP (OpenTelemetry Protocol) to backends such as Jaeger for visualization and analysis.
+Traces are exported via OTLP (OpenTelemetry Protocol) to backends such as Jaeger for visualization and analysis. For offline validation, an \texttt{InMemorySpanExporter} captures spans as serializable records with trace IDs, span IDs, parent relationships, and timing---enabling post-hoc verification that tool calls, fault injections, and agent responses share a linked trace (\Cref{sec:qualification}).
 
 \paragraph{Failure Classifier.}
-The \texttt{FailureClassifier} analyzes completed agent traces and classifies observed failures according to the taxonomy in \Cref{sec:taxonomy}. Classification is rule-based, matching exception types and trace patterns to failure categories. This enables automated aggregation of failure statistics across experiment runs.
+The \texttt{FailureClassifier} analyzes completed agent traces and classifies observed failures according to the taxonomy in \Cref{sec:taxonomy}. Classification is rule-based, matching exception types and trace patterns to failure categories. For output consistency (Category~5), the classifier uses token-level Jaccard similarity to detect lexical divergence between paired outputs; this is a surface-level heuristic that can miss semantically significant factual changes (e.g., a city name swap in a long answer) while flagging equivalent paraphrases. The classifier enables automated aggregation of failure statistics across experiment runs but is not used for the main reported metrics.
 
 \subsection{Benchmark Layer}
 
-The benchmark layer provides standardized tasks and evaluation metrics for reproducible agent assessment.
+The benchmark layer provides standardized tasks and metrics for reproducible assessment.
 
 \paragraph{Task Suites.}
-Three task suites cover the primary capabilities of LLM-based agents:
+Three query groups exercise different prompt complexity levels. All groups are dispatched through the same agent pipeline (tool-augmented single invocation for LangGraph/LangChain; UserProxy--AssistantAgent conversation for AutoGen); the groups differ only in query content:
 
 \begin{itemize}
-  \item \textbf{Tool Use} (25 queries): tasks requiring the agent to select and invoke appropriate tools, ranging from simple lookups to multi-step tool chains involving web search and calculation.
-  \item \textbf{Retrieval-Augmented Generation} (15 queries): questions that require retrieving information from a 10-document corpus covering agent reliability topics before generating an answer.
-  \item \textbf{Multi-Agent Coordination} (15 queries): scenarios requiring a researcher--analyst pipeline to collaborate, with the researcher gathering information and the analyst synthesizing results.
+  \item \textbf{Tool Use} (5 queries): factual lookups and calculations that benefit from web search and calculator tool calls.
+  \item \textbf{RAG-Style} (5 queries): knowledge-intensive questions about agent reliability topics, designed to elicit retrieval tool use. (The toolkit defines a \texttt{RAGTask} class with corpus retrieval, but the benchmark runner dispatches these queries through the same tool-augmented agent as other groups; no separate retrieval pipeline is instantiated.)
+  \item \textbf{Multi-Agent-Style} (5 queries): open-ended research-and-synthesis prompts that tend to produce longer, multi-step responses. (The toolkit defines a \texttt{MultiAgentTask} with a researcher--analyst pipeline descriptor, but the benchmark runner does not instantiate a multi-agent graph for LangGraph/LangChain; only AutoGen's adapter is inherently multi-agent for all query groups.)
 \end{itemize}
 
 \paragraph{Metrics.}
-\agentprobe{} computes the following metrics for each experiment run:
+\agentprobe{} computes the following metrics for each experiment condition:
 
 \begin{itemize}
-  \item \textbf{Success Rate ($SR$):} Fraction of tasks completed correctly.
-  \item \textbf{Mean Completion Time ($\bar{T}$):} Average wall-clock time per task.
-  \item \textbf{Recovery Rate ($RR$):} Fraction of injected failures from which the agent successfully recovers.
-  \item \textbf{Token Efficiency ($\eta$):} Ratio of useful output tokens to total tokens consumed.
-  \item \textbf{Failure Cascade Depth ($D$):} Number of subsequent failures triggered by an initial injected fault.
-  \item \textbf{Consistency Score ($C$):} Semantic similarity between outputs across repeated runs of the same task (measured via embedding cosine similarity).
+  \item {\color{orange!80!black}\textbf{Initial Exception Rate ($ER$):} Fraction of runs in which the initial \texttt{agent.invoke()} call raised an unhandled exception under injection conditions. This captures all unhandled exceptions, not per-trial causal attribution to injected faults.}
+  \item {\color{orange!80!black}\textbf{Keyword Pass Rate ($KW$):} Fraction of runs whose output contains expected keywords for the given query, assessed by the toolkit's \texttt{ResponseGrader}. This is a proxy for task compliance rather than strict factual correctness.}
+  \item {\color{orange!80!black}\textbf{Answer-String Presence ($AC$):} For queries with verifiable ground truth, whether the agent's output contains the expected answer substring (e.g., ``paris'' or ``127.05''). This is neither necessary nor sufficient for a correct answer: it can produce false positives (e.g., ``12000 is incorrect'') and false negatives (e.g., a Chinese-language response for Paris). Only 2 of the 5 tool-use queries have unambiguous ground-truth answers; the remaining 3 are open-ended. We report this metric only on the assessable subset.}
+  \item \rfour{\textbf{Mean Completion Time ($\bar{T}$):} Average wall-clock time per task.}
+  \item {\color{orange!80!black}\textbf{Recovery Rate ($RR$):} Fraction of initial failures from which the agent successfully recovers via a single retry. Undefined (N/A) when no failures occur in a condition.}
 \end{itemize}
 
+\noindent The present study reports $ER$, $KW$, $AC$, $\bar{T}$, and $RR$. Additional metrics---token efficiency, failure cascade depth, and cross-run consistency---are defined in the failure taxonomy as desirable measurements but are not yet implemented in the metrics module and are not reported here.
+
 \paragraph{Benchmark Runner.}
-The \texttt{BenchmarkRunner} orchestrates experiment execution, managing the lifecycle of injectors, tracers, and task evaluation. It supports configurable parameters including the number of runs per condition, failure injection probability, and framework selection.
+The \texttt{BenchmarkRunner} orchestrates experiment execution, managing the lifecycle of injectors, tracers, and task evaluation. It supports configurable parameters including the number of runs per condition, failure injection probability, and framework selection. Per-condition checkpointing ensures that partial results survive process interruptions.
 
 
 % ============================================================================
 \section{Experimental Methodology}\label{sec:experiments}
 % ============================================================================
 
+Our study has two phases. Phase~1 is exploratory: it uncovers an integration-level silent failure. Phase~2 patches that bug and reruns a focused experiment with matched injection probabilities and answer-presence grading. A separate qualification experiment validates the adapter-level pipeline (tool execution, fault injection, trace linkage) using deterministic tasks.
+
 \subsection{Frameworks Under Test}
 
-We evaluate three agent-oriented frameworks that represent distinct architectural approaches:
+We evaluate three frameworks with distinct architectural approaches:
 
 \begin{itemize}
   \item \textbf{LangGraph}~\cite{langgraph2024}: A stateful, graph-based orchestration framework where agent behavior is defined as a directed graph of nodes (actions) and edges (transitions). Supports cycles, conditional branching, and persistent state.
@@ -305,17 +337,54 @@ We evaluate three agent-oriented frameworks that represent distinct architectura
   \item \textbf{AutoGen}~\cite{wu2023autogen}: A conversational multi-agent framework where agents interact through structured message passing. Supports flexible agent roles and conversation patterns.
 \end{itemize}
 
-\subsection{Experimental Setup}
+\subsection{Common Configuration}
 
-All experiments use the following configuration:
+Both phases share the following setup:
 
 \begin{itemize}
-  \item \textbf{LLM Backend:} Llama~3.1 8B (Q4\_K\_M quantization) served locally via Ollama~0.1.
-  \item \textbf{Hardware:} Apple M-series, 16\,GB RAM, macOS~15.
-  \item \textbf{Runs per Condition:} 30 independent runs for LangGraph and LangChain; 10 for AutoGen (where the architectural finding is unambiguous at any sample size).
-  \item \textbf{Failure Injection Probability:} $p = 0.20$ for timeout and malformed output; $p = 0.15$ for rate limit and API error. Seed fixed at 42 for reproducibility.
-  \item \textbf{Task Suites:} All three suites---tool use (25 queries), RAG (15 queries), multi-agent (15 queries)---for a total of 55 benchmark tasks.
-  \item \textbf{Failure Types:} Each tool call fault sub-type (timeout, malformed output, rate limit, API error) injected independently, plus a no-injection baseline.
+  \item \textbf{LLM Backend:} Llama~3.1 8B (Q4\_K\_M quantization, Ollama digest prefix \texttt{46e0c10c039e}, identified post-hoc from the same installation) served locally via Ollama~0.31.1. A cross-model validation (\Cref{sec:cross-model}) repeats the qualification and Phase~2 protocol on Mistral~7B (Q4\_K\_M, digest \texttt{6577803aa9a0})~\cite{mistral2024} and Qwen2.5~7B (Q4\_K\_M, digest \texttt{845dbda0ea48})~\cite{qwen25_2024}. Digests were not recorded at experiment time; the historical \texttt{experiment\_metadata.json} files list \texttt{model\_digest:~unknown}. All three models report \texttt{tools} capability in Ollama.
+  \item {\color{blue}\textbf{Hardware:} Apple M-series, 16\,GB unified memory, macOS~27. No discrete GPU was present; GPU/Metal offload settings were not recorded at experiment time.}
+  \item {\color{blue}\textbf{Framework Versions:} LangGraph~1.2.0, LangChain~1.3.1, langchain-core~1.4.0, pyautogen~0.1.14, openai~0.28.1. The complete installed-version list is recorded in per-batch \texttt{experiment\_metadata.json} files in the repository.}
+  \item \textbf{Response Caching:} pyautogen~0.1.14 caches LLM responses via \texttt{diskcache} by default. {\color{orange}Phase~1 did not clear the cache between runs; Phase~2 and all subsequent experiments attempt to clear the cache before each invocation via \texttt{Completion.clear\_cache()}; the adapter silently continues if clearing fails, so cache-free inference is not guaranteed by this mechanism alone. Despite the missing cache-clearing in Phase~1, no millisecond-scale total invocation latencies were observed: all 150 Phase~1 AutoGen runs have latencies between 6.8\,s and 317\,s, with zero sub-5\,s runs. Request-level cache hits within a multi-turn conversation were not recorded.}
+  \item \textbf{Random Seed:} 42 for injection sequence control. Ollama does not fix a sampling seed, so repeated runs produce different model outputs.
+  \item \textbf{Recovery Procedure:} After a failed run (unhandled exception), the harness immediately retries \texttt{agent.invoke()} once with the same input (\texttt{recovery\_attempts\,=\,1}). No backoff is applied. The fault injector remains active during the retry, so the retry may also encounter an injected fault (with the same per-call probability). A run is marked as \emph{recovered} if the retry completes without exception.
+  \item \textbf{Error Detection:} A run is recorded as an \emph{error} if the initial \texttt{agent.invoke()} call raises an unhandled exception. This captures all unhandled exceptions under injection conditions, including any unrelated errors; we therefore report ``initial exception rate under injection conditions'' rather than claiming per-trial causal attribution to injected faults.
+\end{itemize}
+
+\subsection{Phase 1: Exploratory Experiment}\label{sec:phase1-method}
+
+Phase~1 evaluates all three query groups across all three frameworks:
+
+\begin{itemize}
+  \item \textbf{Runs per Condition:} 30 for LangGraph and LangChain; 10 for AutoGen (constrained by its multi-turn protocol overhead, which makes each run approximately 11$\times$ slower on average: mean first-attempt latency 84.9\,s for AutoGen vs 7.5--7.7\,s for LangGraph/LangChain across all 1{,}050 Phase~1 trials). Each run cycles through 5 queries per task type via round-robin assignment.
+  \item \textbf{Failure Injection Probability:} $p = 0.20$ for timeout and malformed output; $p = 0.15$ for rate limit and API error.
+  \item \textbf{Query Groups:} All three---tool use (5 queries), RAG-style (5 queries), multi-agent-style (5 queries)---for 15 queries total.
+  \item \textbf{Conditions:} $3~\text{frameworks} \times 3~\text{task types} \times 5~\text{fault conditions} = 45$ conditions (15 per framework), yielding $(15 \times 30) + (15 \times 30) + (15 \times 10) = 1{,}050$ total runs (LangGraph + LangChain at $n = 30$, AutoGen at $n = 10$).
+  \item \textbf{Correctness Grading:} Not active; only error rate and recovery are measured.
+\end{itemize}
+
+\subsection{Phase 2: Patched Validation Experiment}\label{sec:phase2-method}
+
+{\color{magenta}Phase~1 trace analysis revealed that AutoGen never invoked tools (\Cref{sec:phase1-results}). We implemented a compatibility patch (\texttt{\_patch\_openai\_compat()}) that translates between pyautogen's legacy \texttt{functions} parameter and Ollama's \texttt{tools} parameter, and converts \texttt{tool\_calls} responses back to \texttt{function\_call} format for pyautogen's execution loop. Phase~2 reruns the experiment with this patch applied:}
+
+\begin{itemize}
+  \item \textbf{Runs per Condition:} 30 for all three frameworks (symmetric).
+  \item \textbf{Failure Injection Probability:} $p = 0.20$ for all four fault types (matched, addressing the Phase~1 confound).
+  \item \textbf{Query Group:} Tool use only (5 queries). We restrict to tool-use tasks to isolate the effect of the patched tool-calling path; RAG-style and multi-agent-style queries remain untested in Phase~2.
+  \item \textbf{Conditions:} $3~\text{frameworks} \times 1~\text{task type} \times 5~\text{fault conditions} = 15$ conditions, yielding $15 \times 30 = 450$ total runs.
+  \item \textbf{Correctness Grading:} Active. The \texttt{ResponseGrader} checks keyword compliance; answer-string presence is adjudicated post-hoc by checking whether the saved output contains the expected ground-truth substring, on the two assessable queries (indices~0 and~2 in the tool-use suite: ``What is the capital of France?'' and ``Calculate 15\% of 847''). Correct-answer presence does not prove required tool use.
+  \item \textbf{Timeout Budget:} The benchmark harness enforces a 120-second wall-clock timeout per invocation. Timeout injection imposes a 5-second \texttt{time.sleep} before raising; the other three fault types raise immediately. pyautogen's per-request timeout (\texttt{Completion.request\_timeout}) remains at its default 60~seconds.
+\end{itemize}
+
+\subsection{Qualification Experiment}\label{sec:qualification-method}
+
+{\color{magenta}To validate the adapter-level pipeline---tool execution, fault injection, answer-string presence, and trace linkage---we run a small qualification experiment with deterministic tasks (this validates the injector and agent adapters but not runner-level timeout or retry behavior):}
+
+\begin{itemize}
+  \item \textbf{Tasks:} Two calculator queries with known ground truth: ``Compute $7919 \times 6841$'' (expected: 54{,}173{,}879) and ``Compute $3571 + 8429$'' (expected: 12{,}000). The explicit tool-call event is the evidence of tool execution, not the arithmetic difficulty of the query.
+  \item \textbf{Phases:} (a)~Baseline ($p = 0$): verifies, on the same log record, that the required tool was called by registered name, that the call arguments contain the complete expected expression (e.g., \texttt{3571 + 8429}, not merely an operand fragment), that the tool's return value equals the expected answer, and that the final output contains the answer. (b)~Guaranteed fault ($p = 1.0$, API error 503): verifies that a fault was injected at the required tool boundary.
+  \item \textbf{Tracing:} OpenTelemetry \texttt{InMemorySpanExporter} captures all spans, which are serialized to JSON with trace IDs, span IDs, and parent relationships.
+  \item \textbf{Trials:} $3~\text{frameworks} \times 2~\text{tasks} \times 2~\text{phases} = 12$ trials.
 \end{itemize}
 
 \subsection{Experimental Conditions}
@@ -325,153 +394,375 @@ We define the following experimental conditions for each framework:
 \begin{enumerate}
   \item \textbf{Baseline} ($C_0$): No fault injection. Establishes the framework's performance under ideal conditions.
   \item \textbf{Timeout Injection} ($C_1$): Tool calls may time out with probability $p$.
-  \item \textbf{Malformed Output Injection} ($C_2$): Tool calls may return malformed responses with probability $p$.
+  \item \textbf{Malformed Output Injection} ($C_2$): Tool calls may raise a \texttt{ValueError} exception with probability $p$ (simulating a malformed upstream response; see \Cref{sec:discussion} for scope).
   \item \textbf{Rate Limit Injection} ($C_3$): Tool calls may return rate limit errors with probability $p$.
   \item \textbf{API Error Injection} ($C_4$): Tool calls may return generic API errors with probability $p$.
 \end{enumerate}
 
-This yields $3 \times 5 = 15$ experimental conditions per framework, for a total of $15 \times 30 + 15 \times 30 + 15 \times 10 = 1{,}050$ experiment runs across all three frameworks.
-
 \subsection{Statistical Analysis}
 
-We report 95\% confidence intervals for all metrics: Wilson score intervals for proportions (failure rate, recovery rate) and $t$-distribution intervals for continuous measures (latency). Pairwise comparisons between frameworks use Fisher's exact test or the chi-squared test (with Yates' correction) for proportions, and the Mann--Whitney $U$ test for latency distributions. The Kruskal--Wallis $H$ test is used as an omnibus test when comparing three or more groups. Effect sizes are reported using Cohen's $h$ for proportions and Cohen's $d$ for continuous measures.
+We report Wilson score 95\% confidence intervals for proportions (error rate, recovery rate). Each CI is computed on the per-condition denominator (e.g., $n = 30$ trials for error rate, $n = k$ failures for recovery rate where $k$ is the observed failure count); we do not pool across fault types because the four conditions share the same seed and produce identical failure sets within each model. Recovery rate is reported as undefined (N/A) when no failures occur in a condition, rather than as 0\%.
+
+{\color{orange}\textbf{Dependence across conditions.} Because the four injection conditions ($C_1$--$C_4$) share seed~42 and LangGraph/LangChain share the same underlying execution path (\Cref{sec:lg-lc-convergence}), the eight LangGraph/LangChain injection cells in \Cref{tab:phase2-error} exhibit identical failure and recovery counts (7/30 failures, 5/7 recoveries). The shared seed means these cells reflect one failure/recovery pattern, not eight independent replications. Individual runs still differ in model output, latency, and answer content (the 450 executions are real), but the fault-injection trigger sequence and exception-propagation path are common across conditions. We retain the per-condition breakdown for transparency but caution against interpreting the uniform counts as independent evidence.}
 
 
 % ============================================================================
 \section{Results}\label{sec:results}
 % ============================================================================
 
-A total of 1{,}050 experiment runs were completed across all conditions. Full results data and analysis scripts are available in the project repository. \Cref{fig:dashboard} provides a high-level summary of the key results.
+\subsection{Phase 1: Integration Bug Discovery}\label{sec:phase1-results}
 
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{../experiments/plots/summary_dashboard.png}
-  \caption{Summary dashboard showing cross-framework reliability comparison: (a)~overall failure rate, (b)~recovery rate under injection conditions, (c)~mean baseline latency (no injection), and (d)~P99 baseline latency by task type. Panels (c) and (d) use baseline-only data to avoid conflating real LLM inference latency with AutoGen's near-zero injection latency caused by tool bypass. Based on 1{,}050 runs across LangGraph, LangChain, and AutoGen with Llama~3.1 via Ollama.}\label{fig:dashboard}
-\end{figure}
+Phase~1 completed 1{,}050 runs across 45 conditions. Full data are in the project repository; the key findings follow.
 
-\subsection{Baseline Performance}
+\paragraph{LangGraph and LangChain.} Under fault injection, both frameworks exhibit an initial exception rate of 16.1\% [95\%~Wilson~CI: 12.7--20.3\%] across 360 injection runs each, with 83\% overall recovery. These two frameworks produce identical failure counts, because LangChain~1.3 delegates agent execution to LangGraph internally. Source inspection confirms that both wrappers use the same underlying execution path; the identical counts are consistent with shared code rather than coincidental equivalence.
 
-Under baseline conditions (no fault injection), all three frameworks achieve a 0\% failure rate [95\%~CI: 0.0--4.1\%] across all task types ($n = 90$ per framework for LangGraph/LangChain, $n = 30$ for AutoGen). Mean latency varies by task: tool use is fastest (LangGraph: 6.1\,s, LangChain: 6.0\,s), followed by RAG (8.0\,s, 11.4\,s) and multi-agent coordination (11.7\,s, 10.7\,s). AutoGen exhibits substantially higher and more variable latency, with mean latency ranging from 10.9\,s for tool use to 76.1\,s for multi-agent tasks, reflecting the overhead of its conversation-based protocol.
+\paragraph{AutoGen: Silent tool bypass.} AutoGen shows a 5.8\% error rate under injection [95\%~CI: 2.9--11.6\%, $n = 120$], but trace analysis reveals that the LLM never invokes tools. pyautogen~0.1.14 sends tool definitions using the legacy \texttt{functions} parameter, which Ollama's OpenAI-compatible endpoint silently ignores. Llama~3.1 never receives the formatting cue it needs to emit a tool-call JSON block, so it answers every query from parametric knowledge alone and the fault injectors are never triggered. This is an ecosystem integration bug---a mismatch between the client library's API schema and the inference server's supported parameters. Ollama issue~\#3927 reports related silent parameter-dropping behavior, though we have not confirmed the exact internal code path.\footnote{See \url{https://github.com/ollama/ollama/issues/3927}. AutoGen issue~\#4225 (\url{https://github.com/microsoft/autogen/issues/4225}) reports a related dependency failure but does not document the exact silent-schema mismatch observed here.} AutoGen's errors are entirely conversation-protocol timeouts from pyautogen's 60-second per-request limit, unrelated to injected faults.
 
-\subsection{Fault Tolerance Comparison}
+\paragraph{Motivation for Phase~2.} Phase~1 AutoGen results are uninterpretable for fault-tolerance comparison because the injected faults never fire. The asymmetric probabilities ($p = 0.15$ vs $p = 0.20$) also confound fault-type comparisons, and answer-presence grading was not active. Phase~2 fixes all three issues.
 
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{../experiments/plots/failure_rate_by_framework.png}
-  \caption{Failure rate by framework and injection type. LangGraph and LangChain show matched failure rates under all injection conditions, while AutoGen reports 0\% across all conditions due to tool-execution bypass. Error bars omitted for clarity; 95\% Wilson score CIs are reported in the text.}\label{fig:sr_comparison}
-\end{figure}
 
-Under fault injection, LangGraph and LangChain both exhibit an overall failure rate of 12.9\% [95\%~CI: 10.1--16.3\%], with 58 failures out of 450 runs each. Timeout and malformed output injection produce failure rates of 16.7\% [10.4--25.7\%], while rate limit and API error injection yield 15.6\% [9.5--24.4\%]. The difference between LangGraph and LangChain is not statistically significant ($\chi^2$ test with Yates' correction, $p = 1.0$, Cohen's $h = 0.000$, negligible effect). This is expected: LangChain~v1.3+ internally delegates to LangGraph for agent execution, making them architecturally equivalent at the tool-calling layer.
+\subsection{Phase 2: Patched Experiment}\label{sec:phase2-results}
 
-AutoGen reports 0\% failure across all conditions [95\%~CI: 0.0--2.5\%, $n = 150$]. The difference versus LangGraph/LangChain is highly significant ($\chi^2$, $p < 0.0001$, Cohen's $h = 0.73$, medium effect).
+Phase~2 completed all 450 planned runs (3~frameworks $\times$ 5~conditions $\times$ 30~runs) with no skipped trials.
 
-\subsection{The Silent Failure Phenomenon}
+\subsubsection{Baseline Performance}
 
-Closer inspection of AutoGen traces reveals that the 0\% failure rate is an artifact: AutoGen with Llama~3.1 via Ollama does not produce function-call-formatted responses. The LLM responds directly to queries without invoking any tools, so the fault injectors are never triggered. This constitutes a \emph{silent failure}---the agent appears resilient but is not actually using its tools, producing answers from parametric knowledge alone.
+Under baseline conditions ($C_0$, no fault injection), all three frameworks achieve a 0\% error rate [95\%~Wilson~CI: 0.0--11.4\%, $n = 30$ each]. Mean latency varies: LangGraph 6.1\,s, LangChain 8.4\,s, AutoGen 16.4\,s. AutoGen's higher latency reflects its multi-turn conversation protocol, which exchanges multiple messages between UserProxy and AssistantAgent even for simple queries, compared to the single-invocation pattern used by LangGraph/LangChain.
 
-This finding underscores a critical limitation of pass/fail metrics: an agent that bypasses its tools entirely will show perfect scores on fault-injection benchmarks while potentially producing less accurate or less grounded answers. AgentProbe's observability layer detects this through tool invocation counts in the trace data.
+\subsubsection{Fault Tolerance}\label{sec:phase2-fault}
 
-\subsection{Recovery Behavior}
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{../experiments/plots/recovery_rate_heatmap.png}
-  \caption{Recovery rate heatmap by framework and failure type. Rate limit and API error conditions show higher recovery (86\%) than timeout and malformed output (73\%). AutoGen shows N/A (no failures to recover from).}\label{fig:recovery}
-\end{figure}
-
-For LangGraph and LangChain, recovery rates differ by failure type. Rate limit and API error injections yield 86\% recovery, while timeout and malformed output injections yield 73\% recovery. This pattern is consistent across both frameworks and all task types: transient errors that produce clear error signals (HTTP~429, 503) are more recoverable than timeouts (which block execution) and malformed outputs (which may propagate silently through the reasoning chain).
-
-\subsection{Latency Impact}
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=0.8\textwidth]{../experiments/plots/latency_comparison.png}
-  \caption{P99 latency distribution across frameworks. The omnibus Kruskal--Wallis test indicates a significant difference ($H = 11.65$, $p = 0.003$), driven by AutoGen's high variance in baseline conditions.}\label{fig:latency}
-\end{figure}
-
-Under baseline conditions (no injection), latency differs substantially across frameworks. LangGraph and LangChain exhibit similar mean latencies (8.6\,s and 9.4\,s respectively), while AutoGen is significantly slower (38.3\,s mean), with P99 reaching 149\,s for multi-agent tasks. The omnibus Kruskal--Wallis test confirms a significant difference in latency distributions ($H = 11.65$, $p = 0.003$). AutoGen's conversation-based protocol incurs substantial overhead for real LLM inference. Under injection conditions, AutoGen exhibits near-zero latency (6--27\,ms) because the agent bypasses tool execution entirely, producing fast but ungrounded responses---a further manifestation of the silent failure phenomenon.
-
-\subsection{Summary of Statistical Comparisons}
+\Cref{tab:phase2-error} summarizes error rates under injection.
 
 \begin{table}[htbp]
-\caption{Pairwise statistical comparisons between frameworks. Failure rate comparisons use the chi-squared test with Yates' correction; latency comparisons use the Mann--Whitney $U$ test.}\label{tab:pairwise}
+\caption{Phase~2 initial exception rate by framework and injection type (tool-use task, $n = 30$ per cell, $p = 0.20$ for all types). Recovery rate is the fraction of initial failures recovered via a single retry; N/A indicates no failures occurred.}\label{tab:phase2-error}
 \centering
-\resizebox{\textwidth}{!}{%
 \begin{tabular}{llcccc}
 \toprule
-\textbf{Comparison} & \textbf{Metric} & \textbf{Test} & \textbf{$p$-value} & \textbf{Effect Size} & \textbf{Magnitude} \\
+\textbf{Framework} & \textbf{Condition} & \textbf{Failures} & \textbf{Error Rate} & \textbf{Recovered} & \textbf{Recovery} \\
 \midrule
-AutoGen vs LangChain   & Failure rate & $\chi^2$ (Yates) & $< 0.0001$ & $h = 0.73$ & Medium \\
-AutoGen vs LangGraph   & Failure rate & $\chi^2$ (Yates) & $< 0.0001$ & $h = 0.73$ & Medium \\
-LangChain vs LangGraph & Failure rate & $\chi^2$ (Yates) & $1.0$       & $h = 0.00$ & Negligible \\
+LangGraph  & Baseline        & 0  & 0.0\%  & N/A & N/A \\
+           & Timeout         & 7  & 23.3\% & 5   & 71.4\% \\
+           & Malformed       & 7  & 23.3\% & 5   & 71.4\% \\
+           & Rate Limit      & 7  & 23.3\% & 5   & 71.4\% \\
+           & API Error       & 7  & 23.3\% & 5   & 71.4\% \\
 \midrule
-AutoGen vs LangChain   & Latency & Mann--Whitney $U$ & $0.004$ & $d = 0.01$ & Negligible \\
-AutoGen vs LangGraph   & Latency & Mann--Whitney $U$ & $0.005$ & $d = 0.00$ & Negligible \\
-LangChain vs LangGraph & Latency & Mann--Whitney $U$ & $0.245$ & $d = 0.09$ & Negligible \\
+LangChain  & Baseline        & 0  & 0.0\%  & N/A & N/A \\
+           & Timeout         & 7  & 23.3\% & 5   & 71.4\% \\
+           & Malformed       & 7  & 23.3\% & 5   & 71.4\% \\
+           & Rate Limit      & 7  & 23.3\% & 5   & 71.4\% \\
+           & API Error       & 7  & 23.3\% & 5   & 71.4\% \\
+\midrule
+AutoGen    & Baseline        & 0  & 0.0\%  & N/A & N/A \\
+           & Timeout         & 0  & 0.0\%  & N/A & N/A \\
+           & Malformed       & 0  & 0.0\%  & N/A & N/A \\
+           & Rate Limit      & 0  & 0.0\%  & N/A & N/A \\
+           & API Error       & 0  & 0.0\%  & N/A & N/A \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular}
 \end{table}
+
+\paragraph{LangGraph and LangChain.} Both frameworks show a 23.3\% error rate [95\%~Wilson~CI: 11.8--40.9\%] in every injection condition, with 71.4\% recovery [35.9--91.8\%] across all four fault types. The uniform error rate across fault types reflects the matched injection probability ($p = 0.20$) and the same seed: all four sub-types raise exceptions at the tool-call boundary. Timeout injection additionally imposes a 5-second \texttt{time.sleep} before raising, but the three other types raise immediately. The exception content does not reach the LLM in any case. Despite the additional delay, the same error and recovery counts were observed for timeout as for the other types in this particular seed/schedule; this does not establish that timing has no independent effect in general. The identical counts between LangGraph and LangChain confirm the shared implementation observed in Phase~1.
+
+\paragraph{AutoGen: Error absorption.} AutoGen achieves a 0\% error rate [95\%~Wilson~CI: 0.0--11.4\%, $n = 30$] under every injection condition, including all four fault types. With the compatibility patch applied, AutoGen now executes tools---the injector log records 79--83 tool calls per condition with 15 recorded injections each (approximately 18--19\% of calls under the fixed seed, versus the configured $p = 0.20$). However, unlike LangGraph/LangChain, where an injected exception propagates as an unhandled error, AutoGen's adapter returns the tool error as a function-response message to the AssistantAgent, which continues the conversation rather than crashing. This difference in exception-handling behavior is specific to the tested configuration (pyautogen~0.1.14 with Ollama); whether it generalizes to all conversation-based versus graph-based architectures requires testing additional frameworks and backends.
+
+\subsubsection{Answer-String Presence}\label{sec:phase2-correctness}
+
+Error rate measures survival, not quality. \Cref{tab:phase2-correctness} breaks down answer-string presence on the two assessable queries.
+
+\begin{table}[htbp]
+\caption{Answer-string presence on assessable queries (tool-use baseline, $C_0$). Only 2 of 5 queries have verifiable ground truth; each repeats 6 times in 30 runs (round-robin over 5 queries). $n = 12$ assessable trials per framework.}\label{tab:phase2-correctness}
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Framework} & \textbf{Present / Assessable} & \textbf{Ans.\ String} & \textbf{Keyword Pass Rate (all 30)} \\
+\midrule
+LangGraph  & 12 / 12 & 100\%  & 30 / 30 (100\%) \\
+LangChain  & 12 / 12 & 100\%  & 30 / 30 (100\%) \\
+AutoGen    & 4 / 12  & 33.3\%$^\ddagger$ & 10 / 30 (33.3\%) \\
+\bottomrule
+\multicolumn{4}{l}{\footnotesize $^\ddagger$Historical answer extractor (see \Cref{sec:limitations}); Qwen2.5 rerun with corrected extractor gives 0\% (0/12).}
+\end{tabular}
+\end{table}
+
+Under baseline ($C_0$), LangGraph and LangChain achieve 100\% answer-string presence on the 12 assessable trials each [95\%~Wilson~CI: 75.8--100\%], consistent with their reliable tool execution. AutoGen achieves only 33.3\% [13.8--60.9\%] (historical extractor; Qwen2.5's rerun with the corrected extractor gives 0\%), despite tools now being called. The Phase~2 batch did not record per-tool arguments and return values. The separate qualification experiment (\Cref{sec:qualification}) demonstrates one observed mechanism in those qualification trials: the calculator is called with the correct expression and returns the correct result, yet the model's final message contains a different number. This post-tool hallucination is consistent with the main-batch answer-presence failures but does not causally attribute every earlier failure to the same path, since main records lack per-call argument/return linkage.
+
+Under injection conditions, initial answer-string presence on assessable questions is 75.0\% (36/48) for each of LangGraph/LangChain and 39.6\% (19/48) for AutoGen. The LangGraph/LangChain figure reflects the 23.3\% of runs that fail with exceptions and produce no usable output; among surviving runs, answer-string presence remains 100\%. AutoGen's keyword pass rates range from 26.7\% to 46.7\% across injection conditions, similar to its baseline rate. These are point estimates for this single seed and model configuration.
+
+\subsubsection{Latency}\label{sec:phase2-latency}
+
+\Cref{tab:phase2-latency} reports latency for the tool-use task.
+
+\begin{table}[htbp]
+\caption{Latency by framework and condition (tool-use task, Phase~2). P99 is the empirical sample maximum ($n = 30$; ceiling nearest-rank at the 99th percentile equals the sample maximum for $n < 100$).}\label{tab:phase2-latency}
+\centering
+\begin{tabular}{llcc}
+\toprule
+\textbf{Framework} & \textbf{Condition} & \textbf{Mean (s)} & \textbf{P99 (s)} \\
+\midrule
+LangGraph  & Baseline    & 6.1  & 13.5 \\
+           & Injection   & 6.5--7.9 & 17.5--19.5 \\
+LangChain  & Baseline    & 8.4  & 17.6 \\
+           & Injection   & 6.4--8.0 & 16.2--19.4 \\
+AutoGen    & Baseline    & 16.4 & 33.5 \\
+           & Injection   & 19.8--22.8 & 49.1--67.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+AutoGen is approximately 2--3.6$\times$ slower than LangGraph/LangChain, with condition-matched ratios ranging from 1.96$\times$ (baseline vs LangChain) to 3.57$\times$ (API-error vs LangChain). Under injection, AutoGen's latency increases more substantially (up to 67.2\,s P99) because the multi-turn protocol spends additional rounds processing tool-error messages and regenerating responses. LangGraph/LangChain latency remains relatively stable under injection because failed runs terminate quickly with an exception.
+
+
+\subsection{Qualification Experiment}\label{sec:qualification}
+
+The qualification experiment validates three properties that the main batch data alone cannot demonstrate.
+
+{\color{orange}\paragraph{Results.} Of 12 trials, 10 passed (\Cref{tab:qualification}). The six \emph{baseline} trials check correct answer, calculator called by registered name, correct expression arguments, and correct return values. LangGraph and LangChain pass all four baseline trials; AutoGen fails both. The six \emph{guaranteed-fault} trials check only that $p = 1.0$ injection fires at the calculator boundary and is recorded with span IDs; they do not require correct answers. All six pass, including both AutoGen trials. In AutoGen's failed baseline trials, the injector log shows the calculator was called with the correct expression and returned the correct result (e.g., \texttt{calculator('7919 * 6841')} $\to$ \texttt{54173879}), but the model's final message reports a different number (54{,}254{,}019 for multiplication; 5{,}790 for addition). This is post-tool hallucination within AutoGen's multi-turn conversation protocol.}
+
+\begin{table}[htbp]
+\caption{Qualification experiment results (batch \texttt{20261111\_211913}). Baseline phase checks correct answer, required tool called by registered name, and expression argument match; guaranteed-fault phase checks fault injection at the required tool boundary. Injector logs record call arguments and return values. 38 OpenTelemetry spans captured across all trials.}\label{tab:qualification}
+\centering
+\begin{tabular}{llcc}
+\toprule
+\textbf{Framework} & \textbf{Phase} & \textbf{Pass / Total} & \textbf{Verdict} \\
+\midrule
+LangGraph  & Baseline          & 2 / 2 & PASS \\
+           & Guaranteed fault  & 2 / 2 & PASS \\
+LangChain  & Baseline          & 2 / 2 & PASS \\
+           & Guaranteed fault  & 2 / 2 & PASS \\
+AutoGen    & Baseline          & 0 / 2 & FAIL \\
+           & Guaranteed fault  & 2 / 2 & PASS \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Trace linkage.} Each injector call is recorded with a unique OpenTelemetry span ID. The qualification artifact contains 38 spans with trace IDs, parent relationships, and timing data, confirming that tool invocations, fault injections, and agent responses are linked within the same distributed trace. This validates the adapter--injector--tracer path; the qualification script invokes adapters directly rather than through the benchmark runner, so it does not independently test the runner's retry, timeout, or batch-abort logic.
+
+
+\subsection{Cross-Model Validation}\label{sec:cross-model}
+
+{\color{green!50!black}Are these patterns specific to Llama~3.1, or do they hold across architectures? We repeat qualification and the full Phase~2 protocol on Mistral~7B (v0.3)~\cite{mistral2024} and Qwen2.5~7B~\cite{qwen25_2024}, both served via Ollama with the same seed (42) and matched probability ($p = 0.20$).}
+
+\subsubsection{Cross-Model Qualification}
+
+\Cref{tab:cross-model-qualification} summarizes the 12-trial qualification across all three models.
+
+\begin{table}[htbp]
+\caption{Qualification results across three models (12 trials each, same strict checker). Baseline requires correct tool, full expression match, correct return value, and correct final answer. Guaranteed-fault requires fault injection at the required tool boundary.}\label{tab:cross-model-qualification}
+\centering
+\begin{tabular}{llccc}
+\toprule
+\textbf{Framework} & \textbf{Phase} & \textbf{Llama 3.1} & \textbf{Mistral 7B} & \textbf{Qwen2.5 7B} \\
+\midrule
+LangGraph  & Baseline         & 2/2 & 1/2 & 2/2 \\
+           & Guaranteed fault & 2/2 & 2/2 & 2/2 \\
+LangChain  & Baseline         & 2/2 & 1/2 & 2/2 \\
+           & Guaranteed fault & 2/2 & 2/2 & 2/2 \\
+AutoGen    & Baseline         & 0/2 & 0/2 & 0/2 \\
+           & Guaranteed fault & 2/2 & 2/2 & 2/2 \\
+\midrule
+\textbf{Total}     &                  & 10/12 & 8/12 & 10/12 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+{\color{green!50!black}Three findings are consistent across all models: (1)~fault injection fires reliably at the required tool boundary (all 18 guaranteed-fault trials pass); (2)~AutoGen's conversation protocol fails to surface correct answers in baseline trials despite the calculator returning the right value; and (3)~LangGraph and LangChain produce correct baseline answers more reliably than AutoGen. Mistral~7B's two LangGraph/LangChain baseline failures on the large multiplication task ($7919 \times 6841$) are numeric-formatting errors, not arithmetic failures: the tool returns the correct value \texttt{54173879} and the model reproduces the correct digits but with misplaced comma grouping (\texttt{5,417,3879} instead of \texttt{54,173,879}). Under strict format-matching these count as failures; under numeric-value grading, Mistral's qualification total would be 10/12 rather than 8/12. Both Llama~3.1 and Qwen2.5 achieve 4/4 LangGraph/LangChain baseline pass. Qwen2.5's AutoGen failure mode is distinct: it loops tool calls without producing a text response, compared to Llama~3.1's post-tool hallucination. In short, the \emph{framework-level} patterns (fault injection, error absorption, answer-presence gaps) hold across all three models, even though the specific failure modes vary.}
+
+\subsubsection{Cross-Model Phase 2}\label{sec:cross-model-phase2}
+
+{\color{green!50!black}\Cref{tab:cross-model-phase2} summarizes the Phase~2 results across all three models. Qwen2.5 completes all 450 runs, including AutoGen injection conditions. Mistral~7B completes all LangGraph/LangChain conditions (300 runs total, including 240 injection runs) and 5 of 30 AutoGen baseline runs before persistent 120-second timeouts forced the batch to abort; the four AutoGen injection conditions were not attempted.}
+
+\begin{table}[H]
+\caption{Cross-model Phase~2 results. LangGraph/LangChain are identical per model (shared code path). Within each model, all four fault types produce the same failure and recovery sets (same seed, same tool boundary), so we report per-condition values ($n = 30$) rather than pooling. ``Answer-string presence'' checks whether the expected English answer substring appears in the extracted response; it is not a semantic accuracy measure (see \Cref{sec:limitations}). Mistral AutoGen injection omitted due to persistent timeouts.}\label{tab:cross-model-phase2}
+\centering
+\footnotesize
+\begin{tabular}{llccc}
+\toprule
+\textbf{Metric} & \textbf{Condition} & \textbf{Llama 3.1} & \textbf{Mistral 7B} & \textbf{Qwen2.5 7B} \\
+\midrule
+\multicolumn{5}{l}{\textit{LangGraph / LangChain (shared code path)}} \\
+Error rate & Per cond.\ ($n\!=\!30$) & 23.3\% [11.8--40.9] & 26.7\% [14.2--44.4] & 26.7\% [14.2--44.4] \\
+Recovery rate & Per cond.\ ($n\!=\!7/8/8$) & 71.4\% [35.9--91.8] & 62.5\% [30.6--86.3] & 50.0\% [21.5--78.5] \\
+Keyword pass & Baseline ($n\!=\!30$) & 100\% & 80.0\% & 80.0\% \\
+Keyword pass & Injection ($n\!=\!30$) & 76.7\% & 60.0\% & 63.3\% \\
+Ans.\ string & Baseline ($n\!=\!12$) & 100\% & 100\% & 100\% \\
+Ans.\ string & Injection ($n\!=\!12$) & 75.0\% & 75.0\% & 83.3\% \\
+Ans.\ string (retry) & Injection ($n\!=\!12$) & 91.7\% & 91.7\% & 91.7\% \\
+Tool calls & Per condition & 37 & 54 & 53 \\
+Injections & Per condition & 9 & 12 & 12 \\
+\midrule
+\multicolumn{5}{l}{\textit{AutoGen}} \\
+Error rate & Baseline & 0.0\% & 20.0\%$^*$ & 0.0\% \\
+Error rate & Injection & 0.0\% & --- & 0.0\% \\
+Ans.\ string & Baseline ($n_{\text{assess}}$) & 33.3\% (4/12) & 50.0\% (1/2)$^*$ & 0.0\% (0/12)$^\dagger$ \\
+Ans.\ string & Injection ($n_{\text{assess}}$) & 39.6\% (19/48) & --- & 12.5\% (6/48)$^\dagger$ \\
+Empty answers & Baseline & 7/30 & 1/5$^*$ & 21/30$^\dagger$ \\
+\bottomrule
+\multicolumn{5}{l}{\footnotesize $^*$Mistral AutoGen baseline: only 5/30 runs attempted before persistent timeouts.} \\
+\multicolumn{5}{l}{\footnotesize $^\dagger$Qwen AutoGen: rerun batch with corrected extractor; Llama/Mistral use historical extractor.} \\
+\multicolumn{5}{l}{\footnotesize Wilson 95\% CIs shown in brackets. ``Ans.\ string'' = expected-answer-string presence.} \\
+\end{tabular}
+\end{table}
+
+\rthree{Three findings generalize across all tested models:}
+
+\begin{enumerate}
+  \item {\color{green!50!black}\textbf{Seed-fixed injection.} The fixed seed produces a deterministic injection sequence, but the number of tool calls and injections encountered per condition varies by model: Llama~3.1 makes 37~calls and encounters 9~injections per LG/LC condition, while Mistral and Qwen2.5 make 53--54~calls and encounter 12~injections. The difference arises because adaptive tool use and retry consumption determine which draws from the random stream are encountered. The injection mechanism itself is deterministic, but per-model exposure is not matched.}
+  \item {\color{green!50!black}\textbf{Uniform fault-type behavior.} Within each model, all four fault types produce identical error and recovery counts for LangGraph/LangChain, replicating the Phase~2 finding from \Cref{sec:phase2-results}. The exception type does not reach the LLM, and the common benchmark harness applies the same single-retry policy, so identical outcomes are expected given the same injection sequence.}
+  \item {\color{green!50!black}\textbf{AutoGen error absorption across models.} AutoGen absorbs tool exceptions in both completed injection configurations (0\% unhandled-exception rate for Llama~3.1 and Qwen2.5). Mistral AutoGen injection was not attempted; its single baseline failure is a 120-second timeout, not a tool-fault exception. Qwen2.5 AutoGen injection produces 137--142 tool calls per condition (vs 37--54 for LG/LC), indicating repeated tool-call attempts. The specific failure mode varies: Llama~3.1 produces post-tool hallucination, Mistral generates JSON-formatted tool-call descriptions instead of natural-language answers, and Qwen2.5 loops tool calls and produces non-answer text (raw tool-call JSON or Chinese-language filler) rather than a natural-language answer. Whether this error absorption is inherent to the conversation protocol, specific to the adapter version, or influenced by model size remains an open question (see \Cref{sec:discussion}).}
+\end{enumerate}
+
+{\color{green!50!black}Recovery rates differ across models---Llama~3.1: 5/7 (71.4\%), Mistral: 5/8 (62.5\%), Qwen2.5: 4/8 (50.0\%)---but these are small-sample counts with widely overlapping confidence intervals, and the models encounter different numbers of injections (9 vs 12) due to different tool-call patterns. We do not attribute the differences to specific model capabilities. The initial answer-string-presence gap (Qwen2.5 83.3\% vs 75.0\% for Llama/Mistral) has a direct explanation: Qwen2.5 loses two assessable trials per injection condition while the other models lose three, reflecting different placement of failures rather than alternative reasoning. After the allowed retry, all three models reach 44/48 (91.7\%) assessable-answer presence on LG/LC injection conditions, eliminating the apparent initial-answer advantage.}
+
+{\color{green!50!black}The framework-level observations are consistent across the tested configurations: LangGraph/LangChain propagate exceptions to the harness (which retries once with reinjection active) across all three models, while AutoGen absorbs exceptions internally in the two completed injection configurations (Llama~3.1 and Qwen2.5; Mistral AutoGen injection was not attempted). This consistency strengthens the finding but does not establish it as a universal architectural property, since all configurations share the same backend, adapter code, and protocol shim.}
+
+\Cref{fig:cross-model-error-recovery,fig:cross-model-tool-exposure,fig:cross-model-correctness} visualize these cross-model patterns.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{cross_model_error_recovery.pdf}
+\caption{Cross-model error and recovery rates for LangGraph/LangChain under fault injection ($n = 30$ per condition, $p = 0.20$). Error bars show Wilson 95\% confidence intervals. All three models exhibit similar error rates (23--27\%) with overlapping CIs; recovery rates trend downward from Llama~3.1 to Qwen2.5 but CIs overlap substantially.}\label{fig:cross-model-error-recovery}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.65\linewidth]{cross_model_tool_exposure.pdf}
+\caption{Per-condition tool-call counts and injection encounters across models (LG/LC, seed~42). Llama~3.1 makes fewer tool calls (37) and encounters fewer injections (9) than Mistral and Qwen2.5 (53--54 calls, 12 injections), reflecting model-specific adaptive tool use rather than injection-mechanism differences.}\label{fig:cross-model-tool-exposure}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{cross_model_correctness.pdf}
+\caption{Answer-string presence progression on assessable queries ($n = 12$ per condition). Baseline: all models achieve 100\%. After injection, presence drops to 75--83\%. After one retry, all three models converge to 91.7\% (11/12), eliminating apparent initial-answer differences.}\label{fig:cross-model-correctness}
+\end{figure}
 
 
 % ============================================================================
 \section{Discussion}\label{sec:discussion}
 % ============================================================================
 
-\subsection{Architectural Implications}
+\subsection{Why LangGraph and LangChain Converged}\label{sec:lg-lc-convergence}
 
-Our results reveal three key architectural insights. First, the convergence of LangGraph and LangChain ($p = 1.0$) reflects a broader trend in the ecosystem: LangChain~v1.3+ delegates agent execution to LangGraph internally, making architectural differences at the tool-calling layer negligible. From a BDI perspective, both frameworks implement equivalent plan-selection and intention-reconsideration mechanisms for tool-augmented agents.
+{\color{orange!80!black}The identical failure counts across both phases are consistent with source-code inspection showing that LangChain~1.3 delegates tool dispatch to LangGraph under the hood: both frameworks share the same underlying \texttt{ToolNode} and execution path at the tool-calling boundary. The identical counts extend to recovery outcomes because the fixed seed produces the same injection sequence, and the common benchmark harness applies one retry with reinjection active---the same external procedure for both wrappers. A more informative comparison would have used a pre-LangGraph version of LangChain (the now-deprecated \texttt{AgentExecutor}) against LangGraph. This highlights a broader lesson for benchmarking: framework APIs can be misleading proxies for architectural difference.}
 
-Second, AutoGen's tool-execution bypass exposes a critical gap in conversation-based architectures when paired with local models. The OpenAI-compatible API used by pyautogen does not enforce function-call formatting with Ollama-served models, causing the LLM to skip tool invocation entirely. This is analogous to a BDI agent that abandons its plans in favor of direct belief-based responses---functional but ungrounded.
+\subsection{AutoGen's Error-Absorption Behavior}
 
-Third, the differential recovery rates (86\% for rate limit/API error vs.\ 73\% for timeout/malformed output) suggest that agents handle failures with clear error signals better than failures that block execution or corrupt the reasoning chain. This motivates the design of agent middleware that converts ambiguous failures into explicit error messages.
+Phase~1 revealed that AutoGen never called tools (an integration bug). Phase~2, with the compatibility patch applied, reveals a more nuanced picture: AutoGen \emph{does} call tools, faults \emph{are} injected (15 recorded injections per condition under the fixed seed), but the adapter returns tool exceptions as function-response messages to the AssistantAgent, which continues the conversation---either retrying the tool call or answering from parametric knowledge. This produces a 0\% unhandled-exception rate but does not mean the agent handled the fault correctly: it often produces incorrect answers. The 0\% exception rate is substantially explained by pyautogen~0.1.14's \texttt{execute\_function()} implementation, which catches exceptions raised by tool functions and converts them to \texttt{(False, "Error:~...")} response tuples. This is a library exception-to-message policy, not an agent-level recovery mechanism; it measures exception propagation rather than task resilience.
 
-\subsection{Toward Reliable Agent-Oriented Systems}
+The practical implication is worrying: in production, agents with this policy silently degrade rather than fail loudly, potentially returning plausible but wrong answers. The 33.3\% baseline answer-string presence on assessable questions (vs 100\% for LangGraph/LangChain, $n = 12$ each; this Llama~3.1 figure uses the historical answer extractor and has not been rerun with the corrected version---see \Cref{sec:limitations}) suggests that even without faults, the pyautogen~0.1.14 adapter with local Llama~3.1 inference produces unreliable outputs. Cross-model validation (\Cref{sec:cross-model-phase2}) shows this pattern holds across the tested configurations: Qwen2.5 achieves 0\% (0/12) AutoGen baseline answer-string presence; one baseline response correctly identifies Paris in Chinese but fails the English-substring check, so the 0\% figure reflects the string-matching metric, not necessarily zero factual knowledge.
 
-Based on our findings, we recommend: (1)~\textbf{tool invocation auditing} as a mandatory component of agent evaluation, to detect silent failure modes like tool-execution bypass; (2)~\textbf{explicit error wrapping} for tool calls, converting timeouts and malformed outputs into structured error responses that the LLM can reason about; (3)~\textbf{framework-agnostic fault injection} as part of CI/CD pipelines for agent systems; and (4)~\textbf{multi-metric evaluation} combining pass/fail rates with tool usage statistics, recovery rates, and latency distributions.
+\paragraph{Traced diagnostic: direct client vs AutoGen shim.}
+{\color{green!50!black}To investigate whether AutoGen's low answer-string presence is caused by the model, the protocol conversion, or the adapter's continuation policy, we ran a diagnostic comparing two execution paths on the same three deterministic tasks:
+(1)~a \emph{direct client} calling Ollama's \texttt{/v1/chat/completions} endpoint with the native \texttt{tools}/\texttt{tool\_calls} format (using the same openai~0.28.1 library), and
+(2)~the full \emph{AutoGen shim} (pyautogen~0.1.14 with \texttt{\_patch\_openai\_compat()}).
+Both paths used identical tool schemas, system prompts, model weights, and temperature ($T = 0$). All direct-client tasks ran first in an unpatched process to prevent contamination from the AutoGen compatibility shim.}
 
-\subsection{Bridging Symbolic and Sub-Symbolic Agents}
+\Cref{tab:diagnostic} summarizes the results.
+Through the direct client (run before any AutoGen code to prevent patch contamination), both Llama~3.1 and Qwen2.5 call each tool exactly once, receive the correct result, and produce a text answer containing the expected value---achieving 2/3 literal answer-string presence (the multiplication answer \texttt{54,173,879} is numerically correct but the comma-formatted output does not match the unformatted expected string \texttt{54173879}; all three answers are factually correct under comma-normalized matching).
+Through the AutoGen shim (also $T = 0$), the same models diverge: Llama~3.1 calls tools 3 times per task. On the France query, the expected substring appears in AutoGen's selected final message after repeated calls. On the other two, the model hallucinates a different number (e.g., the calculator returns \texttt{54173879} but the model's final message reports 54{,}444{,}919). Qwen2.5 calls tools 4--5 times per task; on the France query, the selected final message contains non-answer text (a raw JSON tool description) rather than a factual response, while the arithmetic tasks end with empty selected text and a pending tool call at the turn limit.
 
-The failure modes observed in LLM-based agents highlight capabilities that symbolic BDI agents handle naturally: explicit goal management prevents infinite loops, formal plan libraries enable structured recovery, and logical state representations resist corruption. Conversely, LLM-based agents excel at flexible tool use and natural language understanding, where symbolic agents struggle.
+\begin{table}[H]
+\caption{Traced diagnostic: direct client vs AutoGen shim on three deterministic tasks. All direct-client tasks ran first in an unpatched process; all AutoGen tasks ran second, both with $T = 0$. Source artifacts: Llama \texttt{diagnostic\_20261112\_113543}, Qwen \texttt{diagnostic\_20261112\_113622}.}\label{tab:diagnostic}
+\centering
+\footnotesize
+\begin{tabular}{llcccc}
+\toprule
+ & & \multicolumn{2}{c}{\textbf{Direct Client}} & \multicolumn{2}{c}{\textbf{AutoGen Shim}} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+\textbf{Model} & \textbf{Task} & \textbf{Calls} & \textbf{Ans.} & \textbf{Calls} & \textbf{Ans.} \\
+\midrule
+Llama 3.1 & Capital of France & 1 & \checkmark & 3 & \checkmark$^\ast$ \\
+Llama 3.1 & 15\% of 847 & 1 & \checkmark & 3 & $\times^\dagger$ \\
+Llama 3.1 & 7919 $\times$ 6841 & 1 & $\times^\S$ & 3 & $\times^\dagger$ \\
+\midrule
+Qwen2.5 & Capital of France & 1 & \checkmark & 4 & $\times^\ddagger$ \\
+Qwen2.5 & 15\% of 847 & 1 & \checkmark & 5 & $\times^\ddagger$ \\
+Qwen2.5 & 7919 $\times$ 6841 & 1 & $\times^\S$ & 5 & $\times^\ddagger$ \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\begin{minipage}{\linewidth}
+\footnotesize
+\noindent $^\ast$Correct answer after repeated tool calls and hallucinated intermediate text.\par
+\noindent $^\S$Numerically correct (54{,}173{,}879) but comma-formatted; fails literal-substring check.\par
+\noindent $^\dagger$Post-tool hallucination: calculator returned correct value but model reported a different number.\par
+\noindent $^\ddagger$Repeated tool-call loop: capital task ends with non-answer JSON text; arithmetic tasks end with empty selected text.\par
+\end{minipage}
+\end{table}
 
-Our taxonomy suggests a natural division of labor: BDI-style goal management and plan selection could address orchestration errors (infinite loops, wrong branching) and context degradation (by maintaining explicit state), while LLM-based reasoning handles flexible tool use and natural language understanding. The silent failure phenomenon observed in AutoGen further motivates hybrid designs: a BDI layer could enforce tool invocation requirements as part of its plan structure, preventing the LLM from bypassing tools. AgentProbe's fault injectors provide a testbed for evaluating such hybrid architectures.
+{\color{green!50!black}Although temperature is now matched, the compared paths still differ in stopping policy and orchestration: the direct client stops at the first text response, while AutoGen continues under its auto-reply policy; and tool results are sent as \texttt{role="tool"} (direct) versus \texttt{role="function"} (pyautogen's legacy format). These confounds mean the diagnostic does not isolate the message-role difference as the sole cause.}
 
-\subsection{Limitations}
+{\color{green!50!black}The diagnostic supports a weaker but still informative conclusion: both tested models can solve these deterministic tasks correctly through the minimal modern client, while the tested AutoGen configuration produces worse selected final outputs. The compared paths differ in at least three factors---protocol conversion, continuation policy, and answer-selection logic---and the diagnostic does not isolate which factors are responsible. This is consistent with the adapter/protocol layer being a major contributor to AutoGen's low answer-string presence, but a controlled intervention varying each factor independently would be needed to establish causal attribution or quantify their relative contributions.}
+
+{\color{green!50!black}All three tested configurations share the same adapter version, protocol shim, and local backend, so we cannot establish whether native function-calling support (as in AutoGen~0.4 or cloud-hosted APIs) would fully resolve the issue. The evidence establishes different output-selection behavior in these tested configurations, not a universal property of conversation-based versus graph-based architectures.}
+
+\subsection{Error Rate Is Not Enough}
+
+AutoGen's 0\% error rate alongside 33.3\% baseline answer-string presence (historical extractor) is a cautionary example: an agent that absorbs every exception looks resilient by error-rate measures but may be returning empty or incorrect answers. LangGraph/LangChain's 23.3\% error rate under injection sounds alarming by comparison, but on baseline assessable questions (no injection), answer-string presence is 100\% [95\%~Wilson~CI: 75.8--100\%, $n = 12$]. Under injection, initial answer-string presence is 75.0\% (36/48 assessable trials) for LangGraph/LangChain and 39.6\% (19/48) for AutoGen. A composite metric combining survival, correctness, and trace evidence---as demonstrated in the qualification experiment---provides a more complete picture.
+
+\subsection{Uniform Recovery Across Fault Types}
+
+In Phase~2, all four fault types produce identical error rates (23.3\%) and recovery rates (71.4\%) for LangGraph/LangChain. This contrasts with Phase~1, where rate-limit/API-error recovery (93\%) appeared higher than timeout/malformed-output recovery (73\%). The Phase~1 gap was confounded with injection probability ($p = 0.15$ vs $p = 0.20$); Phase~2's matched $p = 0.20$ eliminates this confound. All four sub-types raise exceptions at the tool-call boundary, and the exception content does not reach the LLM. Timeout injection additionally imposes a 5-second \texttt{time.sleep} delay before raising; the other three types raise immediately. Despite this timing difference, the same error and recovery counts were observed for all four types under this particular seed and schedule. This does not establish that timing has no independent effect in general---only that it did not produce a measurable difference in this configuration. Differentiating fault-type effects would require larger sample sizes and multiple seeds, as well as injection mechanisms with genuinely distinct failure signatures (e.g., corrupted data that reaches the model's context).
+
+\subsection{Scope of ``Malformed Output'' Injection}
+
+{\color{orange!80!black}The current ``malformed output'' injector raises an exception rather than returning corrupted data to the agent. This means it tests the agent's exception-handling path, not its ability to parse or reason about damaged tool responses. A true malformed-output test would return syntactically valid but semantically incorrect data (e.g., a JSON response with wrong field values) and check whether the agent detects the inconsistency. This is an important direction for future work that would exercise a different failure surface.}
+
+\subsection{Implications for Hybrid Architectures}
+
+The failure modes we catalogued map onto the classical symbolic/sub-symbolic divide. Orchestration errors (infinite loops, wrong branches) are the kind of problem that BDI-style goal management was designed to address, and context degradation would in principle be less dangerous when state lives in a logical database rather than an LLM's attention window---though our experiments do not test these hypotheses directly.
+
+LLM-based agents win on flexibility---they handle ambiguous natural-language queries and use tools they were not explicitly programmed for. A hybrid architecture might use a BDI planner for high-level goals and tool-invocation requirements (potentially preventing AutoGen-style silent error absorption) while delegating individual tool calls and language reasoning to the LLM. Recent work on self-healing agentic orchestrators~\cite{sureshbabu2026selfhealing} explores automated recovery strategies for tool-augmented LLM systems, which could complement such hybrid designs. Whether such a design actually mitigates the failures observed here is an empirical question; \agentprobe{}'s fault injectors could serve as a regression suite for evaluating it.
+
+\subsection{Limitations}\label{sec:limitations}
 
 \begin{itemize}
-  \item Our study evaluates three frameworks; results may not generalize to all agent architectures (e.g., CrewAI, DSPy).
-  \item Fault injection probabilities are uniform ($p = 0.15$--$0.20$); production failure patterns may be bursty or correlated.
-  \item We use a single LLM backend (Llama~3.1 8B); larger models or commercial APIs (GPT-4, Claude) may exhibit different resilience characteristics, particularly for tool-calling format compliance.
-  \item The convergence of LangChain and LangGraph is version-specific (LangChain~v1.3+); earlier versions with the deprecated \texttt{AgentExecutor} may show different behavior.
-  \item AutoGen's tool-execution bypass is specific to the pyautogen~0.1.14 + Ollama combination; the newer AutoGen~0.4 (AG2) SDK may handle local models differently.
+  \item {\color{magenta}\textbf{Local open-weight models only.} The main study uses Llama~3.1 8B via Ollama, with cross-model validation on Mistral~7B and Qwen2.5~7B (\Cref{sec:cross-model}). All three are 7--9B parameter quantized models on a single local backend. Larger models or cloud-hosted APIs with constrained decoding may produce different results, particularly for AutoGen's answer-string presence.}
+  \item {\color{magenta}\textbf{Single seed.} Both phases use seed~42 for injection control. While this ensures reproducibility, it means the specific set of injected trials is fixed. Different seeds would produce different injection sequences and potentially different failure/recovery counts; the Wilson CIs quantify sampling uncertainty conditional on this design, not a guarantee that future seeds will fall within these bounds.}
+  \item {\color{magenta}\textbf{Tool-use only in Phase~2.} RAG-style and multi-agent-style queries were not rerun after patching AutoGen. Whether AutoGen's error-absorption behavior extends to more complex query types is unknown.}
+  \item {\color{magenta}\textbf{Taxonomy--evaluation gap.} The taxonomy defines five failure categories, but experiments inject only tool-call faults. Orchestration and context injectors are implemented but not experimentally validated.}
+  \item {\color{magenta}\textbf{Malformed-output scope.} The ``malformed output'' injector raises exceptions rather than returning corrupted data, making it functionally equivalent to the other fault types in the current implementation.}
+  \item {\color{magenta}\textbf{Answer-string presence on 40\% of queries.} Only 2 of 5 tool-use queries have verifiable ground truth. Answer-presence claims are scoped to this assessable subset; the remaining 60\% are evaluated only by keyword presence, which is a weak proxy.}
+  \item {\color{magenta}\textbf{LangChain--LangGraph convergence.} This is version-specific to LangChain~1.3; earlier versions using the deprecated \texttt{AgentExecutor} may behave differently.}
+  \item {\color{magenta}\textbf{AutoGen version.} The tool-calling patch and error-absorption behavior are specific to pyautogen~0.1.14; the community fork (AG2) and Microsoft's AutoGen~0.4 rewrite may handle faults differently.}
+  \item {\color{magenta}\textbf{Unmatched injection exposure.} Although the same random seed is used, models encounter different numbers of tool calls and injections per condition (e.g., 37~calls/9~injections for Llama vs 53--54~calls/12~injections for Mistral/Qwen). Cross-model recovery comparisons are therefore descriptive rather than controlled.}
+  \item {\color{magenta}\textbf{Incomplete Mistral AutoGen.} Mistral's AutoGen baseline completed only 5 of 30 planned runs before persistent timeouts; its four injection conditions were not attempted. Mistral AutoGen results are an aborted configuration, not a completed comparison.}
+  \item {\color{magenta}\textbf{Shared adapter and backend.} All three models use the same Ollama backend, protocol shim, and adapter code. Cross-model consistency demonstrates robustness within this stack but does not isolate framework architecture from adapter implementation.}
+  \item {\color{magenta}\textbf{AutoGen output extraction and mixed adapter versions.} The AutoGen adapter extracts the last non-empty assistant message from the conversation history. In pyautogen~0.1.14, tool-call messages have role \texttt{assistant} with empty content; the corrected extractor skips these and returns the last substantive response. However, only Qwen2.5's AutoGen cells have been rerun with the corrected extractor (batch \texttt{20261112\_063451}); Llama~3.1 and Mistral AutoGen results use the historical extractor. The two configurations are labeled in \Cref{tab:cross-model-phase2}. Qwen2.5's rerun baseline produces 0\% answer-string presence (0/12) vs the historical batch's 8.3\% (1/12); this difference involves both the extraction change and different inference trajectories, so neither factor can be isolated. Despite the corrected extractor, 70\% of Qwen AutoGen baseline responses remain empty. Qwen2.5's injection answer-string presence (6/48, 12.5\%) exceeds its baseline (0/12); this counterintuitive inversion likely reflects small-sample variability rather than injection improving outputs, since both rates are low and their Wilson CIs overlap substantially. The traced diagnostic (\Cref{tab:diagnostic}) shows that both models produce correct answers when the AutoGen adapter is bypassed, pointing to the adapter layer as a likely source, though the diagnostic confounds message format with stopping policy and answer selection (temperature is matched at $T\!=\!0$).}
 \end{itemize}
 
 \subsection{Threats to Validity}
 
-\paragraph{Internal Validity.} The use of controlled fault injection with fixed probabilities and a fixed seed (42) ensures reproducibility but may not capture the complexity of real-world failure patterns. We mitigate this by using 10--30 runs per condition and reporting Wilson score confidence intervals.
+\paragraph{Internal Validity.} {\color{magenta}The use of controlled fault injection with fixed probability and seed ensures reproducibility but limits generalizability. With 30 runs per condition, each of the 5 queries repeats 6 times via round-robin, so runs using the same query are not fully independent. We report Wilson score confidence intervals throughout. The matched injection probability in Phase~2 eliminates the Phase~1 confound between fault type and injection rate.}
 
-\paragraph{External Validity.} Our benchmark tasks are designed to be representative but cannot cover all possible agent applications. We select tasks that exercise the core capabilities (tool use, RAG, multi-agent coordination) common to most production deployments.
+\paragraph{External Validity.} {\color{magenta}The main study uses Llama~3.1 8B on Ollama, with cross-model validation on Mistral~7B and Qwen2.5~7B (\Cref{sec:cross-model}). All three are locally hosted 7--9B quantized open-weight models on a single backend, without constrained decoding or server-side JSON enforcement. Cloud-hosted frontier APIs (GPT-4o, Claude) typically provide structured-output enforcement, which may substantially change tool-calling reliability. The cross-model validation shows that error propagation in LangGraph/LangChain is consistent across all three model architectures on this backend; AutoGen error absorption is confirmed for the two completed injection configurations (Llama~3.1 and Qwen2.5; Mistral AutoGen injection was not attempted after baseline instability). This does not establish generality beyond these configurations. The specific failure modes and answer-presence gaps vary with model. Extension to larger models and cloud-hosted backends remains the highest-priority future work (see item~1 in Future Work).}
 
-\paragraph{Construct Validity.} Our metrics (success rate, recovery rate, etc.) are standard in reliability engineering but may not capture all dimensions of agent quality. We supplement quantitative metrics with qualitative trace analysis.
+\paragraph{Construct Validity.} {\color{magenta}We measure three complementary dimensions: error rate (survival), keyword pass rate (compliance), and answer-string presence (whether the expected answer substring appears in the output). The qualification experiment validates the adapter-level pipeline (tool execution, fault injection, and trace linkage) with linked traces but does not cover runner-level timeout or retry behavior. However, the 60\% of queries without verifiable ground truth limits the scope of answer-presence claims. Zhu et~al.~\cite{zhu2025benchmarking} provide best-practice guidelines for building rigorous agentic benchmarks; our design aligns with several of their recommendations (controlled conditions, reproducible seeds) but falls short on others (limited task diversity, single seed). Future work should use tasks with 100\% assessable ground truth.}
 
 
 % ============================================================================
 \section{Conclusions and Future Work}\label{sec:conclusion}
 % ============================================================================
 
-This paper presented \agentprobe{}, an open-source toolkit for systematically evaluating the reliability of LLM-based intelligent agents through controlled fault injection and observability. We introduced a five-category failure taxonomy covering tool call faults, orchestration errors, context degradation, latency anomalies, and output consistency violations. Through a comparative empirical study of LangGraph, LangChain, and AutoGen across 1{,}050 experiment runs, we demonstrated that: (1)~conventional pass/fail metrics can mask critical architectural weaknesses such as tool-execution bypass; (2)~LangGraph and LangChain exhibit equivalent fault tolerance at the tool-calling layer, reflecting their shared internal architecture; (3)~recovery rates vary systematically by failure type, with transient errors recovering better than blocking or corrupting failures; and (4)~systematic fault injection with multi-metric evaluation is essential for trustworthy agent assessment.
+The central lesson of this work is that a single reliability metric can be profoundly misleading. In Phase~1, AutoGen exhibited a lower error rate than LangGraph/LangChain under fault injection---not because it handled faults better, but because an API-schema mismatch silently prevented tool execution. In Phase~2, after patching the integration bug, AutoGen achieved a 0\% error rate while tools were verifiably called and faults were verifiably injected---but the expected answer string appeared in only 4 of 12 assessable baseline trials (33\%; historical extractor---Qwen2.5's rerun with the corrected extractor gives 0\%). LangGraph/LangChain, by contrast, failed loudly 23.3\% of the time under injection but achieved 12/12 answer-string presence on baseline assessable questions (100\%). Under injection, initial answer-string presence was 75\% (36/48) for LangGraph/LangChain and 39.6\% (19/48) for AutoGen. Without trace-level observability and answer-presence grading, either phase's results could have been misinterpreted. A traced diagnostic (\Cref{tab:diagnostic}) showed that when the AutoGen shim is bypassed and the same models call tools through the native \texttt{tools}/\texttt{tool\_calls} format, both Llama~3.1 and Qwen2.5 produce factually correct answers on all three deterministic tasks (3/3 under comma-normalized matching; 2/3 under the literal-substring rule used elsewhere), while the AutoGen shim produces 1/3 (Llama) and 0/3 (Qwen)---suggesting the adapter/protocol layer plays a substantial role, though the compared paths still differ in stopping policy and answer selection. Cross-model validation on Mistral~7B and Qwen2.5~7B (\Cref{sec:cross-model}) shows that LangGraph/LangChain error propagation is consistent across all three 7--9B models on the same backend, while AutoGen error absorption is confirmed for the two completed injection configurations (Llama~3.1 and Qwen2.5; Mistral AutoGen injection was not attempted). Recovery rates and failure placement vary by model. After the allowed retry, all three models reach the same assessable-answer rate (91.7\%) for LG/LC, suggesting that initial-answer differences reflect fault placement rather than model capability.
 
-Our contributions advance the understanding of how sub-symbolic intelligent agents fail and recover, providing empirical grounding for the design of more robust agent-oriented systems. The open-source release of \agentprobe{} enables the research community to reproduce our results and extend the evaluation to additional frameworks, failure modes, and application domains.
+The toolkit, taxonomy, full experimental data, and qualification artifacts are available at \url{https://github.com/chhayankjain/AgentProbe}. We encourage other groups to run \agentprobe{} on their own framework and model combinations and to contribute injector modules for failure modes we have not yet covered.
 
 \paragraph{Future Work.}
-Several directions merit further investigation:
-\begin{itemize}
-  \item \textbf{Hybrid architectures:} Integrating BDI-style formal reasoning with LLM-based agents to address the failure modes identified in our taxonomy.
-  \item \textbf{Adaptive fault injection:} Developing intelligent fault injection strategies that target framework-specific weak points identified through initial profiling.
-  \item \textbf{Multi-model evaluation:} Extending the study to compare resilience across different LLM backends (e.g., GPT-4, Claude, Llama, Mistral).
-  \item \textbf{Production telemetry integration:} Connecting \agentprobe{}'s observability layer with production monitoring systems for continuous reliability assessment.
-  \item \textbf{Automated recovery synthesis:} Using the failure taxonomy to automatically generate recovery strategies for detected failure patterns.
-\end{itemize}
+The most pressing next steps are:
+
+\begin{enumerate}
+  \item {\color{green!50!black}\textbf{Larger models and cloud backends.} Our cross-model validation (\Cref{sec:cross-model}) covers three 7--9B quantized models on a single local backend but does not include larger models (Llama~3.1 70B, GPT-4o, Claude), different serving stacks (vLLM, TGI), or cloud-hosted APIs with native function-calling and constrained decoding. The traced diagnostic (\Cref{tab:diagnostic}) points to the adapter/protocol layer as a likely factor in AutoGen's answer-presence gap, but confounds message format with stopping policy and answer selection (temperature is matched at $T\!=\!0$). A configuration with native tool-calling support and controlled factor isolation would establish which specific differences cause the gap.}
+
+  \item {\color{orange!80!black}\textbf{Full-spectrum assessable tasks.} The current tool-use suite has only 40\% assessable questions. Future experiments should use tasks where every query has unambiguous ground truth, enabling answer-presence measurement on the full population.}
+
+  \item {\color{orange!80!black}\textbf{Additional taxonomy categories.} Experimentally validating the orchestration-error and context-degradation injectors is a high priority. The current results cover only tool-call faults.}
+
+  \item {\color{blue}\textbf{Realistic fault models.} Our injection is uniform and independent; production failures tend to be bursty and correlated. Under correlated faults, a failure during the first attempt would persist into the retry, likely reducing recovery rates below those observed with independent per-call injection. A correlated-failure injector would bring \agentprobe{}'s fault model closer to production reality.}
+
+  \item {\color{orange!80!black}\textbf{True malformed-output injection.} Two distinct directions remain: schema/format errors (e.g., truncated JSON, wrong field types) and semantic corruption (syntactically valid but factually incorrect data). Both would test agents' ability to detect and handle corrupted tool responses---a distinct failure surface from the exception path tested here.}
+
+  \item {\color{magenta}\textbf{Multiple seeds.} Validating results across multiple injection seeds would strengthen the statistical claims beyond the single seed~42 used here.}
+\end{enumerate}
 
 \vspace{6pt}
 
@@ -483,9 +774,15 @@ Several directions merit further investigation:
 
 \funding{This research received no external funding.}
 
-\dataavailability{The \agentprobe{} toolkit, benchmark tasks, and experimental scripts are available as open-source software at \url{https://github.com/chhayankjain/AgentProbe}.}
+\dataavailability{The \agentprobe{} toolkit, benchmark tasks, experimental scripts, Phase~1 and Phase~2 results, and qualification artifacts are available as open-source software at \url{https://github.com/chhayankjain/AgentProbe}.}
 
 \conflictsofinterest{The authors declare no conflicts of interest.}
+
+\institutionalreview{Not applicable.}
+
+\informedconsent{Not applicable.}
+
+\acknowledgments{The generative AI tool Claude (Anthropic, San Francisco, CA, USA) was used to assist with writing the analysis code and producing the tables and figures from its output. It was also used for language refinement, editorial improvements, and enhancing the clarity of presentation. The research design, choice of data, interpretation of results, and all scientific conclusions are the authors' own. All AI-assisted output was reviewed, tested, and revised by the authors, who take full responsibility for the final manuscript.}
 
 % ============================================================================
 % References
@@ -523,10 +820,12 @@ Wei, J.; Wang, X.; Schuurmans, D.; Bosma, M.; Ichter, B.; Xia, F.; Chi, E.; Le, 
 \bibitem{langgraph2024}
 LangChain, Inc.
 \newblock LangGraph: Build Stateful, Multi-Actor Applications with LLMs, 2024.
+\newblock Available online: \url{https://github.com/langchain-ai/langgraph} (accessed on 7 October 2026).
 
 \bibitem{langchain2023}
 Chase, H.
 \newblock LangChain: Building applications with LLMs through composability, 2023.
+\newblock Available online: \url{https://github.com/langchain-ai/langchain} (accessed on 7 October 2026).
 
 \bibitem{wu2023autogen}
 Wu, Q.; Bansal, G.; Zhang, J.; Wu, Y.; Li, B.; Zhu, E.; Jiang, L.; Zhang, X.; Zhang, S.; Liu, J.; et~al.
@@ -536,6 +835,7 @@ Wu, Q.; Bansal, G.; Zhang, J.; Wu, Y.; Li, B.; Zhu, E.; Jiang, L.; Zhang, X.; Zh
 \bibitem{opentelemetry2024}
 OpenTelemetry Authors.
 \newblock OpenTelemetry---An observability framework for cloud-native software, 2024.
+\newblock Available online: \url{https://opentelemetry.io/} (accessed on 7 October 2026).
 
 \bibitem{bordini2007programming}
 Bordini, R.H.; H{\"u}bner, J.F.; Wooldridge, M.
@@ -547,10 +847,10 @@ Winikoff, M.
 \newblock JACK intelligent agents: An industrial strength platform.
 \newblock In \textit{Multi-Agent Programming}; Springer: Boston, MA, USA, 2005; pp.~175--193.
 
-\bibitem{stoyanov2024agents}
-Stoyanov, S.; Doycheva, A.; Tabakova-Komsalova, V.
-\newblock Intelligent agents and their applications in modern computing.
-\newblock \textit{Future Internet} \textbf{2024}, \textit{16}.
+\bibitem{garcez2023neurosymbolic}
+Garcez, A.d.; Lamb, L.C.
+\newblock Neurosymbolic AI: The 3rd wave.
+\newblock \textit{Artificial Intelligence Review} \textbf{2023}, \textit{56}, 12387--12406.
 
 \bibitem{hsueh1997fault}
 Hsueh, M.-C.; Tsai, T.K.; Iyer, R.K.
@@ -565,6 +865,7 @@ Basiri, A.; Behnam, N.; de~Rooij, R.; Hochstein, L.; Kosewski, L.; Reynolds, J.;
 \bibitem{chaostoolkit2024}
 ChaosIQ.
 \newblock Chaos Toolkit---An Open API for Chaos Engineering, 2024.
+\newblock Available online: \url{https://chaostoolkit.org/} (accessed on 7 October 2026).
 
 \bibitem{goodfellow2015explaining}
 Goodfellow, I.J.; Shlens, J.; Szegedy, C.
@@ -592,9 +893,9 @@ Liu, X.; Yu, H.; Zhang, H.; Xu, Y.; Lei, X.; Lai, H.; Gu, Y.; Ding, H.; Men, K.;
 \newblock In Proceedings of the International Conference on Learning Representations (ICLR), Vienna, Austria, 7--11 May 2024.
 
 \bibitem{yao2024tau}
-Yao, S.; et~al.
+Yao, S.; Shinn, N.; Razavi, P.; Narasimhan, K.
 \newblock $\tau$-bench: A benchmark for tool-agent-user interaction in real-world domains.
-\newblock \textit{arXiv preprint} \textbf{2024}.
+\newblock \textit{arXiv preprint arXiv:2406.12045} \textbf{2024}.
 
 \bibitem{zhou2024webarena}
 Zhou, S.; Xu, F.F.; Zhu, H.; Zhou, X.; Lo, R.; Sridhar, A.; Cheng, X.; Bisk, Y.; Fried, D.; Alon, U.; et~al.
@@ -604,6 +905,72 @@ Zhou, S.; Xu, F.F.; Zhu, H.; Zhou, X.; Lo, R.; Sridhar, A.; Cheng, X.; Bisk, Y.;
 \bibitem{openllmetry2024}
 Traceloop.
 \newblock OpenLLMetry---Open-source observability for LLM applications, 2024.
+\newblock Available online: \url{https://github.com/traceloop/openllmetry} (accessed on 7 October 2026).
+
+\bibitem{ruan2024toolemu}
+Ruan, Y.; Dong, H.; Wang, A.; Pitis, S.; Zhou, Y.; Ba, J.; Dubois, Y.; Maddison, C.J.; Hashimoto, T.
+\newblock Identifying the Risks of LM Agents with an LM-Emulated Sandbox.
+\newblock In Proceedings of the Twelfth International Conference on Learning Representations (ICLR), Vienna, Austria, 2024.
+
+\bibitem{cemri2025mast}
+Cemri, M.; Pan, M.Z.; Yang, S.; Agrawal, L.A.; Chopra, B.; Tiwari, R.; Keutzer, K.; Parameswaran, A.; Klein, D.; Ramchandran, K.; et~al.
+\newblock Why Do Multi-Agent LLM Systems Fail?
+\newblock \textit{arXiv preprint arXiv:2503.13657}, 2025.
+
+\bibitem{reliabilitybench2026}
+Gupta, A.
+\newblock ReliabilityBench: Evaluating LLM Agent Reliability Under Production-Like Stress Conditions.
+\newblock \textit{arXiv preprint arXiv:2601.06112} \textbf{2026}.
+
+\bibitem{mcpinjector2026}
+Iannillo, A.K.; Owotogbe, J.S.; Natella, R.; Avallone, F.; Kudryavtseva, K.; Kumara, I.
+\newblock Tool-Calling LLM Agents Under Realistic MCP Faults: Scale Does Not Purchase Fault Tolerance.
+\newblock \textit{arXiv preprint arXiv:2610.32555} \textbf{2026}.
+
+\bibitem{kraishan2026loud}
+Kraishan, O.
+\newblock Loud Failures, Quiet Failures: Fault Detection and Recovery in Tool-Using Language Model Agents.
+\newblock \textit{arXiv preprint arXiv:2610.10062} \textbf{2026}.
+
+\bibitem{mistral2024}
+Jiang, A.Q.; Sablayrolles, A.; Mensch, A.; Bamford, C.; Chaplot, D.S.; de~las~Casas, D.; Bressand, F.; Lengyel, G.; Lample, G.; Saulnier, L.; et~al.
+\newblock Mistral 7B.
+\newblock \textit{arXiv preprint arXiv:2310.06825} \textbf{2023}.
+
+\bibitem{qwen25_2024}
+Team, Q.
+\newblock Qwen2.5 Technical Report.
+\newblock \textit{arXiv preprint arXiv:2412.15115} \textbf{2024}.
+
+\bibitem{zhang2025failure}
+Zhang, S.; Yin, M.; Zhang, J.; Liu, J.; Han, Z.; Zhang, J.; Li, B.; Wang, C.; Wang, H.; Chen, Y.; Wu, Q.
+\newblock Which Agent Causes Task Failures and When? On Automated Failure Attribution of LLM Multi-Agent Systems.
+\newblock In \textit{Proceedings of the 42nd International Conference on Machine Learning (ICML)}, Vancouver, BC, Canada, 2025; PMLR 267, pp.~76583--76599.
+
+\bibitem{jia2026masfire}
+Jia, J.; Deng, Z.; Chen, Z.; Wang, Y.; Zheng, Z.
+\newblock MAS-FIRE: Fault Injection and Reliability Evaluation for LLM-Based Multi-Agent Systems.
+\newblock \textit{arXiv preprint arXiv:2602.19843} \textbf{2026}.
+
+\bibitem{mazumder2026agentcheck}
+Mazumder, A.; Lia, N.J.
+\newblock AgentCheck: A Reproduce--Intervene--Mitigate Workbench for LLM Agents over MCP.
+\newblock \textit{arXiv preprint arXiv:2607.11098} \textbf{2026}.
+
+\bibitem{patil2025bfcl}
+Patil, S.G.; Mao, H.; Yan, F.; Ji, C.C.-J.; Suresh, V.; Stoica, I.; Gonzalez, J.E.
+\newblock The Berkeley Function Calling Leaderboard (BFCL): From Tool Use to Agentic Evaluation of Large Language Models.
+\newblock In \textit{Proceedings of the 42nd International Conference on Machine Learning (ICML)}, Vancouver, BC, Canada, 2025; PMLR 267, pp.~48371--48392.
+
+\bibitem{sureshbabu2026selfhealing}
+Suresh~Babu, R.; Agrawal, A.
+\newblock Self-Healing Agentic Orchestrators for Reliable Tool-Augmented Large Language Model Systems.
+\newblock \textit{arXiv preprint arXiv:2606.01416} \textbf{2026}.
+
+\bibitem{zhu2025benchmarking}
+Zhu, Y.; Jin, T.; Pruksachatkun, Y.; Zhang, A.K.; Liu, S.; Cui, S.; Kapoor, S.; Longpre, S.; Meng, K.; Weiss, R.; et~al.
+\newblock Establishing Best Practices in Building Rigorous Agentic Benchmarks.
+\newblock In \textit{Advances in Neural Information Processing Systems (NeurIPS)}, Datasets and Benchmarks Track, 2025.
 
 \end{thebibliography}
 

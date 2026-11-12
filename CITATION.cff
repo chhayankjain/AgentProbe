@@ -6,13 +6,15 @@ authors:
   - family-names: Jain
     given-names: Chhayank
     affiliation: Arizona State University
-    orcid: ""
+    orcid: "https://orcid.org/0009-0006-6831-426X"
   - family-names: Pattnaik
     given-names: Sarthak
     affiliation: Boston University
+    orcid: "https://orcid.org/0009-0004-4994-4800"
   - family-names: Pinsky
     given-names: Eugene
     affiliation: Boston University
+    orcid: "https://orcid.org/0000-0002-3836-1851"
 version: "1.0.0"
 date-released: "2026-09-13"
 license: MIT
@@ -32,6 +34,5 @@ abstract: >-
   AgentProbe is an open-source fault-injection and observability toolkit
   for systematically evaluating the reliability of LLM-based intelligent
   agents. It implements a five-category failure taxonomy with configurable
-  injectors, OpenTelemetry-based tracing, and 55 standardized benchmark
-  tasks spanning tool use, retrieval-augmented generation, and multi-agent
-  coordination.
+  injectors, OpenTelemetry-based tracing, and 15 benchmark queries
+  spanning tool use, retrieval-style, and multi-agent-style prompts.
