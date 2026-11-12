@@ -59,9 +59,9 @@ CORPUS: list[dict[str, str]] = [
         "doc_id": "agentprobe_s4",
         "title": "Experimental Setup",
         "content": (
-            "Experiments compare LangGraph, LangChain, and AutoGen across three task types: "
-            "tool-use agents, RAG agents, and multi-agent pipelines. LLMs used include "
-            "Llama-3 via Ollama (local, zero API cost), GPT-4o, and Claude Sonnet. "
+            "Experiments compare LangGraph, LangChain, and AutoGen across three query groups: "
+            "tool-use, retrieval-style, and multi-agent-style prompts. The benchmark uses "
+            "Llama-3 via Ollama (local, zero API cost) as the default LLM backend. "
             "All experiments are reproducible from the public repository."
         ),
     },
@@ -69,10 +69,11 @@ CORPUS: list[dict[str, str]] = [
         "doc_id": "agentprobe_s5",
         "title": "Results",
         "content": (
-            "LangGraph showed the lowest failure rate under tool timeout injection (12%) "
-            "compared to LangChain (18%) and AutoGen (21%). Recovery rates were highest "
-            "for LangGraph (87%) due to its explicit graph-based retry handling. "
-            "P99 latency under cascading slowdown was 3.2x baseline for all frameworks."
+            "Under tool-call fault injection, error rates varied by framework and "
+            "configuration. Recovery rates depended on injection probability and fault type. "
+            "Trace analysis revealed that some framework-model pairings silently bypass "
+            "tool execution, inflating apparent resilience. "
+            "P99 latency increased substantially under fault injection for all frameworks."
         ),
     },
     # --- Expanded corpus documents (s6 – s10) ---
@@ -166,7 +167,7 @@ RAG_QUERIES: list[RAGQuery] = [
         query_id="rag_003",
         input="Which agent framework had the lowest failure rate under timeout injection?",
         relevant_doc_ids=["agentprobe_s5"],
-        expected_keywords=["langgraph", "12%"],
+        expected_keywords=["error", "framework", "fault"],
     ),
     RAGQuery(
         query_id="rag_004",

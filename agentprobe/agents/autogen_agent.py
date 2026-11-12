@@ -17,6 +17,12 @@ point to an Ollama local server:
         ]
     }
 
+**Protocol fix (Nov 2026):** pyautogen 0.1.14 uses the legacy OpenAI
+``functions`` / ``function_call`` format, but Ollama 0.31+ only handles
+the newer ``tools`` / ``tool_calls`` format.  :func:`_patch_openai_compat`
+installs a one-time monkey-patch on ``openai.ChatCompletion.create`` that
+converts between the two formats transparently.
+
 Usage::
 
     from agentprobe.agents.autogen_agent import AutoGenToolAgent
@@ -40,6 +46,56 @@ from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjec
 from agentprobe.observer.tracer import get_tracer
 
 _tracer = get_tracer(__name__)
+
+_COMPAT_PATCHED = False
+
+
+def _patch_openai_compat() -> None:
+    """Monkey-patch ``openai.ChatCompletion.create`` to bridge the
+    ``functions`` ↔ ``tools`` protocol gap between pyautogen 0.1.14
+    and Ollama's OpenAI-compatible endpoint.
+
+    Request:  ``functions`` list → ``tools`` list (wrapped in type/function)
+    Response: ``tool_calls`` list → single ``function_call`` dict
+
+    The patch is idempotent and applied at most once per process.
+    """
+    global _COMPAT_PATCHED
+    if _COMPAT_PATCHED:
+        return
+
+    import openai
+
+    _original_create = openai.ChatCompletion.create
+
+    @staticmethod  # type: ignore[misc]
+    def _patched_create(*args: Any, **kwargs: Any) -> Any:
+        # --- request: functions → tools ---
+        if "functions" in kwargs and "tools" not in kwargs:
+            functions = kwargs.pop("functions")
+            kwargs["tools"] = [
+                {"type": "function", "function": f} for f in functions
+            ]
+        # Also remove function_call if present (incompatible with tools)
+        kwargs.pop("function_call", None)
+
+        resp = _original_create(*args, **kwargs)
+
+        # --- response: tool_calls → function_call ---
+        for choice in resp.get("choices", []):
+            msg = choice.get("message", {})
+            tool_calls = msg.get("tool_calls")
+            if tool_calls and not msg.get("function_call"):
+                first = tool_calls[0]
+                fn = first.get("function", {})
+                msg["function_call"] = {
+                    "name": fn.get("name", ""),
+                    "arguments": fn.get("arguments", "{}"),
+                }
+        return resp
+
+    openai.ChatCompletion.create = _patched_create
+    _COMPAT_PATCHED = True
 
 
 class AutoGenToolAgent:
@@ -65,6 +121,7 @@ class AutoGenToolAgent:
         self._llm_config = llm_config
         self._max_turns = max_turns
         self._injector = ToolFailureInjector(failure_config) if failure_config else None
+        _patch_openai_compat()
         self._agents = self._build_agents()
 
     def invoke(self, input: dict[str, Any]) -> dict[str, Any]:
@@ -85,7 +142,15 @@ class AutoGenToolAgent:
                 query = f"Context:\n{context}\n\nQuestion: {query}"
 
             user_proxy, assistant = self._agents
-            chat_result = user_proxy.initiate_chat(
+            # Clear conversation history and response cache between runs
+            user_proxy.reset()
+            assistant.reset()
+            try:
+                from autogen.oai.completion import Completion
+                Completion.clear_cache()
+            except (ImportError, Exception):
+                pass
+            user_proxy.initiate_chat(
                 assistant,
                 message=query,
                 max_turns=self._max_turns,
@@ -93,16 +158,29 @@ class AutoGenToolAgent:
             latency_ms = (time.perf_counter() - start) * 1000
             span.set_attribute("latency_ms", latency_ms)
 
-            # Extract last assistant message as output
-            messages = getattr(chat_result, "chat_history", []) or []
-            output = next(
-                (m.get("content", "") for m in reversed(messages) if m.get("role") == "assistant"),
-                "",
-            )
+            # Extract last assistant message with nonempty content from
+            # conversation history.  pyautogen 0.1.14 stores messages on the
+            # agent objects, not the return value.  Tool-call messages have
+            # role="assistant" but empty/None content, so we skip those to
+            # find the actual natural-language response (if any).
+            messages = assistant.chat_messages.get(user_proxy, [])
+            output = ""
+            for m in reversed(messages):
+                if m.get("role") == "assistant":
+                    content = (m.get("content") or "").strip()
+                    if content:
+                        output = content
+                        break
+
+            # Count tool executions from conversation history
+            tool_calls = [m for m in messages if m.get("role") == "function"]
+            span.set_attribute("tool_call_count", len(tool_calls))
+
             return {
                 "output": output,
                 "latency_ms": latency_ms,
                 "framework": self.framework,
+                "tool_calls": len(tool_calls),
             }
 
     def get_injector_summary(self) -> dict[str, Any]:
@@ -115,13 +193,17 @@ class AutoGenToolAgent:
             import autogen
 
             def _web_search(query: str) -> str:
-                fn = lambda q: f"[MOCK WEB SEARCH] Results for: {q}\nFound 3 relevant results."  # noqa: E731
+                def _web_search_impl(q: str) -> str:
+                    return f"[MOCK WEB SEARCH] Results for: {q}\nFound 3 relevant results."
+
                 if self._injector:
-                    return self._injector.call(fn, query)
-                return fn(query)
+                    return self._injector.call(
+                        _web_search_impl, query, tool_name="web_search",
+                    )
+                return _web_search_impl(query)
 
             def _calculator(expression: str) -> str:
-                def fn(expr: str) -> str:
+                def _calculator_impl(expr: str) -> str:
                     allowed = set("0123456789+-*/()., ")
                     if not all(c in allowed for c in expr):
                         return "Error: invalid characters"
@@ -131,10 +213,14 @@ class AutoGenToolAgent:
                         return f"Error: {e}"
 
                 if self._injector:
-                    return self._injector.call(fn, expression)
-                return fn(expression)
+                    return self._injector.call(
+                        _calculator_impl, expression, tool_name="calculator",
+                    )
+                return _calculator_impl(expression)
 
             # Define function schemas for the LLM
+            # These are in the legacy 'functions' format; _patch_openai_compat()
+            # converts them to 'tools' format before sending to the API.
             functions = [
                 {
                     "name": "web_search",

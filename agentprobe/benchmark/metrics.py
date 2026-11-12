@@ -49,6 +49,12 @@ class AgentMetrics:
     failure_type: str
     n_runs: int
 
+    # Execution counts
+    n_planned: int = 0
+    n_executed: int = 0
+    n_skipped: int = 0
+    condition_complete: bool = True
+
     # Failure metrics
     failure_rate: float = 0.0           # [0, 1]
     n_failures: int = 0
@@ -76,6 +82,10 @@ class AgentMetrics:
             "task": self.task,
             "failure_type": self.failure_type,
             "n_runs": self.n_runs,
+            "n_planned": self.n_planned,
+            "n_executed": self.n_executed,
+            "n_skipped": self.n_skipped,
+            "condition_complete": self.condition_complete,
             "failure_rate": round(self.failure_rate, 4),
             "n_failures": self.n_failures,
             "n_successes": self.n_successes,
@@ -135,15 +145,22 @@ class MetricsCalculator:
                 return obj.get(key, default)
             return getattr(obj, key, default)
 
-        successes = [r for r in runs if _get(r, "success", False)]
-        failures = [r for r in runs if not _get(r, "success", False)]
+        # Separate executed from skipped trials
+        n_planned = len(runs)
+        executed = [r for r in runs if _get(r, "status", "completed") == "completed"]
+        n_skipped = n_planned - len(executed)
+        condition_complete = n_skipped == 0
+
+        # Compute metrics only from executed trials
+        successes = [r for r in executed if _get(r, "success", False)]
+        failures = [r for r in executed if not _get(r, "success", False)]
         recovered = [r for r in failures if _get(r, "recovered", False)]
 
-        latencies = [_get(r, "latency_ms", 0.0) for r in runs]
+        latencies = [_get(r, "latency_ms", 0.0) for r in executed]
         recovery_latencies = [_get(r, "recovery_latency_ms", 0.0) for r in recovered]
 
-        n = len(runs)
-        failure_rate = len(failures) / n
+        n = len(executed)
+        failure_rate = len(failures) / n if n > 0 else 0.0
         recovery_rate = len(recovered) / len(failures) if failures else 0.0
 
         return AgentMetrics(
@@ -151,6 +168,10 @@ class MetricsCalculator:
             task=tk,
             failure_type=ft,
             n_runs=n,
+            n_planned=n_planned,
+            n_executed=n,
+            n_skipped=n_skipped,
+            condition_complete=condition_complete,
             failure_rate=failure_rate,
             n_failures=len(failures),
             n_successes=len(successes),

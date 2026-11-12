@@ -146,6 +146,9 @@ class InjectionResult:
     latency_ms: float = 0.0
     span_id: str | None = None
     call_index: int = 0
+    call_args: tuple = ()
+    call_kwargs: dict = field(default_factory=dict)
+    return_value: Any = None
 
 
 # ---------------------------------------------------------------------------
@@ -188,13 +191,20 @@ class ToolFailureInjector:
 
         return wrapper  # type: ignore[return-value]
 
-    def call(self, fn: Callable[..., T], *args: Any, **kwargs: Any) -> T:
-        """Directly invoke a function with failure injection (no decoration needed)."""
-        return self._execute_sync(fn, fn.__name__, *args, **kwargs)  # type: ignore[return-value]
+    def call(self, fn: Callable[..., T], *args: Any, tool_name: str | None = None, **kwargs: Any) -> T:
+        """Directly invoke a function with failure injection (no decoration needed).
 
-    async def call_async(self, fn: Callable[..., T], *args: Any, **kwargs: Any) -> T:
+        Args:
+            fn: The tool function to call.
+            *args: Positional arguments forwarded to *fn*.
+            tool_name: Override the recorded tool name (defaults to ``fn.__name__``).
+            **kwargs: Keyword arguments forwarded to *fn*.
+        """
+        return self._execute_sync(fn, tool_name or fn.__name__, *args, **kwargs)  # type: ignore[return-value]
+
+    async def call_async(self, fn: Callable[..., T], *args: Any, tool_name: str | None = None, **kwargs: Any) -> T:
         """Directly invoke an async function with failure injection."""
-        return await self._execute_async(fn, fn.__name__, *args, **kwargs)  # type: ignore[return-value]
+        return await self._execute_async(fn, tool_name or fn.__name__, *args, **kwargs)  # type: ignore[return-value]
 
     # ------------------------------------------------------------------
     # LangChain integration
@@ -283,14 +293,20 @@ class ToolFailureInjector:
                 injected=inject,
                 call_index=idx,
                 span_id=format(span.get_span_context().span_id, "016x"),
+                call_args=args,
+                call_kwargs=dict(kwargs),
             )
             try:
                 if inject:
+                    if self.config.failure_type == ToolFailureType.TIMEOUT:
+                        time.sleep(self.config.timeout_seconds)
                     exc = self._build_exception()
                     span.set_status(Status(StatusCode.ERROR, str(exc)))
                     rec.exception = exc
                     raise exc
-                return fn(*args, **kwargs)
+                result = fn(*args, **kwargs)
+                rec.return_value = result
+                return result
             except ToolCallError:
                 raise
             except Exception as exc:
@@ -323,6 +339,8 @@ class ToolFailureInjector:
                 injected=inject,
                 call_index=idx,
                 span_id=format(span.get_span_context().span_id, "016x"),
+                call_args=args,
+                call_kwargs=dict(kwargs),
             )
             try:
                 if inject:
@@ -333,7 +351,9 @@ class ToolFailureInjector:
                     span.set_status(Status(StatusCode.ERROR, str(exc)))
                     rec.exception = exc
                     raise exc
-                return await fn(*args, **kwargs)
+                result = await fn(*args, **kwargs)
+                rec.return_value = result
+                return result
             except ToolCallError:
                 raise
             except Exception as exc:

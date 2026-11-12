@@ -29,13 +29,9 @@ htmlcov/
 .ipynb_checkpoints/
 *.ipynb_metadata/
 
-# Experiments & results (raw data, kept locally, selectively committed)
-experiments/results/*.csv
-experiments/results/*.json
+# Experiments & results
 experiments/results/*.parquet
 !experiments/results/.gitkeep
-!experiments/results/combined_summary.json
-!experiments/results/experiment_metadata.json
 
 # Secrets / API keys
 .env
