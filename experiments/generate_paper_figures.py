@@ -176,10 +176,9 @@ def fig2_tool_exposure(lglc: dict) -> None:
     width = 0.32
 
     bars1 = ax.bar(x - width / 2, lglc["tool_calls"], width, label="Tool calls",
-                   color=[c + "AA" for c in MODEL_COLORS[:len(models)]],
-                   edgecolor="white", zorder=3)
+                   color="#90CAF9", edgecolor="black", linewidth=0.5, zorder=3)
     bars2 = ax.bar(x + width / 2, lglc["injections"], width, label="Injections",
-                   color=MODEL_COLORS[:len(models)], edgecolor="white", zorder=3)
+                   color="#FF8A65", edgecolor="black", linewidth=0.5, zorder=3)
 
     for bar, val in zip(bars1, lglc["tool_calls"]):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
@@ -211,6 +210,7 @@ def fig3_correctness(lglc: dict) -> None:
     width = 0.22
 
     stages = ["Baseline", "Injection (initial)", "Injection (post-retry)"]
+    stage_colors = ["#90CAF9", "#FFB74D", "#81C784"]
     data = [
         [c / n * 100 for c, n in zip(lglc["correct_baseline"], n_assess)],
         [c / n * 100 for c, n in zip(lglc["correct_injection"], n_assess)],
@@ -218,13 +218,12 @@ def fig3_correctness(lglc: dict) -> None:
     ]
     counts = [lglc["correct_baseline"], lglc["correct_injection"], lglc["correct_retry"]]
     hatches = ["", "//", ""]
-    alphas = [0.5, 0.7, 1.0]
 
     for i, (stage, vals, cnts) in enumerate(zip(stages, data, counts)):
         offset = (i - 1) * width
         bars = ax.bar(x + offset, vals, width, label=stage,
-                      color=MODEL_COLORS[:len(models)], edgecolor="black", linewidth=0.5,
-                      alpha=alphas[i], hatch=hatches[i], zorder=3)
+                      color=stage_colors[i], edgecolor="black", linewidth=0.5,
+                      hatch=hatches[i], zorder=3)
         for bar, val, cnt, n in zip(bars, vals, cnts, n_assess):
             ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.5,
                     f"{cnt}/{n}", ha="center", va="bottom", fontsize=7.5)
@@ -235,8 +234,9 @@ def fig3_correctness(lglc: dict) -> None:
                  fontweight="bold")
     ax.set_xticks(x)
     ax.set_xticklabels(models)
-    ax.set_ylim(0, 115)
-    ax.legend(loc="upper right", fontsize=8)
+    ax.set_ylim(0, 118)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.0), fontsize=8, ncol=3,
+              framealpha=0.9)
     ax.grid(axis="y", alpha=0.3, zorder=0)
 
     fig.tight_layout()

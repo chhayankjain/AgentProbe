@@ -4,7 +4,7 @@
 
 AgentProbe is an open source benchmarking toolkit that injects real-world failure modes into LangGraph, LangChain, and AutoGen agents, traces execution via OpenTelemetry, and measures reliability metrics (MTTR, failure rate, P99 latency) across frameworks and workloads.
 
-Companion to the paper: *"Failure Modes and Observability Patterns in Production Agentic LLM Systems: A Systematic Study"* (arXiv, 2026).
+Companion to the paper: *"AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents"* (submitted to MAKE, MDPI, 2026).
 
 ---
 
@@ -28,8 +28,12 @@ AgentProbe classifies agentic failures into five categories:
 # Install
 pip install -e ".[ollama]"
 
-# Start Ollama with Llama-3
-ollama pull llama3
+# Start Ollama with Llama 3.1 (used in all paper experiments)
+ollama pull llama3.1
+
+# For cross-model validation (optional)
+# ollama pull mistral:7b
+# ollama pull qwen2.5:7b
 
 # Run baseline benchmark (no failures)
 python experiments/run_benchmarks.py --frameworks langgraph --tasks tool_use --baseline-only
@@ -160,19 +164,104 @@ pytest tests/ -v -m "not slow and not integration"
 
 ## Reproducing Paper Results
 
+The paper reports a two-phase study using Llama 3.1 8B (Q4_K_M) via Ollama, with injection seed 42 throughout.
+
+### Phase 1 — Discovery (1,050 runs)
+
+Phase 1 uses `run_benchmarks.py` with 30 runs for LangGraph/LangChain and 10 for AutoGen across 3 task types and 5 fault conditions. This phase discovered that AutoGen never invokes tools due to a legacy API-parameter mismatch.
+
+> **Historical reproduction note:** The current codebase includes the patched AutoGen adapter (`_patch_openai_compat()`). To reproduce the original Phase 1 bypass behavior, use the pre-patch source at tag `v1.0.0`. Running Phase 1 commands with the current code will produce patched AutoGen behavior (tools are called), not the historical bypass.
+
 ```bash
-# Full benchmark matrix (50 runs per config, ~2-3h with Ollama)
+# LangGraph / LangChain (30 runs per condition)
 python experiments/run_benchmarks.py \
-    --frameworks langgraph langchain autogen \
+    --frameworks langgraph langchain \
     --tasks tool_use rag multi_agent \
     --failure-types none timeout malformed_output rate_limit api_error \
-    --n-runs 50 \
-    --llm ollama \
-    --model llama3 \
-    --save-results
+    --n-runs 30 --llm ollama --model llama3.1 --save-results
 
-# Results saved to experiments/results/
+# AutoGen (10 runs per condition)
+python experiments/run_benchmarks.py \
+    --frameworks autogen \
+    --tasks tool_use rag multi_agent \
+    --failure-types none timeout malformed_output rate_limit api_error \
+    --n-runs 10 --llm ollama --model llama3.1 --save-results
 ```
+
+### Phase 2 — Patched Validation (450 runs)
+
+Phase 2 uses `run_experiment_v2.py` with the patched AutoGen adapter (proper `tool_name=` recording, `_patch_openai_compat()` for the functions/tools protocol gap). Runs 30 trials per condition across 3 frameworks × 5 fault conditions on tool-use tasks only, with matched p=0.20 injection probability.
+
+```bash
+python experiments/run_experiment_v2.py \
+    --frameworks langgraph langchain autogen \
+    --model llama3.1 --seed 42
+```
+
+### Qualification Experiment (12 trials)
+
+A small, targeted validation with deterministic calculator tasks and guaranteed fault injection (p=1.0). Produces a self-contained JSON artifact with inputs, outputs, tool events, injection log entries (with args/returns), and linked OTel trace span IDs.
+
+```bash
+python experiments/run_qualification.py \
+    --frameworks langgraph langchain autogen \
+    --model llama3.1
+```
+
+### Cross-Model Validation
+
+Repeats the qualification and Phase 2 protocol on additional models (Mistral 7B, Qwen2.5 7B):
+
+```bash
+# Smoke test: verify tool calling works
+python experiments/smoke_test_model.py --model mistral:7b
+python experiments/smoke_test_model.py --model qwen2.5:7b
+
+# Qualification (12 trials per model)
+python experiments/run_qualification.py --model mistral:7b
+python experiments/run_qualification.py --model qwen2.5:7b
+
+# Full Phase 2 (450 runs per model)
+python experiments/run_experiment_v2.py --model mistral:7b --seed 42
+python experiments/run_experiment_v2.py --model qwen2.5:7b --seed 42
+
+# Cross-model analysis
+python experiments/analyze_cross_model.py \
+    --batches experiments/results_v2/LLAMA_BATCH experiments/results_v2/MISTRAL_BATCH experiments/results_v2/QWEN_BATCH \
+    --models llama3.1 mistral:7b qwen2.5:7b
+```
+
+Results are saved to `experiments/results_v2/`.
+
+### AutoGen Diagnostic (Direct Client vs Shim)
+
+A diagnostic comparing the AutoGen adapter pipeline against a direct OpenAI-compatible client on the same three deterministic tasks. The compared paths differ in message format, stopping policy, and temperature handling; results are consistent with the adapter layer being a major contributor to low answer-string presence but do not isolate a single cause:
+
+```bash
+# Llama 3.1
+python experiments/autogen_diagnostic.py --model llama3.1
+
+# Qwen2.5 7B
+python experiments/autogen_diagnostic.py --model qwen2.5:7b
+```
+
+Diagnostic artifacts are saved to `experiments/results_v2/diagnostic_*/`.
+
+### Analysis
+
+Phase 2 uses the corrected summary at `experiments/results_v2/` (not the original `experiments/results/combined_summary.json`, which contains known counting bugs). The paper's tables are derived from:
+- **Phase 2 batch (Llama 3.1):** `experiments/results_v2/20261111_113514/`
+- **Phase 2 batch (Mistral 7B):** `experiments/results_v2/20261111_233435/`
+- **Phase 2 batch (Qwen2.5 7B LG/LC):** `experiments/results_v2/20261112_040156/`
+- **Phase 2 batch (Qwen2.5 7B AutoGen rerun):** `experiments/results_v2/20261112_063451/` (corrected extractor)
+- **Corrected summary:** `review_outputs/20261111_recheck/corrected_summary.json`
+- **Qualification (Llama 3.1):** `experiments/results_v2/qualification_20261111_211913/` (12 trials, 10 passed)
+- **Qualification (Mistral 7B):** `experiments/results_v2/qualification_20261111_233116/` (12 trials, 8 passed)
+- **Qualification (Qwen2.5 7B):** `experiments/results_v2/qualification_20261111_233320/` (12 trials, 10 passed)
+
+> **Source map:** The authoritative mapping from each paper table cell to its batch directory is in [`experiments/results_v2/paper_source_map.json`](experiments/results_v2/paper_source_map.json). The Qwen2.5 column combines two batches: LangGraph/LangChain from `20261112_040156` and AutoGen from `20261112_063451` (corrected output extractor). Llama and Mistral use their single original batches. The `analyze_cross_model.py` script does not automatically merge these; use the source map to select the correct batch per framework.
+
+> **Model digests:** All three models use Q4_K_M quantization. Ollama digest prefixes: Llama `46e0c10c039e`, Mistral `6577803aa9a0`, Qwen `845dbda0ea48`. The `experiment_metadata.json` files in historical batches record `model_digest: unknown` because digest capture was added after the experiments ran; the digests listed here were identified post-hoc from the same Ollama installation.
 
 ## Citation
 

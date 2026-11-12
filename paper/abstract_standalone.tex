@@ -1,0 +1,36 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{times}
+\usepackage{parskip}
+\usepackage{hyperref}
+
+\begin{document}
+
+\begin{center}
+{\Large\bfseries AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents}
+
+\vspace{1em}
+
+{\large Chhayank Jain\textsuperscript{1}, Sarthak Pattnaik\textsuperscript{2}, Eugene Pinsky\textsuperscript{2,*}}
+
+\vspace{0.5em}
+
+\textsuperscript{1} Arizona State University, Tempe, AZ, USA\\
+\textsuperscript{2} Boston University, Boston, MA, USA\\[0.3em]
+\textsuperscript{*} Correspondence: epinsky@bu.edu
+\end{center}
+
+\vspace{1.5em}
+
+\noindent\textbf{Abstract:}
+LLM-based intelligent agents are increasingly deployed in production, yet their fault tolerance is poorly understood. We present AgentProbe, an open-source fault-injection and observability toolkit with a five-category failure taxonomy, configurable injectors, and OpenTelemetry tracing. We compare three frameworks---LangGraph, LangChain, and AutoGen---using Llama~3.1 8B via Ollama in a two-phase study. Phase~1 (1,050~runs) reveals that AutoGen never invokes tools due to a legacy API-parameter mismatch silently ignored by Ollama. Phase~2 patches AutoGen and re-executes 450~runs (30 per condition; the four fault types share a single seed and produce identical LangGraph/LangChain failure/recovery patterns, so these cells are not independent replications) with matched injection probability ($p = 0.20$) and answer-presence grading. Under injection, LangGraph and LangChain exhibit a 23.3\% error rate [95\%~Wilson~CI: 11.8--40.9\%] with 71.4\% recovery. AutoGen achieves 0\% error rate---its conversation protocol absorbs tool exceptions---but the expected answer string appears in only 33.3\% of assessable baseline questions versus 100\% for LangGraph/LangChain ($n = 12$ each; Llama~3.1 figure uses the historical answer extractor---see Section~7.7). A qualification experiment with guaranteed injection ($p = 1.0$) validates the pipeline via linked traces. Cross-model validation on Mistral~7B and Qwen2.5~7B shows consistent framework-level patterns across three architectures on one local backend. These results show that pass/fail metrics can hide silent tool bypass and error absorption, making fault injection with trace-level observability essential for evaluation.
+
+\vspace{1em}
+
+\noindent\textbf{Keywords:} intelligent agents; multi-agent systems; agent-oriented architectures; Large Language Models (LLMs); reliability benchmarking; fault injection; observability
+
+\vspace{1.5em}
+
+{\noindent\textbf{Data Availability:} The AgentProbe toolkit, benchmark tasks, experimental scripts, and all experimental results are available as open-source software at\\\url{https://github.com/chhayankjain/AgentProbe}.}
+
+\end{document}
