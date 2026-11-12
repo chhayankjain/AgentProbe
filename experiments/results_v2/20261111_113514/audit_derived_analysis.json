@@ -1,0 +1,1207 @@
+{
+  "audit_timestamp_utc": "2026-11-11T07:52:00.105282+00:00",
+  "source_batch": "experiments/results_v2/20261111_113514",
+  "source_manifest_checksum": "ff9af604f915558770652051123da6f6293c2f1ed51d622f07b012fc3ae6b8e6",
+  "note": "Derived analysis \u2014 original batch files are unchanged.",
+  "reconciliation": {
+    "manifest_csv_count": 15,
+    "actual_csv_count": 15,
+    "csv_lists_match": true,
+    "manifest_n_records": 450,
+    "actual_json_records": 450,
+    "all_status_completed": true,
+    "checkpoint_conditions": 15,
+    "per_condition_csv_json_match": true,
+    "errors": []
+  },
+  "bugs_found": {
+    "tool_call_overcounting": {
+      "description": "injector_calls field is the cumulative condition total, identical for all 30 records. summary.total_tool_calls = sum(injector_calls) = 30 * condition_total, a 30x overcount.",
+      "example": "langgraph/timeout: stored total_tool_calls=1110, actual condition total=37",
+      "affected_fields": [
+        "injector_calls",
+        "injector_injections",
+        "tool_call_count"
+      ],
+      "affected_summary_fields": [
+        "total_tool_calls",
+        "total_injections"
+      ]
+    },
+    "output_field_format": {
+      "description": "output field contains str(dict) \u2014 e.g. \"{'output': 'Paris...', 'latency_ms': 1234, 'framework': 'langgraph'}\" \u2014 not the actual answer text. Grading ran on str(dict) which happens to produce correct results for these specific keywords, but is fragile.",
+      "impact": "No grade changes found between str(dict) and extracted inner text for this keyword set. However, the approach would fail if keywords collided with metadata field values."
+    },
+    "grading_anomalies": {
+      "description": "Comparison of stored grade_correct vs regraded-on-inner-text.",
+      "count": 0,
+      "details": []
+    }
+  },
+  "metadata_gaps": {
+    "model_digest": "Stored as \"unknown\". Actual: sha256-667b0c1932bc6ffc593ed1d03f895bf2dc8dc6df21db3042284a6f4416b06a29",
+    "git_dirty": "True. Dirty files: autogen_agent.py, runner.py, metrics.py, run_experiment_v2.py, test_benchmark_runner.py. Base commit: 955da0b.",
+    "dirty_file_diff_stat": "5 files changed, 457 insertions(+), 111 deletions(-)"
+  },
+  "conditions": [
+    {
+      "framework": "langgraph",
+      "failure_type": "none",
+      "n_runs": 30,
+      "initial_success": 30,
+      "initial_fail": 0,
+      "recovered": 0,
+      "unrecovered": 0,
+      "failed_run_ids": [],
+      "recovered_run_ids": [],
+      "failure_rate": 0.0,
+      "failure_rate_95ci": [
+        0.0,
+        0.1135
+      ],
+      "recovery_rate": null,
+      "recovery_rate_95ci": null,
+      "kw_pass_count": 30,
+      "kw_pass_rate": 1.0,
+      "kw_pass_rate_95ci": [
+        0.8865,
+        1.0
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 6,
+          "fail": 0,
+          "total": 6
+        },
+        "1": {
+          "pass": 6,
+          "fail": 0,
+          "total": 6
+        },
+        "2": {
+          "pass": 6,
+          "fail": 0,
+          "total": 6
+        },
+        "3": {
+          "pass": 6,
+          "fail": 0,
+          "total": 6
+        },
+        "4": {
+          "pass": 6,
+          "fail": 0,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 6,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 0,
+      "recovery_kw_total": 0,
+      "recovery_exact_correct": 0,
+      "recovery_exact_total": 0,
+      "injector_total_calls": null,
+      "injector_total_injections": null,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": true,
+      "note_baseline_tools": "Baseline (none) has no injector wrapper; tool_call_count=0 means NOT INSTRUMENTED, not zero tool calls",
+      "mean_ms": 6078.8,
+      "p50_ms": 5760.6,
+      "p90_ms": 11935.4,
+      "p99_ms": 12187.3,
+      "max_ms": 13468.4
+    },
+    {
+      "framework": "langgraph",
+      "failure_type": "timeout",
+      "n_runs": 30,
+      "initial_success": 23,
+      "initial_fail": 7,
+      "recovered": 5,
+      "unrecovered": 2,
+      "failed_run_ids": [
+        1,
+        6,
+        7,
+        9,
+        15,
+        18,
+        20
+      ],
+      "recovered_run_ids": [
+        1,
+        6,
+        7,
+        15,
+        18
+      ],
+      "failure_rate": 0.2333,
+      "failure_rate_95ci": [
+        0.1179,
+        0.4093
+      ],
+      "recovery_rate": 0.7143,
+      "recovery_rate_95ci": [
+        0.3589,
+        0.9178
+      ],
+      "kw_pass_count": 23,
+      "kw_pass_rate": 0.7667,
+      "kw_pass_rate_95ci": [
+        0.5907,
+        0.8821
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "1": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "2": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "3": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "4": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 5,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 5,
+      "recovery_kw_total": 5,
+      "recovery_exact_correct": 1,
+      "recovery_exact_total": 1,
+      "injector_total_calls": 37,
+      "injector_total_injections": 9,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 7882.1,
+      "p50_ms": 6925.3,
+      "p90_ms": 16140.2,
+      "p99_ms": 17165.9,
+      "max_ms": 17542.8
+    },
+    {
+      "framework": "langgraph",
+      "failure_type": "malformed_output",
+      "n_runs": 30,
+      "initial_success": 23,
+      "initial_fail": 7,
+      "recovered": 5,
+      "unrecovered": 2,
+      "failed_run_ids": [
+        1,
+        6,
+        7,
+        9,
+        15,
+        18,
+        20
+      ],
+      "recovered_run_ids": [
+        1,
+        6,
+        7,
+        15,
+        18
+      ],
+      "failure_rate": 0.2333,
+      "failure_rate_95ci": [
+        0.1179,
+        0.4093
+      ],
+      "recovery_rate": 0.7143,
+      "recovery_rate_95ci": [
+        0.3589,
+        0.9178
+      ],
+      "kw_pass_count": 23,
+      "kw_pass_rate": 0.7667,
+      "kw_pass_rate_95ci": [
+        0.5907,
+        0.8821
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "1": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "2": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "3": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "4": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 5,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 5,
+      "recovery_kw_total": 5,
+      "recovery_exact_correct": 1,
+      "recovery_exact_total": 1,
+      "injector_total_calls": 37,
+      "injector_total_injections": 9,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 7272.8,
+      "p50_ms": 2556.9,
+      "p90_ms": 17916.2,
+      "p99_ms": 19096.8,
+      "max_ms": 19126.6
+    },
+    {
+      "framework": "langgraph",
+      "failure_type": "rate_limit",
+      "n_runs": 30,
+      "initial_success": 23,
+      "initial_fail": 7,
+      "recovered": 5,
+      "unrecovered": 2,
+      "failed_run_ids": [
+        1,
+        6,
+        7,
+        9,
+        15,
+        18,
+        20
+      ],
+      "recovered_run_ids": [
+        1,
+        6,
+        7,
+        15,
+        18
+      ],
+      "failure_rate": 0.2333,
+      "failure_rate_95ci": [
+        0.1179,
+        0.4093
+      ],
+      "recovery_rate": 0.7143,
+      "recovery_rate_95ci": [
+        0.3589,
+        0.9178
+      ],
+      "kw_pass_count": 23,
+      "kw_pass_rate": 0.7667,
+      "kw_pass_rate_95ci": [
+        0.5907,
+        0.8821
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "1": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "2": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "3": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "4": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 5,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 5,
+      "recovery_kw_total": 5,
+      "recovery_exact_correct": 1,
+      "recovery_exact_total": 1,
+      "injector_total_calls": 37,
+      "injector_total_injections": 9,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 6499.5,
+      "p50_ms": 2591.8,
+      "p90_ms": 15831.7,
+      "p99_ms": 16953.4,
+      "max_ms": 17548.1
+    },
+    {
+      "framework": "langgraph",
+      "failure_type": "api_error",
+      "n_runs": 30,
+      "initial_success": 23,
+      "initial_fail": 7,
+      "recovered": 5,
+      "unrecovered": 2,
+      "failed_run_ids": [
+        1,
+        6,
+        7,
+        9,
+        15,
+        18,
+        20
+      ],
+      "recovered_run_ids": [
+        1,
+        6,
+        7,
+        15,
+        18
+      ],
+      "failure_rate": 0.2333,
+      "failure_rate_95ci": [
+        0.1179,
+        0.4093
+      ],
+      "recovery_rate": 0.7143,
+      "recovery_rate_95ci": [
+        0.3589,
+        0.9178
+      ],
+      "kw_pass_count": 23,
+      "kw_pass_rate": 0.7667,
+      "kw_pass_rate_95ci": [
+        0.5907,
+        0.8821
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "1": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "2": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "3": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "4": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 5,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 5,
+      "recovery_kw_total": 5,
+      "recovery_exact_correct": 1,
+      "recovery_exact_total": 1,
+      "injector_total_calls": 37,
+      "injector_total_injections": 9,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 7011.1,
+      "p50_ms": 3801.9,
+      "p90_ms": 16179.6,
+      "p99_ms": 18968.7,
+      "max_ms": 19522.7
+    },
+    {
+      "framework": "langchain",
+      "failure_type": "none",
+      "n_runs": 30,
+      "initial_success": 30,
+      "initial_fail": 0,
+      "recovered": 0,
+      "unrecovered": 0,
+      "failed_run_ids": [],
+      "recovered_run_ids": [],
+      "failure_rate": 0.0,
+      "failure_rate_95ci": [
+        0.0,
+        0.1135
+      ],
+      "recovery_rate": null,
+      "recovery_rate_95ci": null,
+      "kw_pass_count": 30,
+      "kw_pass_rate": 1.0,
+      "kw_pass_rate_95ci": [
+        0.8865,
+        1.0
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 6,
+          "fail": 0,
+          "total": 6
+        },
+        "1": {
+          "pass": 6,
+          "fail": 0,
+          "total": 6
+        },
+        "2": {
+          "pass": 6,
+          "fail": 0,
+          "total": 6
+        },
+        "3": {
+          "pass": 6,
+          "fail": 0,
+          "total": 6
+        },
+        "4": {
+          "pass": 6,
+          "fail": 0,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 6,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 0,
+      "recovery_kw_total": 0,
+      "recovery_exact_correct": 0,
+      "recovery_exact_total": 0,
+      "injector_total_calls": null,
+      "injector_total_injections": null,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": true,
+      "note_baseline_tools": "Baseline (none) has no injector wrapper; tool_call_count=0 means NOT INSTRUMENTED, not zero tool calls",
+      "mean_ms": 8358.9,
+      "p50_ms": 8492.9,
+      "p90_ms": 16799.3,
+      "p99_ms": 17389.4,
+      "max_ms": 17599.7
+    },
+    {
+      "framework": "langchain",
+      "failure_type": "timeout",
+      "n_runs": 30,
+      "initial_success": 23,
+      "initial_fail": 7,
+      "recovered": 5,
+      "unrecovered": 2,
+      "failed_run_ids": [
+        1,
+        6,
+        7,
+        9,
+        15,
+        18,
+        20
+      ],
+      "recovered_run_ids": [
+        1,
+        6,
+        7,
+        15,
+        18
+      ],
+      "failure_rate": 0.2333,
+      "failure_rate_95ci": [
+        0.1179,
+        0.4093
+      ],
+      "recovery_rate": 0.7143,
+      "recovery_rate_95ci": [
+        0.3589,
+        0.9178
+      ],
+      "kw_pass_count": 23,
+      "kw_pass_rate": 0.7667,
+      "kw_pass_rate_95ci": [
+        0.5907,
+        0.8821
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "1": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "2": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "3": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "4": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 5,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 5,
+      "recovery_kw_total": 5,
+      "recovery_exact_correct": 1,
+      "recovery_exact_total": 1,
+      "injector_total_calls": 37,
+      "injector_total_injections": 9,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 7977.5,
+      "p50_ms": 7459.0,
+      "p90_ms": 15630.0,
+      "p99_ms": 18167.1,
+      "max_ms": 19137.3
+    },
+    {
+      "framework": "langchain",
+      "failure_type": "malformed_output",
+      "n_runs": 30,
+      "initial_success": 23,
+      "initial_fail": 7,
+      "recovered": 5,
+      "unrecovered": 2,
+      "failed_run_ids": [
+        1,
+        6,
+        7,
+        9,
+        15,
+        18,
+        20
+      ],
+      "recovered_run_ids": [
+        1,
+        6,
+        7,
+        15,
+        18
+      ],
+      "failure_rate": 0.2333,
+      "failure_rate_95ci": [
+        0.1179,
+        0.4093
+      ],
+      "recovery_rate": 0.7143,
+      "recovery_rate_95ci": [
+        0.3589,
+        0.9178
+      ],
+      "kw_pass_count": 23,
+      "kw_pass_rate": 0.7667,
+      "kw_pass_rate_95ci": [
+        0.5907,
+        0.8821
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "1": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "2": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "3": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "4": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 5,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 5,
+      "recovery_kw_total": 5,
+      "recovery_exact_correct": 1,
+      "recovery_exact_total": 1,
+      "injector_total_calls": 37,
+      "injector_total_injections": 9,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 6415.0,
+      "p50_ms": 2601.6,
+      "p90_ms": 15705.1,
+      "p99_ms": 16010.0,
+      "max_ms": 16168.0
+    },
+    {
+      "framework": "langchain",
+      "failure_type": "rate_limit",
+      "n_runs": 30,
+      "initial_success": 23,
+      "initial_fail": 7,
+      "recovered": 5,
+      "unrecovered": 2,
+      "failed_run_ids": [
+        1,
+        6,
+        7,
+        9,
+        15,
+        18,
+        20
+      ],
+      "recovered_run_ids": [
+        1,
+        6,
+        7,
+        15,
+        18
+      ],
+      "failure_rate": 0.2333,
+      "failure_rate_95ci": [
+        0.1179,
+        0.4093
+      ],
+      "recovery_rate": 0.7143,
+      "recovery_rate_95ci": [
+        0.3589,
+        0.9178
+      ],
+      "kw_pass_count": 23,
+      "kw_pass_rate": 0.7667,
+      "kw_pass_rate_95ci": [
+        0.5907,
+        0.8821
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "1": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "2": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "3": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "4": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 5,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 5,
+      "recovery_kw_total": 5,
+      "recovery_exact_correct": 1,
+      "recovery_exact_total": 1,
+      "injector_total_calls": 37,
+      "injector_total_injections": 9,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 6748.6,
+      "p50_ms": 2755.0,
+      "p90_ms": 16047.2,
+      "p99_ms": 16793.6,
+      "max_ms": 19404.6
+    },
+    {
+      "framework": "langchain",
+      "failure_type": "api_error",
+      "n_runs": 30,
+      "initial_success": 23,
+      "initial_fail": 7,
+      "recovered": 5,
+      "unrecovered": 2,
+      "failed_run_ids": [
+        1,
+        6,
+        7,
+        9,
+        15,
+        18,
+        20
+      ],
+      "recovered_run_ids": [
+        1,
+        6,
+        7,
+        15,
+        18
+      ],
+      "failure_rate": 0.2333,
+      "failure_rate_95ci": [
+        0.1179,
+        0.4093
+      ],
+      "recovery_rate": 0.7143,
+      "recovery_rate_95ci": [
+        0.3589,
+        0.9178
+      ],
+      "kw_pass_count": 23,
+      "kw_pass_rate": 0.7667,
+      "kw_pass_rate_95ci": [
+        0.5907,
+        0.8821
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "1": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "2": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "3": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        },
+        "4": {
+          "pass": 5,
+          "fail": 1,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 5,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 5,
+      "recovery_kw_total": 5,
+      "recovery_exact_correct": 1,
+      "recovery_exact_total": 1,
+      "injector_total_calls": 37,
+      "injector_total_injections": 9,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 6378.6,
+      "p50_ms": 2207.8,
+      "p90_ms": 15820.4,
+      "p99_ms": 16005.0,
+      "max_ms": 17352.5
+    },
+    {
+      "framework": "autogen",
+      "failure_type": "none",
+      "n_runs": 30,
+      "initial_success": 30,
+      "initial_fail": 0,
+      "recovered": 0,
+      "unrecovered": 0,
+      "failed_run_ids": [],
+      "recovered_run_ids": [],
+      "failure_rate": 0.0,
+      "failure_rate_95ci": [
+        0.0,
+        0.1135
+      ],
+      "recovery_rate": null,
+      "recovery_rate_95ci": null,
+      "kw_pass_count": 10,
+      "kw_pass_rate": 0.3333,
+      "kw_pass_rate_95ci": [
+        0.1923,
+        0.5122
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 2,
+          "fail": 4,
+          "total": 6
+        },
+        "1": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "2": {
+          "pass": 2,
+          "fail": 4,
+          "total": 6
+        },
+        "3": {
+          "pass": 0,
+          "fail": 6,
+          "total": 6
+        },
+        "4": {
+          "pass": 2,
+          "fail": 4,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 2,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 0,
+      "recovery_kw_total": 0,
+      "recovery_exact_correct": 0,
+      "recovery_exact_total": 0,
+      "injector_total_calls": null,
+      "injector_total_injections": null,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": true,
+      "note_baseline_tools": "Baseline (none) has no injector wrapper; tool_call_count=0 means NOT INSTRUMENTED, not zero tool calls",
+      "mean_ms": 16391.2,
+      "p50_ms": 15042.1,
+      "p90_ms": 27709.0,
+      "p99_ms": 31953.2,
+      "max_ms": 33461.1
+    },
+    {
+      "framework": "autogen",
+      "failure_type": "timeout",
+      "n_runs": 30,
+      "initial_success": 30,
+      "initial_fail": 0,
+      "recovered": 0,
+      "unrecovered": 0,
+      "failed_run_ids": [],
+      "recovered_run_ids": [],
+      "failure_rate": 0.0,
+      "failure_rate_95ci": [
+        0.0,
+        0.1135
+      ],
+      "recovery_rate": null,
+      "recovery_rate_95ci": null,
+      "kw_pass_count": 11,
+      "kw_pass_rate": 0.3667,
+      "kw_pass_rate_95ci": [
+        0.2187,
+        0.5449
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 3,
+          "fail": 3,
+          "total": 6
+        },
+        "1": {
+          "pass": 3,
+          "fail": 3,
+          "total": 6
+        },
+        "2": {
+          "pass": 0,
+          "fail": 6,
+          "total": 6
+        },
+        "3": {
+          "pass": 1,
+          "fail": 5,
+          "total": 6
+        },
+        "4": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 0,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 0,
+      "recovery_kw_total": 0,
+      "recovery_exact_correct": 0,
+      "recovery_exact_total": 0,
+      "injector_total_calls": 79,
+      "injector_total_injections": 15,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 22090.2,
+      "p50_ms": 21130.6,
+      "p90_ms": 30555.6,
+      "p99_ms": 37080.2,
+      "max_ms": 56091.3
+    },
+    {
+      "framework": "autogen",
+      "failure_type": "malformed_output",
+      "n_runs": 30,
+      "initial_success": 30,
+      "initial_fail": 0,
+      "recovered": 0,
+      "unrecovered": 0,
+      "failed_run_ids": [],
+      "recovered_run_ids": [],
+      "failure_rate": 0.0,
+      "failure_rate_95ci": [
+        0.0,
+        0.1135
+      ],
+      "recovery_rate": null,
+      "recovery_rate_95ci": null,
+      "kw_pass_count": 14,
+      "kw_pass_rate": 0.4667,
+      "kw_pass_rate_95ci": [
+        0.3023,
+        0.6386
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "1": {
+          "pass": 3,
+          "fail": 3,
+          "total": 6
+        },
+        "2": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "3": {
+          "pass": 0,
+          "fail": 6,
+          "total": 6
+        },
+        "4": {
+          "pass": 3,
+          "fail": 3,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 4,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 0,
+      "recovery_kw_total": 0,
+      "recovery_exact_correct": 0,
+      "recovery_exact_total": 0,
+      "injector_total_calls": 82,
+      "injector_total_injections": 15,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 22179.7,
+      "p50_ms": 18524.5,
+      "p90_ms": 38173.0,
+      "p99_ms": 56814.3,
+      "max_ms": 66255.7
+    },
+    {
+      "framework": "autogen",
+      "failure_type": "rate_limit",
+      "n_runs": 30,
+      "initial_success": 30,
+      "initial_fail": 0,
+      "recovered": 0,
+      "unrecovered": 0,
+      "failed_run_ids": [],
+      "recovered_run_ids": [],
+      "failure_rate": 0.0,
+      "failure_rate_95ci": [
+        0.0,
+        0.1135
+      ],
+      "recovery_rate": null,
+      "recovery_rate_95ci": null,
+      "kw_pass_count": 8,
+      "kw_pass_rate": 0.2667,
+      "kw_pass_rate_95ci": [
+        0.1418,
+        0.4445
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 2,
+          "fail": 4,
+          "total": 6
+        },
+        "1": {
+          "pass": 3,
+          "fail": 3,
+          "total": 6
+        },
+        "2": {
+          "pass": 1,
+          "fail": 5,
+          "total": 6
+        },
+        "3": {
+          "pass": 0,
+          "fail": 6,
+          "total": 6
+        },
+        "4": {
+          "pass": 2,
+          "fail": 4,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 1,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 0,
+      "recovery_kw_total": 0,
+      "recovery_exact_correct": 0,
+      "recovery_exact_total": 0,
+      "injector_total_calls": 81,
+      "injector_total_injections": 15,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 19810.6,
+      "p50_ms": 16718.5,
+      "p90_ms": 33392.3,
+      "p99_ms": 38330.3,
+      "max_ms": 49115.4
+    },
+    {
+      "framework": "autogen",
+      "failure_type": "api_error",
+      "n_runs": 30,
+      "initial_success": 30,
+      "initial_fail": 0,
+      "recovered": 0,
+      "unrecovered": 0,
+      "failed_run_ids": [],
+      "recovered_run_ids": [],
+      "failure_rate": 0.0,
+      "failure_rate_95ci": [
+        0.0,
+        0.1135
+      ],
+      "recovery_rate": null,
+      "recovery_rate_95ci": null,
+      "kw_pass_count": 12,
+      "kw_pass_rate": 0.4,
+      "kw_pass_rate_95ci": [
+        0.2459,
+        0.5768
+      ],
+      "kw_pass_by_prompt": {
+        "0": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "1": {
+          "pass": 4,
+          "fail": 2,
+          "total": 6
+        },
+        "2": {
+          "pass": 1,
+          "fail": 5,
+          "total": 6
+        },
+        "3": {
+          "pass": 0,
+          "fail": 6,
+          "total": 6
+        },
+        "4": {
+          "pass": 3,
+          "fail": 3,
+          "total": 6
+        }
+      },
+      "exact_numerical_correct": 1,
+      "exact_numerical_total": 6,
+      "recovery_kw_pass": 0,
+      "recovery_kw_total": 0,
+      "recovery_exact_correct": 0,
+      "recovery_exact_total": 0,
+      "injector_total_calls": 83,
+      "injector_total_injections": 15,
+      "injector_field_is_cumulative": true,
+      "baseline_not_instrumented": false,
+      "note_baseline_tools": null,
+      "mean_ms": 22754.7,
+      "p50_ms": 16545.8,
+      "p90_ms": 42475.2,
+      "p99_ms": 44428.5,
+      "max_ms": 67179.1
+    }
+  ],
+  "irrecoverable_evidence": [
+    "Per-trial tool call counts: injector_calls is cumulative across all runs in a condition. Individual per-run tool call counts were never recorded. The stored per-record value is the condition-total snapshot at the time each record was written (identical for all 30 runs).",
+    "Baseline tool call counts: baseline conditions (failure_type=none) have no injector wrapper. tool_call_count=0 and injector_calls=0 reflect absence of instrumentation, not absence of tool calls. Actual baseline tool usage is not recoverable from stored data.",
+    "Manifest checksum: CORRECTED \u2014 the stored checksum (ff9af60...) IS reproducible by loading records in the metadata framework/condition order (frameworks \u00d7 sorted tasks \u00d7 failure_types). The independent audit (review_outputs/publication_audit.py) confirmed this. The earlier statement that file-load order produces a different checksum was due to using alphabetical file globbing instead of the metadata-specified order.",
+    "Model digest: experiment_metadata.json records model_digest=\"unknown\" because `ollama show llama3.1` output format did not match the sha256 grep pattern. The actual digest is sha256-667b0c1932bc6ffc593ed1d03f895bf2dc8dc6df21db3042284a6f4416b06a29 (from `ollama show llama3.1:latest --modelfile`).",
+    "Git dirty state: experiment_metadata.json records git_dirty=true. The dirty files are the experiment runner (run_experiment_v2.py), autogen_agent.py monkey-patch, runner.py timeout fixes, metrics.py skip-tracking, and test additions. The base commit is 955da0b.",
+    "AutoGen inner output is last assistant message only: the multi-turn conversation may contain correct answers in earlier turns that are not captured in the output field. For example, run_id=0 (capital of France) \u2014 AutoGen said \"Paris\" in an earlier turn but the last message was \"The information was already known.\" Grading on last-message-only understates AutoGen answer quality. Full conversation logs were printed to stdout but not persisted per-record.",
+    "Recovery output grading for failed-and-unrecovered runs: these runs have empty recovery_output. It is unknown whether the recovery attempt produced a partial answer before the second failure.",
+    "Injection schedule determinism: all 8 LG/LC injection conditions share identical failed_run_ids [1,6,7,9,15,18,20] because the injector uses seed=42 and is re-created per condition. This means recovery_rate=5/7 is measured on the SAME 7 prompts across all fault types, not on independent samples. Multiple seeds would be needed to assess recovery variance."
+  ],
+  "corrections_applied": [
+    {
+      "date": "2026-11-11",
+      "field": "irrecoverable_evidence[2]",
+      "change": "Manifest checksum is reproducible using metadata framework/condition order. Previous statement was incorrect.",
+      "verified_by": "review_outputs/publication_audit.py"
+    }
+  ]
+}

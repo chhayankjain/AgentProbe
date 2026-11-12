@@ -1,0 +1,811 @@
+diff --git a/agentprobe/agents/autogen_agent.py b/agentprobe/agents/autogen_agent.py
+index 5a43c46..84eab6c 100644
+--- a/agentprobe/agents/autogen_agent.py
++++ b/agentprobe/agents/autogen_agent.py
+@@ -17,6 +17,12 @@ point to an Ollama local server:
+         ]
+     }
+ 
++**Protocol fix (Nov 2026):** pyautogen 0.1.14 uses the legacy OpenAI
++``functions`` / ``function_call`` format, but Ollama 0.31+ only handles
++the newer ``tools`` / ``tool_calls`` format.  :func:`_patch_openai_compat`
++installs a one-time monkey-patch on ``openai.ChatCompletion.create`` that
++converts between the two formats transparently.
++
+ Usage::
+ 
+     from agentprobe.agents.autogen_agent import AutoGenToolAgent
+@@ -41,6 +47,56 @@ from agentprobe.observer.tracer import get_tracer
+ 
+ _tracer = get_tracer(__name__)
+ 
++_COMPAT_PATCHED = False
++
++
++def _patch_openai_compat() -> None:
++    """Monkey-patch ``openai.ChatCompletion.create`` to bridge the
++    ``functions`` ↔ ``tools`` protocol gap between pyautogen 0.1.14
++    and Ollama's OpenAI-compatible endpoint.
++
++    Request:  ``functions`` list → ``tools`` list (wrapped in type/function)
++    Response: ``tool_calls`` list → single ``function_call`` dict
++
++    The patch is idempotent and applied at most once per process.
++    """
++    global _COMPAT_PATCHED
++    if _COMPAT_PATCHED:
++        return
++
++    import openai
++
++    _original_create = openai.ChatCompletion.create
++
++    @staticmethod  # type: ignore[misc]
++    def _patched_create(*args: Any, **kwargs: Any) -> Any:
++        # --- request: functions → tools ---
++        if "functions" in kwargs and "tools" not in kwargs:
++            functions = kwargs.pop("functions")
++            kwargs["tools"] = [
++                {"type": "function", "function": f} for f in functions
++            ]
++        # Also remove function_call if present (incompatible with tools)
++        kwargs.pop("function_call", None)
++
++        resp = _original_create(*args, **kwargs)
++
++        # --- response: tool_calls → function_call ---
++        for choice in resp.get("choices", []):
++            msg = choice.get("message", {})
++            tool_calls = msg.get("tool_calls")
++            if tool_calls and not msg.get("function_call"):
++                first = tool_calls[0]
++                fn = first.get("function", {})
++                msg["function_call"] = {
++                    "name": fn.get("name", ""),
++                    "arguments": fn.get("arguments", "{}"),
++                }
++        return resp
++
++    openai.ChatCompletion.create = _patched_create
++    _COMPAT_PATCHED = True
++
+ 
+ class AutoGenToolAgent:
+     """AutoGen AssistantAgent + UserProxy with AgentProbe instrumentation.
+@@ -65,6 +121,7 @@ class AutoGenToolAgent:
+         self._llm_config = llm_config
+         self._max_turns = max_turns
+         self._injector = ToolFailureInjector(failure_config) if failure_config else None
++        _patch_openai_compat()
+         self._agents = self._build_agents()
+ 
+     def invoke(self, input: dict[str, Any]) -> dict[str, Any]:
+@@ -108,10 +165,16 @@ class AutoGenToolAgent:
+                 (m.get("content", "") for m in reversed(messages) if m.get("role") == "assistant"),
+                 "",
+             )
++
++            # Count tool executions from conversation history
++            tool_calls = [m for m in messages if m.get("role") == "function"]
++            span.set_attribute("tool_call_count", len(tool_calls))
++
+             return {
+                 "output": output,
+                 "latency_ms": latency_ms,
+                 "framework": self.framework,
++                "tool_calls": len(tool_calls),
+             }
+ 
+     def get_injector_summary(self) -> dict[str, Any]:
+@@ -144,6 +207,8 @@ class AutoGenToolAgent:
+                 return fn(expression)
+ 
+             # Define function schemas for the LLM
++            # These are in the legacy 'functions' format; _patch_openai_compat()
++            # converts them to 'tools' format before sending to the API.
+             functions = [
+                 {
+                     "name": "web_search",
+diff --git a/agentprobe/benchmark/metrics.py b/agentprobe/benchmark/metrics.py
+index af8b359..cc9dac3 100644
+--- a/agentprobe/benchmark/metrics.py
++++ b/agentprobe/benchmark/metrics.py
+@@ -49,6 +49,12 @@ class AgentMetrics:
+     failure_type: str
+     n_runs: int
+ 
++    # Execution counts
++    n_planned: int = 0
++    n_executed: int = 0
++    n_skipped: int = 0
++    condition_complete: bool = True
++
+     # Failure metrics
+     failure_rate: float = 0.0           # [0, 1]
+     n_failures: int = 0
+@@ -76,6 +82,10 @@ class AgentMetrics:
+             "task": self.task,
+             "failure_type": self.failure_type,
+             "n_runs": self.n_runs,
++            "n_planned": self.n_planned,
++            "n_executed": self.n_executed,
++            "n_skipped": self.n_skipped,
++            "condition_complete": self.condition_complete,
+             "failure_rate": round(self.failure_rate, 4),
+             "n_failures": self.n_failures,
+             "n_successes": self.n_successes,
+@@ -135,15 +145,22 @@ class MetricsCalculator:
+                 return obj.get(key, default)
+             return getattr(obj, key, default)
+ 
+-        successes = [r for r in runs if _get(r, "success", False)]
+-        failures = [r for r in runs if not _get(r, "success", False)]
++        # Separate executed from skipped trials
++        n_planned = len(runs)
++        executed = [r for r in runs if _get(r, "status", "completed") == "completed"]
++        n_skipped = n_planned - len(executed)
++        condition_complete = n_skipped == 0
++
++        # Compute metrics only from executed trials
++        successes = [r for r in executed if _get(r, "success", False)]
++        failures = [r for r in executed if not _get(r, "success", False)]
+         recovered = [r for r in failures if _get(r, "recovered", False)]
+ 
+-        latencies = [_get(r, "latency_ms", 0.0) for r in runs]
++        latencies = [_get(r, "latency_ms", 0.0) for r in executed]
+         recovery_latencies = [_get(r, "recovery_latency_ms", 0.0) for r in recovered]
+ 
+-        n = len(runs)
+-        failure_rate = len(failures) / n
++        n = len(executed)
++        failure_rate = len(failures) / n if n > 0 else 0.0
+         recovery_rate = len(recovered) / len(failures) if failures else 0.0
+ 
+         return AgentMetrics(
+@@ -151,6 +168,10 @@ class MetricsCalculator:
+             task=tk,
+             failure_type=ft,
+             n_runs=n,
++            n_planned=n_planned,
++            n_executed=n,
++            n_skipped=n_skipped,
++            condition_complete=condition_complete,
+             failure_rate=failure_rate,
+             n_failures=len(failures),
+             n_successes=len(successes),
+diff --git a/agentprobe/benchmark/runner.py b/agentprobe/benchmark/runner.py
+index 2d38d17..34696cd 100644
+--- a/agentprobe/benchmark/runner.py
++++ b/agentprobe/benchmark/runner.py
+@@ -30,15 +30,16 @@ Usage::
+ 
+ from __future__ import annotations
+ 
++import concurrent.futures
+ import csv
+ import json
+-import multiprocessing as mp
+ import time
+ import traceback
+ from dataclasses import dataclass, field
+ from pathlib import Path
+ from typing import Any, Callable
+ 
++from opentelemetry import context as otel_context
+ from rich.console import Console
+ from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
+ 
+@@ -71,7 +72,16 @@ class _HarnessTimeout(Exception):
+ 
+ @dataclass
+ class RunResult:
+-    """Result of a single benchmark run (one agent invocation)."""
++    """Result of a single benchmark run (one agent invocation).
++
++    The ``status`` field distinguishes executed trials from those skipped
++    after a harness timeout aborted the condition:
++      - ``"completed"`` — trial was dispatched and finished (success or failure).
++      - ``"skipped"``   — trial was never dispatched (prior timeout lingering).
++
++    Only ``"completed"`` trials should be included in error-rate, recovery,
++    and latency calculations.
++    """
+ 
+     run_id: int
+     framework: str
+@@ -79,6 +89,7 @@ class RunResult:
+     failure_type: str
+     success: bool
+     latency_ms: float
++    status: str = "completed"
+     failure_category: str = "none"
+     exception_type: str = ""
+     exception_msg: str = ""
+@@ -94,6 +105,7 @@ class RunResult:
+             "framework": self.framework,
+             "task": self.task,
+             "failure_type": self.failure_type,
++            "status": self.status,
+             "success": self.success,
+             "latency_ms": round(self.latency_ms, 2),
+             "failure_category": self.failure_category,
+@@ -166,6 +178,7 @@ class BenchmarkRunner:
+             self._classifier = FailureClassifier()
+         except ImportError:
+             pass  # classifier module not yet merged
++        self._invocation_hung = False
+         self._injector: Any = None
+         if self.config.failure_config is not None:
+             try:
+@@ -199,6 +212,21 @@ class BenchmarkRunner:
+             )
+ 
+             for run_id in range(cfg.n_runs):
++                if self._invocation_hung:
++                    results.append(RunResult(
++                        run_id=run_id,
++                        framework=cfg.framework,
++                        task=cfg.task,
++                        failure_type=failure_type,
++                        success=False,
++                        latency_ms=0.0,
++                        status="skipped",
++                        failure_category="harness_abort",
++                        exception_type="_HarnessTimeout",
++                        exception_msg="Skipped: prior trial timed out with lingering thread",
++                    ))
++                    progress.advance(task_bar)
++                    continue
+                 result = self._run_single(run_id, failure_type)
+                 results.append(result)
+                 progress.advance(task_bar)
+@@ -266,79 +294,94 @@ class BenchmarkRunner:
+                 )
+ 
+     def _invoke_with_timeout(self, task_input: dict) -> Any:
+-        """Invoke agent with wall-clock timeout and process isolation.
++        """Invoke agent with wall-clock timeout enforcement.
+ 
+-        Runs ``self.agent.invoke(task_input)`` in a child process via
+-        ``multiprocessing.Process`` (fork context).  Guarantees:
++        Uses a thread so that the agent's injector RNG, injection logs,
++        and all mutable state advance in-process (no fork/copy issues).
++        The current OpenTelemetry context is explicitly propagated into the
++        worker thread so that agent spans become children of the benchmark span.
+ 
+-        1. On timeout, ``process.kill()`` + ``process.join()`` ensures the
+-           invocation has **stopped** before this method returns.  No
+-           overlap with subsequent recovery or trial invocations.
+-        2. Upstream exceptions (including ``TimeoutError``) are propagated
++        Guarantees:
++        1. Upstream exceptions (including ``TimeoutError``) are propagated
+            with their original type and message.
+-        3. Only genuine wall-clock deadline expiry raises ``_HarnessTimeout``.
++        2. Only genuine wall-clock deadline expiry raises ``_HarnessTimeout``.
++        3. After a harness timeout, ``self._invocation_hung`` is set to
++           ``True`` so that ``_attempt_recovery`` skips retry and
++           ``run()`` aborts remaining trials, preventing overlap between
++           the lingering thread and new invocations.
++
++        Limitation: Python threads cannot be forcibly killed.  A hung
++        thread may linger until the process exits.
+         """
+         timeout = self.config.timeout_per_run_seconds
+-        ctx = mp.get_context("fork")
+-        result_q: mp.Queue = ctx.Queue()
+-        proc = ctx.Process(
+-            target=_invoke_worker,
+-            args=(self.agent, task_input, result_q),
+-        )
+-        proc.start()
+-        proc.join(timeout=timeout)
++        ctx = otel_context.get_current()
++
++        def _worker() -> Any:
++            token = otel_context.attach(ctx)
++            try:
++                return self.agent.invoke(task_input)
++            finally:
++                otel_context.detach(token)
+ 
+-        if proc.is_alive():
+-            # Deadline expired — kill and wait for termination.
+-            proc.kill()
+-            proc.join()
++        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
++        future = pool.submit(_worker)
++        pool.shutdown(wait=False)
++
++        try:
++            return future.result(timeout=timeout)
++        except Exception:
++            if future.done():
++                # Worker finished (possibly with an exception) before
++                # the deadline — propagate the original exception as-is.
++                return future.result()  # re-raises the worker exception
++            # Worker still running — genuine deadline miss.
++            self._invocation_hung = True
+             raise _HarnessTimeout(
+                 f"Agent invocation exceeded {timeout}s wall-clock timeout"
+             )
+ 
+-        # Process finished — retrieve result or exception.
+-        if result_q.empty():
+-            raise RuntimeError(
+-                f"Worker process exited with code {proc.exitcode} without returning a result"
+-            )
+-        status, payload = result_q.get_nowait()
+-        if status == "ok":
+-            return payload
+-        # Re-raise the worker's exception preserving its original type.
+-        raise payload
+-
+     def _attempt_recovery(self, task_input: dict) -> tuple[bool, float, Any]:
+         """Try to invoke the agent again after a failure.
+ 
+-        Each invocation runs in a child process (via ``_invoke_with_timeout``),
+-        so a killed prior attempt cannot overlap with this retry.
++        If the prior invocation is still running (hung thread after a
++        harness timeout), recovery is skipped entirely to prevent two
++        concurrent invocations on the same agent.
+ 
+         Returns (recovered, latency_ms, output).
+         """
+         if self.config.recovery_attempts == 0:
+             return False, 0.0, None
++        if self._invocation_hung:
++            return False, 0.0, None
+         for attempt in range(self.config.recovery_attempts):
+             start = time.perf_counter()
+             try:
+                 output = self._invoke_with_timeout(task_input)
+                 return True, (time.perf_counter() - start) * 1000, output
+             except Exception:
++                if self._invocation_hung:
++                    break  # recovery attempt itself timed out; stop retrying
+                 continue
+         return False, 0.0, None
+ 
+     def _summary_line(self, results: list[RunResult]) -> str:
+-        total = len(results)
+-        failures = sum(1 for r in results if not r.success)
++        executed = [r for r in results if r.status == "completed"]
++        skipped = len(results) - len(executed)
++        total = len(executed)
++        failures = sum(1 for r in executed if not r.success)
+         rate = failures / total if total > 0 else 0.0
+-        recovered = sum(1 for r in results if r.recovered)
+-        latencies = [r.latency_ms for r in results]
++        recovered = sum(1 for r in executed if r.recovered)
++        latencies = [r.latency_ms for r in executed]
+         p99 = sorted(latencies)[min(int(total * 0.99), total - 1)] if latencies else 0.0
+-        return (
+-            f"[green]Done[/green] — {total} runs | "
++        line = (
++            f"[green]Done[/green] — {total} executed | "
+             f"failure_rate={rate:.1%} | "
+             f"recovered={recovered}/{failures} | "
+             f"P99={p99:.0f}ms"
+         )
++        if skipped:
++            line += f" | [yellow]{skipped} skipped (condition incomplete)[/yellow]"
++        return line
+ 
+     def _save(self, results: list[RunResult], path: str) -> None:
+         p = Path(path)
+@@ -360,29 +403,6 @@ class BenchmarkRunner:
+         _console.print(f"[dim]Results saved to {csv_path} and {json_path}[/dim]")
+ 
+ 
+-# ---------------------------------------------------------------------------
+-# Process-isolated invocation worker
+-# ---------------------------------------------------------------------------
+-
+-
+-def _invoke_worker(agent: Any, task_input: dict, result_q: "mp.Queue") -> None:
+-    """Run ``agent.invoke(task_input)`` and put the result on *result_q*.
+-
+-    Must be a module-level function so that ``multiprocessing.Process``
+-    (fork context) can target it.  The queue receives a two-element tuple:
+-    ``("ok", output)`` on success, or ``("error", exception)`` on failure.
+-    """
+-    try:
+-        output = agent.invoke(task_input)
+-        result_q.put(("ok", output))
+-    except Exception as exc:
+-        try:
+-            result_q.put(("error", exc))
+-        except Exception:
+-            # Exception not picklable — wrap it
+-            result_q.put(("error", RuntimeError(f"{type(exc).__name__}: {exc}")))
+-
+-
+ # ---------------------------------------------------------------------------
+ # Default task generator
+ # ---------------------------------------------------------------------------
+diff --git a/experiments/run_benchmarks.py b/experiments/run_benchmarks.py
+index a81e658..02a33a6 100644
+--- a/experiments/run_benchmarks.py
++++ b/experiments/run_benchmarks.py
+@@ -189,6 +189,15 @@ def run_matrix(
+                 metrics = calc.compute(runs, framework=framework, task=task, failure_type=ft_name)
+                 all_metrics.append(metrics.to_dict())
+ 
++                if runner._invocation_hung:
++                    _console.print(
++                        f"[bold red]Aborting experiment batch: "
++                        f"{framework}/{task}/{ft_name} has a lingering "
++                        f"thread that may compete for backend resources.[/bold red]"
++                    )
++                    tracer.shutdown()
++                    return all_metrics
++
+     tracer.shutdown()
+     return all_metrics
+ 
+diff --git a/tests/test_benchmark_runner.py b/tests/test_benchmark_runner.py
+index 1225021..265bc73 100644
+--- a/tests/test_benchmark_runner.py
++++ b/tests/test_benchmark_runner.py
+@@ -143,7 +143,7 @@ class TestBenchmarkRunner:
+         runner = BenchmarkRunner(AlwaysSuccessAgent(), self._config(n_runs=1))
+         r = runner.run()[0]
+         d = r.to_dict()
+-        for key in ["run_id", "framework", "task", "success", "latency_ms", "failure_type"]:
++        for key in ["run_id", "framework", "task", "success", "latency_ms", "failure_type", "status"]:
+             assert key in d
+ 
+     def test_custom_task_fn(self):
+@@ -181,32 +181,21 @@ class TestBenchmarkRunner:
+ 
+ 
+ class TestTimeoutIsolation:
+-    """Verify that process isolation prevents overlapping invocations."""
++    """Verify timeout handling, upstream error classification, and overlap prevention."""
+ 
+-    def test_timeout_kills_before_recovery(self):
+-        """A timed-out invocation must be dead before recovery starts.
+-
+-        Records wall-clock intervals for each invocation in shared memory.
+-        If any two intervals overlap, the test fails.
++    def test_hung_invocation_skips_recovery(self):
++        """When an invocation hangs past the deadline, recovery is skipped
++        (no second invocation on the same agent while the first is still alive).
+         """
+-        import multiprocessing as mp
+-
+-        # Shared arrays: start[i] and end[i] for up to 4 invocations.
+-        starts = mp.Array("d", [0.0] * 4)
+-        ends = mp.Array("d", [0.0] * 4)
+-        call_idx = mp.Value("i", 0)
++        call_count = {"n": 0}
+ 
+         class SlowAgent:
+             framework = "mock"
+ 
+             def invoke(self, input: dict) -> dict:
+                 import time
+-                with call_idx.get_lock():
+-                    idx = call_idx.value
+-                    call_idx.value += 1
+-                starts[idx] = time.monotonic()
+-                time.sleep(5)  # will be killed
+-                ends[idx] = time.monotonic()
++                call_count["n"] += 1
++                time.sleep(5)  # will exceed the 100ms deadline
+                 return {"output": "slow"}
+ 
+         config = BenchmarkConfig(
+@@ -214,33 +203,19 @@ class TestTimeoutIsolation:
+             task="tool_use",
+             n_runs=1,
+             recovery_attempts=1,
+-            timeout_per_run_seconds=0.1,  # 100ms deadline
++            timeout_per_run_seconds=0.1,
+         )
+         runner = BenchmarkRunner(SlowAgent(), config)
+         results = runner.run()
+ 
+-        # The first invocation was killed, so ends[0] == 0 (never set).
+-        # The recovery invocation was also killed, so ends[1] == 0.
+-        # Key check: recovery must not START before the first process was
+-        # killed. Since process.kill()+join() happens before recovery,
+-        # starts[1] must be > the time the first process was killed.
+-        # We verify there's no temporal overlap: if both processes have
+-        # start times, the second must start after the first was killed
+-        # (i.e., starts[1] > starts[0] + timeout, roughly).
+-        n_calls = call_idx.value
+-        assert n_calls >= 1  # at least the first invocation started
+-        if n_calls >= 2:
+-            # Second invocation started after first was killed.
+-            # With 100ms timeout + kill overhead, the gap should be small
+-            # but strictly sequential.
+-            gap = starts[1] - starts[0]
+-            assert gap >= 0.1, (
+-                f"Recovery started only {gap*1000:.0f}ms after initial invocation, "
+-                f"expected >= 100ms (the timeout deadline)"
+-            )
+-
+         assert len(results) == 1
+         assert not results[0].success
++        assert results[0].exception_type == "_HarnessTimeout"
++        # Recovery must be skipped — only 1 invocation, not 2
++        assert not results[0].recovered
++        assert call_count["n"] == 1, (
++            f"Expected 1 invocation (no recovery), got {call_count['n']}"
++        )
+ 
+     def test_upstream_timeout_preserves_type(self):
+         """An agent raising TimeoutError should not be mislabeled as harness deadline."""
+@@ -284,7 +259,7 @@ class TestTimeoutIsolation:
+             task="tool_use",
+             n_runs=1,
+             recovery_attempts=0,
+-            timeout_per_run_seconds=0.2,  # 200ms
++            timeout_per_run_seconds=0.2,
+         )
+         runner = BenchmarkRunner(HangAgent(), config)
+         start = time.perf_counter()
+@@ -294,5 +269,261 @@ class TestTimeoutIsolation:
+         assert len(results) == 1
+         assert not results[0].success
+         assert results[0].exception_type == "_HarnessTimeout"
+-        # Should return within 2s (generous margin for process overhead)
++        # Should return within 2s (generous margin for thread overhead)
+         assert elapsed < 2.0, f"Timeout took {elapsed:.1f}s, expected < 2s"
++
++    def test_injector_rng_advances_across_trials(self):
++        """The injector's RNG must produce different values across trials,
++        not repeat the same state (which would happen with fork-based isolation).
++        """
++        import random
++
++        rng_values = []
++
++        class RNGProbeAgent:
++            framework = "mock"
++
++            def __init__(self):
++                self._rng = random.Random(42)
++
++            def invoke(self, input: dict) -> dict:
++                val = self._rng.random()
++                rng_values.append(val)
++                return {"output": str(val)}
++
++        config = BenchmarkConfig(
++            framework="mock",
++            task="tool_use",
++            n_runs=4,
++            recovery_attempts=0,
++        )
++        runner = BenchmarkRunner(RNGProbeAgent(), config)
++        runner.run()
++
++        assert len(rng_values) == 4
++        # All values must be distinct (RNG advancing, not resetting)
++        assert len(set(rng_values)) == 4, (
++            f"RNG produced duplicate values: {rng_values}"
++        )
++
++    def test_large_output_not_misclassified(self):
++        """A large successful output must not be recorded as a timeout."""
++
++        class LargeOutputAgent:
++            framework = "mock"
++
++            def invoke(self, input: dict) -> dict:
++                return {"output": "x" * 100_000}
++
++        config = BenchmarkConfig(
++            framework="mock",
++            task="tool_use",
++            n_runs=1,
++            recovery_attempts=0,
++            timeout_per_run_seconds=10.0,
++        )
++        runner = BenchmarkRunner(LargeOutputAgent(), config)
++        results = runner.run()
++
++        assert len(results) == 1
++        assert results[0].success, (
++            f"Large output was misclassified: {results[0].exception_type}"
++        )
++
++    def test_timeout_aborts_remaining_trials(self):
++        """After a harness timeout, remaining trials must be skipped — no new invocations."""
++        call_count = {"n": 0}
++
++        class SlowAgent:
++            framework = "mock"
++
++            def invoke(self, input: dict) -> dict:
++                import time
++                call_count["n"] += 1
++                time.sleep(5)
++                return {"output": "slow"}
++
++        config = BenchmarkConfig(
++            framework="mock",
++            task="tool_use",
++            n_runs=3,
++            recovery_attempts=0,
++            timeout_per_run_seconds=0.1,
++        )
++        runner = BenchmarkRunner(SlowAgent(), config)
++        results = runner.run()
++
++        assert len(results) == 3
++        # Only the first trial should have been dispatched
++        assert call_count["n"] == 1, (
++            f"Expected 1 invocation, got {call_count['n']}"
++        )
++        # First trial: actual timeout, status=completed (it was attempted)
++        assert results[0].exception_type == "_HarnessTimeout"
++        assert not results[0].success
++        assert results[0].status == "completed"
++        # Remaining trials: skipped
++        for r in results[1:]:
++            assert not r.success
++            assert r.status == "skipped"
++            assert r.exception_type == "_HarnessTimeout"
++            assert "Skipped" in r.exception_msg
++            assert r.latency_ms == 0.0
++            assert r.failure_category == "harness_abort"
++
++    def test_skipped_trials_excluded_from_metrics(self):
++        """MetricsCalculator must not count skipped trials in denominators."""
++        from agentprobe.benchmark.metrics import MetricsCalculator
++
++        results = [
++            RunResult(
++                run_id=0, framework="mock", task="tool_use",
++                failure_type="none", success=False, latency_ms=100.0,
++                status="completed", exception_type="_HarnessTimeout",
++            ),
++            RunResult(
++                run_id=1, framework="mock", task="tool_use",
++                failure_type="none", success=False, latency_ms=0.0,
++                status="skipped",
++            ),
++            RunResult(
++                run_id=2, framework="mock", task="tool_use",
++                failure_type="none", success=False, latency_ms=0.0,
++                status="skipped",
++            ),
++        ]
++
++        calc = MetricsCalculator()
++        metrics = calc.compute(results)
++
++        # Only 1 executed trial, not 3
++        assert metrics.n_executed == 1
++        assert metrics.n_skipped == 2
++        assert metrics.n_planned == 3
++        assert not metrics.condition_complete
++        # Failure rate from executed trials only
++        assert metrics.n_runs == 1
++        assert metrics.n_failures == 1
++        assert metrics.failure_rate == 1.0
++        # Latency from executed trials only (100ms, not averaged with 0s)
++        assert metrics.mean_latency_ms == 100.0
++
++    def test_trace_context_propagated_to_worker(self):
++        """Agent invocation in the worker thread must inherit the benchmark span's trace."""
++        from opentelemetry import trace
++        from opentelemetry.sdk.trace import TracerProvider
++        from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter, SpanExportResult
++
++        class _CollectingExporter(SpanExporter):
++            def __init__(self):
++                self.spans = []
++
++            def export(self, spans):
++                self.spans.extend(spans)
++                return SpanExportResult.SUCCESS
++
++            def shutdown(self):
++                pass
++
++        exporter = _CollectingExporter()
++        provider = TracerProvider()
++        provider.add_span_processor(SimpleSpanProcessor(exporter))
++        old_provider = trace.get_tracer_provider()
++        trace.set_tracer_provider(provider)
++
++        observed_ctx = {}
++
++        class TracingAgent:
++            framework = "mock"
++
++            def invoke(self, input: dict) -> dict:
++                span = trace.get_current_span()
++                ctx = span.get_span_context()
++                observed_ctx["trace_id"] = ctx.trace_id
++                observed_ctx["valid"] = ctx.is_valid
++                return {"output": "traced"}
++
++        try:
++            config = BenchmarkConfig(
++                framework="mock",
++                task="tool_use",
++                n_runs=1,
++                recovery_attempts=0,
++            )
++            runner = BenchmarkRunner(TracingAgent(), config)
++            results = runner.run()
++
++            assert results[0].success
++
++            benchmark_spans = [s for s in exporter.spans if s.name.startswith("benchmark.run.")]
++            assert len(benchmark_spans) == 1
++
++            # Agent observed a valid trace context belonging to the benchmark trace
++            assert observed_ctx.get("valid", False), "Worker had no valid OTel context"
++            assert observed_ctx["trace_id"] == benchmark_spans[0].context.trace_id, (
++                "Worker trace ID does not match benchmark span trace ID"
++            )
++        finally:
++            trace.set_tracer_provider(old_provider)
++            provider.shutdown()
++
++    def test_recovery_timeout_stops_retry_loop(self):
++        """If a recovery attempt itself times out, further retries must stop."""
++        call_count = {"n": 0}
++
++        class FailThenHangAgent:
++            framework = "mock"
++
++            def invoke(self, input: dict) -> dict:
++                import time
++                call_count["n"] += 1
++                if call_count["n"] == 1:
++                    raise RuntimeError("initial failure")
++                # Recovery attempt hangs
++                time.sleep(5)
++                return {"output": "never"}
++
++        config = BenchmarkConfig(
++            framework="mock",
++            task="tool_use",
++            n_runs=1,
++            recovery_attempts=3,  # multiple retries configured
++            timeout_per_run_seconds=0.1,
++        )
++        runner = BenchmarkRunner(FailThenHangAgent(), config)
++        results = runner.run()
++
++        assert len(results) == 1
++        assert not results[0].success
++        # Initial call + 1 recovery attempt that hung = 2 total
++        # The remaining 2 recovery attempts must NOT have been dispatched
++        assert call_count["n"] == 2, (
++            f"Expected 2 invocations (initial + 1 hung recovery), got {call_count['n']}"
++        )
++
++    def test_non_hung_failure_allows_recovery(self):
++        """When the invocation fails immediately (not hung), recovery should proceed."""
++        call_count = {"n": 0}
++
++        class FailThenSucceedAgent:
++            framework = "mock"
++
++            def invoke(self, input: dict) -> dict:
++                call_count["n"] += 1
++                if call_count["n"] == 1:
++                    raise RuntimeError("first call fails")
++                return {"output": "recovered"}
++
++        config = BenchmarkConfig(
++            framework="mock",
++            task="tool_use",
++            n_runs=1,
++            recovery_attempts=1,
++        )
++        runner = BenchmarkRunner(FailThenSucceedAgent(), config)
++        results = runner.run()
++
++        assert len(results) == 1
++        assert not results[0].success  # initial invocation failed
++        assert results[0].recovered  # recovery succeeded
++        assert call_count["n"] == 2  # initial + recovery

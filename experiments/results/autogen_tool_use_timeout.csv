@@ -1,0 +1,11 @@
+run_id,framework,task,failure_type,success,latency_ms,failure_category,exception_type,recovered,recovery_latency_ms
+0,autogen,tool_use,timeout,True,7759.54,none,,False,0.0
+1,autogen,tool_use,timeout,True,78423.14,none,,False,0.0
+2,autogen,tool_use,timeout,True,23462.05,none,,False,0.0
+3,autogen,tool_use,timeout,True,35994.43,none,,False,0.0
+4,autogen,tool_use,timeout,True,37660.69,none,,False,0.0
+5,autogen,tool_use,timeout,True,10311.04,none,,False,0.0
+6,autogen,tool_use,timeout,True,59310.1,none,,False,0.0
+7,autogen,tool_use,timeout,True,16438.99,none,,False,0.0
+8,autogen,tool_use,timeout,True,33018.48,none,,False,0.0
+9,autogen,tool_use,timeout,True,58758.33,none,,False,0.0

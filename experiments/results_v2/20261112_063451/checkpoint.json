@@ -1,0 +1,9 @@
+{
+  "completed_conditions": [
+    "autogen_tool_use_none",
+    "autogen_tool_use_timeout",
+    "autogen_tool_use_malformed_output",
+    "autogen_tool_use_rate_limit",
+    "autogen_tool_use_api_error"
+  ]
+}

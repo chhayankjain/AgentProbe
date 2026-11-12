@@ -28,6 +28,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 RESULTS_DIR = Path(__file__).parent / "results"
 PLOTS_DIR = Path(__file__).parent / "plots"
 
+# Consistent colors and display names across all figures
+FW_COLORS = {"autogen": "#4CAF50", "langchain": "#FF9800", "langgraph": "#2196F3"}
+FW_LABELS = {"autogen": "AutoGen", "langchain": "LangChain", "langgraph": "LangGraph"}
+FT_LABELS = {
+    "none": "None", "timeout": "Timeout", "malformed_output": "Malformed Output",
+    "rate_limit": "Rate Limit", "api_error": "API Error",
+}
+TASK_LABELS = {
+    "multi_agent": "Multi-Agent", "rag": "RAG", "tool_use": "Tool Use",
+}
+
 
 def load_results() -> list[dict]:
     path = RESULTS_DIR / "combined_summary.json"
@@ -47,7 +58,6 @@ def plot_failure_rate_by_framework(results: list[dict]) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
     x = np.arange(len(failure_types))
     width = 0.25
-    colors = {"langgraph": "#2196F3", "langchain": "#FF9800", "autogen": "#4CAF50"}
 
     for i, fw in enumerate(frameworks):
         rates = []
@@ -59,14 +69,14 @@ def plot_failure_rate_by_framework(results: list[dict]) -> None:
                 rates.append(total_failures / total_runs * 100 if total_runs else 0)
             else:
                 rates.append(0)
-        ax.bar(x + i * width, rates, width, label=fw.capitalize(),
-               color=colors.get(fw, "#999"), edgecolor="white")
+        ax.bar(x + i * width, rates, width, label=FW_LABELS.get(fw, fw),
+               color=FW_COLORS.get(fw, "#999"), edgecolor="white")
 
     ax.set_xlabel("Failure Injection Type", fontsize=12)
     ax.set_ylabel("Failure Rate (%)", fontsize=12)
     ax.set_title("Failure Rate by Framework and Injection Type", fontsize=14, fontweight="bold")
     ax.set_xticks(x + width)
-    ax.set_xticklabels([ft.replace("_", " ").title() for ft in failure_types], fontsize=10)
+    ax.set_xticklabels([FT_LABELS.get(ft, ft) for ft in failure_types], fontsize=10)
     ax.legend(fontsize=11)
     ax.set_ylim(0, max(30, ax.get_ylim()[1] * 1.1))
     ax.grid(axis="y", alpha=0.3)
@@ -91,7 +101,7 @@ def plot_recovery_rate_heatmap(results: list[dict]) -> None:
                 if total_failures > 0:
                     # Approximate recovered count from recovery_rate × n_failures
                     total_recovered = sum(
-                        int(r["recovery_rate"] * r["n_failures"]) for r in matching
+                        round(r["recovery_rate"] * r["n_failures"]) for r in matching
                     )
                     data[i, j] = total_recovered / total_failures * 100
                 else:
@@ -101,9 +111,9 @@ def plot_recovery_rate_heatmap(results: list[dict]) -> None:
     im = ax.imshow(data, cmap="RdYlGn", aspect="auto", vmin=0, vmax=100)
 
     ax.set_xticks(range(len(failure_types)))
-    ax.set_xticklabels([ft.replace("_", " ").title() for ft in failure_types], fontsize=10)
+    ax.set_xticklabels([FT_LABELS.get(ft, ft) for ft in failure_types], fontsize=10)
     ax.set_yticks(range(len(frameworks)))
-    ax.set_yticklabels([fw.capitalize() for fw in frameworks], fontsize=11)
+    ax.set_yticklabels([FW_LABELS.get(fw, fw) for fw in frameworks], fontsize=11)
 
     # Annotate cells
     for i in range(len(frameworks)):
@@ -126,28 +136,26 @@ def plot_recovery_rate_heatmap(results: list[dict]) -> None:
 
 
 def plot_latency_comparison(results: list[dict]) -> None:
-    """Box plot of P99 latencies by framework."""
+    """Box plot of P99 latencies by framework (baseline only)."""
     frameworks = sorted(set(r["framework"] for r in results))
-    colors = {"langgraph": "#2196F3", "langchain": "#FF9800", "autogen": "#4CAF50"}
-
     fig, ax = plt.subplots(figsize=(8, 5))
 
     data_by_fw = []
     labels = []
     for fw in frameworks:
-        p99s = [r["p99_latency_ms"] for r in results if r["framework"] == fw and r["p99_latency_ms"] > 0]
+        p99s = [r["p99_latency_ms"] for r in results if r["framework"] == fw and r["failure_type"] == "none" and r["p99_latency_ms"] > 0]
         if p99s:
             data_by_fw.append(p99s)
-            labels.append(fw.capitalize())
+            labels.append(FW_LABELS.get(fw, fw))
 
     bp = ax.boxplot(data_by_fw, tick_labels=labels, patch_artist=True, widths=0.5)
     for i, fw in enumerate(frameworks):
         if i < len(bp["boxes"]):
-            bp["boxes"][i].set_facecolor(colors.get(fw, "#999"))
+            bp["boxes"][i].set_facecolor(FW_COLORS.get(fw, "#999"))
             bp["boxes"][i].set_alpha(0.7)
 
     ax.set_ylabel("P99 Latency (ms)", fontsize=12)
-    ax.set_title("P99 Latency Distribution by Framework", fontsize=14, fontweight="bold")
+    ax.set_title("P99 Latency Distribution by Framework (Baseline)", fontsize=14, fontweight="bold")
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
     fig.savefig(PLOTS_DIR / "latency_comparison.png", dpi=300)
@@ -159,8 +167,6 @@ def plot_failure_rate_by_task(results: list[dict]) -> None:
     """Failure rates broken down by task type."""
     frameworks = sorted(set(r["framework"] for r in results))
     tasks = sorted(set(r["task"] for r in results))
-    colors = {"langgraph": "#2196F3", "langchain": "#FF9800", "autogen": "#4CAF50"}
-
     fig, axes = plt.subplots(1, len(tasks), figsize=(5 * len(tasks), 5), sharey=True)
     if len(tasks) == 1:
         axes = [axes]
@@ -178,13 +184,13 @@ def plot_failure_rate_by_task(results: list[dict]) -> None:
                 fw_rates[fw] = 0
 
         bars = ax.bar(
-            [fw.capitalize() for fw in frameworks],
+            [FW_LABELS.get(fw, fw) for fw in frameworks],
             [fw_rates[fw] for fw in frameworks],
-            color=[colors.get(fw, "#999") for fw in frameworks],
+            color=[FW_COLORS.get(fw, "#999") for fw in frameworks],
             edgecolor="white",
             width=0.6,
         )
-        ax.set_title(task.replace("_", " ").title(), fontsize=13, fontweight="bold")
+        ax.set_title(TASK_LABELS.get(task, task), fontsize=13, fontweight="bold")
         ax.set_ylim(0, 30)
         ax.grid(axis="y", alpha=0.3)
 
@@ -206,27 +212,27 @@ def plot_failure_rate_by_task(results: list[dict]) -> None:
 def plot_summary_dashboard(results: list[dict]) -> None:
     """2×2 summary dashboard."""
     frameworks = sorted(set(r["framework"] for r in results))
-    colors_list = ["#2196F3", "#FF9800", "#4CAF50"]
+    fw_colors = [FW_COLORS.get(fw, "#999") for fw in frameworks]
+    fw_labels = [FW_LABELS.get(fw, fw) for fw in frameworks]
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
-    # Panel 1: Overall failure rate
+    # Panel 1: Failure rate under injection (baseline excluded)
     ax = axes[0, 0]
     overall_rates = []
     for fw in frameworks:
-        matching = [r for r in results if r["framework"] == fw]
+        matching = [r for r in results if r["framework"] == fw and r["failure_type"] != "none"]
         total_f = sum(r["n_failures"] for r in matching)
         total_n = sum(r["n_runs"] for r in matching)
         overall_rates.append(total_f / total_n * 100 if total_n else 0)
 
-    bars = ax.bar([fw.capitalize() for fw in frameworks], overall_rates,
-                  color=colors_list[:len(frameworks)], edgecolor="white")
+    bars = ax.bar(fw_labels, overall_rates, color=fw_colors, edgecolor="white")
     for bar in bars:
         h = bar.get_height()
         ax.text(bar.get_x() + bar.get_width() / 2., h + 0.3,
                 f"{h:.1f}%", ha="center", va="bottom", fontsize=11, fontweight="bold")
     ax.set_ylabel("Failure Rate (%)")
-    ax.set_title("(a) Overall Failure Rate", fontweight="bold")
+    ax.set_title("(a) Failure Rate (Injection Only)", fontweight="bold")
     ax.set_ylim(0, max(20, max(overall_rates) * 1.3))
     ax.grid(axis="y", alpha=0.3)
 
@@ -236,11 +242,10 @@ def plot_summary_dashboard(results: list[dict]) -> None:
     for fw in frameworks:
         matching = [r for r in results if r["framework"] == fw and r["failure_type"] != "none"]
         total_f = sum(r["n_failures"] for r in matching)
-        total_recovered = sum(int(r["recovery_rate"] * r["n_failures"]) for r in matching)
+        total_recovered = sum(round(r["recovery_rate"] * r["n_failures"]) for r in matching)
         recovery_rates.append(total_recovered / total_f * 100 if total_f else 0)
 
-    bars = ax.bar([fw.capitalize() for fw in frameworks], recovery_rates,
-                  color=colors_list[:len(frameworks)], edgecolor="white")
+    bars = ax.bar(fw_labels, recovery_rates, color=fw_colors, edgecolor="white")
     for bar in bars:
         h = bar.get_height()
         label = f"{h:.0f}%" if h > 0 else "N/A"
@@ -251,8 +256,7 @@ def plot_summary_dashboard(results: list[dict]) -> None:
     ax.set_ylim(0, 110)
     ax.grid(axis="y", alpha=0.3)
 
-    # Panel 3: Mean latency (baseline only — injection latency is not comparable
-    # for AutoGen because it short-circuits without LLM inference)
+    # Panel 3: Mean latency (baseline only)
     ax = axes[1, 0]
     mean_latencies = []
     for fw in frameworks:
@@ -262,8 +266,7 @@ def plot_summary_dashboard(results: list[dict]) -> None:
         else:
             mean_latencies.append(0)
 
-    bars = ax.bar([fw.capitalize() for fw in frameworks], mean_latencies,
-                  color=colors_list[:len(frameworks)], edgecolor="white")
+    bars = ax.bar(fw_labels, mean_latencies, color=fw_colors, edgecolor="white")
     for bar in bars:
         h = bar.get_height()
         ax.text(bar.get_x() + bar.get_width() / 2., h + 300,
@@ -285,17 +288,17 @@ def plot_summary_dashboard(results: list[dict]) -> None:
                 p99s.append(np.mean([r["p99_latency_ms"] for r in matching]))
             else:
                 p99s.append(0)
-        ax.bar(x + i * width, p99s, width, label=fw.capitalize(),
-               color=colors_list[i], edgecolor="white")
+        ax.bar(x + i * width, p99s, width, label=FW_LABELS.get(fw, fw),
+               color=FW_COLORS.get(fw, "#999"), edgecolor="white")
     ax.set_ylabel("P99 Latency (ms)")
     ax.set_title("(d) P99 Latency by Task (Baseline)", fontweight="bold")
     ax.set_xticks(x + width)
-    ax.set_xticklabels([t.replace("_", " ").title() for t in tasks])
+    ax.set_xticklabels([TASK_LABELS.get(t, t) for t in tasks])
     ax.legend(fontsize=9)
     ax.grid(axis="y", alpha=0.3)
 
     fig.suptitle("AgentProbe: Cross-Framework Reliability Comparison\n"
-                 "(llama3.1, Ollama, 1050 runs)",
+                 "(Llama 3.1, Ollama, 1,050 runs)",
                  fontsize=15, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.94])
     fig.savefig(PLOTS_DIR / "summary_dashboard.png", dpi=300, bbox_inches="tight")

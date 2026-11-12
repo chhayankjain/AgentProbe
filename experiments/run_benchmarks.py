@@ -189,6 +189,15 @@ def run_matrix(
                 metrics = calc.compute(runs, framework=framework, task=task, failure_type=ft_name)
                 all_metrics.append(metrics.to_dict())
 
+                if runner._invocation_hung:
+                    _console.print(
+                        f"[bold red]Aborting experiment batch: "
+                        f"{framework}/{task}/{ft_name} has a lingering "
+                        f"thread that may compete for backend resources.[/bold red]"
+                    )
+                    tracer.shutdown()
+                    return all_metrics
+
     tracer.shutdown()
     return all_metrics
 

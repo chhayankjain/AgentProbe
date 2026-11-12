@@ -1,0 +1,1235 @@
+{
+  "qualification_timestamp_utc": "2026-11-11T18:04:10.256863+00:00",
+  "model": "qwen2.5:7b",
+  "frameworks": [
+    "langgraph",
+    "langchain",
+    "autogen"
+  ],
+  "tasks": [
+    {
+      "id": "qual_multiply",
+      "input": "You MUST call the calculator tool with the expression '7919 * 6841' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "54173879",
+      "required_tool": "calculator",
+      "required_expression": "7919 * 6841"
+    },
+    {
+      "id": "qual_add",
+      "input": "You MUST call the calculator tool with the expression '3571 + 8429' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "12000",
+      "required_tool": "calculator",
+      "required_expression": "3571 + 8429"
+    }
+  ],
+  "baseline_config": {
+    "failure_type": "none",
+    "failure_probability": 0.0,
+    "seed": 42
+  },
+  "guaranteed_fault_config": {
+    "failure_type": "api_error",
+    "failure_probability": 1.0,
+    "error_code": 503,
+    "seed": 42
+  },
+  "all_passed": false,
+  "n_trials": 12,
+  "n_passed": 10,
+  "n_failed": 2,
+  "trials": [
+    {
+      "framework": "langgraph",
+      "task_id": "qual_multiply",
+      "phase": "baseline",
+      "input_text": "You MUST call the calculator tool with the expression '7919 * 6841' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "54173879",
+      "required_tool": "calculator",
+      "output": "The result of the expression '7919 * 6841' is 54173879.",
+      "latency_ms": 4850.706707991776,
+      "answer_present": true,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": "54173879",
+      "tool_return_correct": true,
+      "fault_injected": false,
+      "fault_at_required_tool": false,
+      "fault_exception_type": "",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "expression='7919 * 6841', run_manager=<langchain_core.callbacks.manager.CallbackManagerForToolRun object at 0x10f5b1550>, config={'tags': [], 'metadata': {'langgraph_step': 2, 'langgraph_node': 'tools', 'langgraph_triggers': ('branch:to:tools',), 'langgraph_path': ('__pregel_pull', 'tools'), 'langgraph_checkpoint_ns': 'tools:2ae1b353-7b87-8b71-551d-0d3fe039086f', 'checkpoint_ns': 'tools:2ae1b353-7b87-8b71-551d-0d3fe039086f'}, 'callbacks': <langchain_core.callbacks.manager.CallbackManager object at 0x10f555880>, 'recursion_limit': 10, 'configurable': {'__pregel_runtime': Runtime(context=None, store=None, stream_writer=<function Pregel.stream.<locals>.stream_writer at 0x10f542820>, heartbeat=<function _no_op_heartbeat at 0x10f401b10>, previous=None, execution_info=ExecutionInfo(checkpoint_id='1f1ddfa3-0333-65dc-8001-190eaa311841', checkpoint_ns='tools:2ae1b353-7b87-8b71-551d-0d3fe039086f', task_id='2ae1b353-7b87-8b71-551d-0d3fe039086f', thread_id=None, run_id=None, node_attempt=1, node_first_attempt_time=1794420204.5436149), server_info=None, control=<langgraph.runtime.RunControl object at 0x10eb1ded0>), '__pregel_replay_state': None, '__pregel_task_id': '2ae1b353-7b87-8b71-551d-0d3fe039086f', '__pregel_send': <built-in method extend of collections.deque object at 0x10f5194e0>, '__pregel_read': functools.partial(<function local_read at 0x10f403690>, PregelScratchpad(step=2, stop=10, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f525870>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f525780>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f5a0720>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f5258d0>), {'messages': <langgraph.channels.binop.BinaryOperatorAggregate object at 0x10f54a780>, '__start__': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f558500>, '__pregel_tasks': <langgraph.channels.topic.Topic object at 0x10f549d00>, 'branch:to:agent': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f58c580>, 'branch:to:tools': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f58ec80>}, {}, PregelTaskWrites(path=('__pregel_pull', 'tools'), name='tools', writes=deque([('messages', [ToolMessage(content='54173879', name='calculator', id='b298df5f-7449-4265-8692-ebc9365cc0c0', tool_call_id='be4ac6bb-daff-45aa-bc4b-961227831be4')]), ('branch:to:agent', None)]), triggers=('branch:to:tools',))), '__pregel_checkpointer': None, 'checkpoint_map': {'': '1f1ddfa3-0333-65dc-8001-190eaa311841'}, 'checkpoint_id': None, 'checkpoint_ns': 'tools:2ae1b353-7b87-8b71-551d-0d3fe039086f', '__pregel_scratchpad': PregelScratchpad(step=2, stop=10, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f525870>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f525780>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f5a0720>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f5258d0>), '__pregel_call': functools.partial(<function _call at 0x10f480eb0>, <weakref at 0x10f596ca0; dead>, retry_policy=None, futures=<weakref at 0x10f5b55d0; dead>, schedule_task=<bound method SyncPregelLoop.accept_push of <langgraph.pregel._loop.SyncPregelLoop object at 0x10f53a7b0>>, submit=<weakref at 0x10f587b50; to 'langgraph.pregel._executor.BackgroundExecutor' at 0x10f53aa50>)}}",
+          "return_value": "54173879",
+          "latency_ms": 0.64,
+          "span_id": "f510fe981cc381f9",
+          "call_index": 1
+        }
+      ],
+      "span_ids": [
+        "f510fe981cc381f9"
+      ],
+      "verdict": "PASS",
+      "failure_reasons": []
+    },
+    {
+      "framework": "langgraph",
+      "task_id": "qual_add",
+      "phase": "baseline",
+      "input_text": "You MUST call the calculator tool with the expression '3571 + 8429' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "12000",
+      "required_tool": "calculator",
+      "output": "The result of the expression '3571 + 8429' is 12000.",
+      "latency_ms": 2557.271458004834,
+      "answer_present": true,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": "12000",
+      "tool_return_correct": true,
+      "fault_injected": false,
+      "fault_at_required_tool": false,
+      "fault_exception_type": "",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "expression='3571 + 8429', run_manager=<langchain_core.callbacks.manager.CallbackManagerForToolRun object at 0x10f5e8050>, config={'tags': [], 'metadata': {'langgraph_step': 2, 'langgraph_node': 'tools', 'langgraph_triggers': ('branch:to:tools',), 'langgraph_path': ('__pregel_pull', 'tools'), 'langgraph_checkpoint_ns': 'tools:744995d2-c298-6f2f-923e-cbe84dd93f8e', 'checkpoint_ns': 'tools:744995d2-c298-6f2f-923e-cbe84dd93f8e'}, 'callbacks': <langchain_core.callbacks.manager.CallbackManager object at 0x10f5dd250>, 'recursion_limit': 10, 'configurable': {'__pregel_runtime': Runtime(context=None, store=None, stream_writer=<function Pregel.stream.<locals>.stream_writer at 0x10f5a19b0>, heartbeat=<function _no_op_heartbeat at 0x10f401b10>, previous=None, execution_info=ExecutionInfo(checkpoint_id='1f1ddfa3-1d35-6a34-8001-1470255df7f5', checkpoint_ns='tools:744995d2-c298-6f2f-923e-cbe84dd93f8e', task_id='744995d2-c298-6f2f-923e-cbe84dd93f8e', thread_id=None, run_id=None, node_attempt=1, node_first_attempt_time=1794420207.269752), server_info=None, control=<langgraph.runtime.RunControl object at 0x10f5267a0>), '__pregel_replay_state': None, '__pregel_task_id': '744995d2-c298-6f2f-923e-cbe84dd93f8e', '__pregel_send': <built-in method extend of collections.deque object at 0x10f51a7a0>, '__pregel_read': functools.partial(<function local_read at 0x10f403690>, PregelScratchpad(step=2, stop=10, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f526f50>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f527040>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f5a0e00>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f526c50>), {'messages': <langgraph.channels.binop.BinaryOperatorAggregate object at 0x10f5d3780>, '__start__': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f5d3700>, '__pregel_tasks': <langgraph.channels.topic.Topic object at 0x10f5d1d00>, 'branch:to:agent': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f5d3600>, 'branch:to:tools': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f5d35c0>}, {}, PregelTaskWrites(path=('__pregel_pull', 'tools'), name='tools', writes=deque([('messages', [ToolMessage(content='12000', name='calculator', id='2978e822-0207-41ff-9bdd-40a4cbfa0b0f', tool_call_id='d0dc15ff-b5b4-446f-84a6-4c67c6a7180d')]), ('branch:to:agent', None)]), triggers=('branch:to:tools',))), '__pregel_checkpointer': None, 'checkpoint_map': {'': '1f1ddfa3-1d35-6a34-8001-1470255df7f5'}, 'checkpoint_id': None, 'checkpoint_ns': 'tools:744995d2-c298-6f2f-923e-cbe84dd93f8e', '__pregel_scratchpad': PregelScratchpad(step=2, stop=10, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f526f50>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f527040>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f5a0e00>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f526c50>), '__pregel_call': functools.partial(<function _call at 0x10f480eb0>, <weakref at 0x10f5b77e0; dead>, retry_policy=None, futures=<weakref at 0x10f5b7740; dead>, schedule_task=<bound method SyncPregelLoop.accept_push of <langgraph.pregel._loop.SyncPregelLoop object at 0x10f5b8410>>, submit=<weakref at 0x10f5c3cd0; to 'langgraph.pregel._executor.BackgroundExecutor' at 0x10f5b8550>)}}",
+          "return_value": "12000",
+          "latency_ms": 0.3,
+          "span_id": "3120d7d634483378",
+          "call_index": 1
+        }
+      ],
+      "span_ids": [
+        "3120d7d634483378"
+      ],
+      "verdict": "PASS",
+      "failure_reasons": []
+    },
+    {
+      "framework": "langgraph",
+      "task_id": "qual_multiply",
+      "phase": "guaranteed_fault",
+      "input_text": "You MUST call the calculator tool with the expression '7919 * 6841' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "54173879",
+      "required_tool": "calculator",
+      "output": "EXCEPTION: ToolCallAPIError: Tool API returned HTTP 503",
+      "latency_ms": 1324.4161660113605,
+      "answer_present": false,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": null,
+      "tool_return_correct": false,
+      "fault_injected": true,
+      "fault_at_required_tool": true,
+      "fault_exception_type": "ToolCallAPIError",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "expression='7919 * 6841', run_manager=<langchain_core.callbacks.manager.CallbackManagerForToolRun object at 0x10f5e8e10>, config={'tags': [], 'metadata': {'langgraph_step': 2, 'langgraph_node': 'tools', 'langgraph_triggers': ('branch:to:tools',), 'langgraph_path': ('__pregel_pull', 'tools'), 'langgraph_checkpoint_ns': 'tools:75ae9791-f108-e066-6627-fbad2f41b763', 'checkpoint_ns': 'tools:75ae9791-f108-e066-6627-fbad2f41b763'}, 'callbacks': <langchain_core.callbacks.manager.CallbackManager object at 0x10f5c1d50>, 'recursion_limit': 10, 'configurable': {'__pregel_runtime': Runtime(context=None, store=None, stream_writer=<function Pregel.stream.<locals>.stream_writer at 0x10f5a3320>, heartbeat=<function _no_op_heartbeat at 0x10f401b10>, previous=None, execution_info=ExecutionInfo(checkpoint_id='1f1ddfa3-35ab-64c4-8001-2b48fbfe7537', checkpoint_ns='tools:75ae9791-f108-e066-6627-fbad2f41b763', task_id='75ae9791-f108-e066-6627-fbad2f41b763', thread_id=None, run_id=None, node_attempt=1, node_first_attempt_time=1794420209.8345401), server_info=None, control=<langgraph.runtime.RunControl object at 0x10f527e50>), '__pregel_replay_state': None, '__pregel_task_id': '75ae9791-f108-e066-6627-fbad2f41b763', '__pregel_send': <built-in method extend of collections.deque object at 0x10f51b790>, '__pregel_read': functools.partial(<function local_read at 0x10f403690>, PregelScratchpad(step=2, stop=10, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f527d30>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f527b50>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f5a2770>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f527370>), {'messages': <langgraph.channels.binop.BinaryOperatorAggregate object at 0x10f5cc4c0>, '__start__': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f5cc840>, '__pregel_tasks': <langgraph.channels.topic.Topic object at 0x10f5cc780>, 'branch:to:agent': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f5cc580>, 'branch:to:tools': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f5cc600>}, {}, PregelTaskWrites(path=('__pregel_pull', 'tools'), name='tools', writes=deque([('__error__', ToolCallAPIError('Tool API returned HTTP 503'))]), triggers=('branch:to:tools',))), '__pregel_checkpointer': None, 'checkpoint_map': {'': '1f1ddfa3-35ab-64c4-8001-2b48fbfe7537'}, 'checkpoint_id': None, 'checkpoint_ns': 'tools:75ae9791-f108-e066-6627-fbad2f41b763', '__pregel_scratchpad': PregelScratchpad(step=2, stop=10, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f527d30>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f527b50>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f5a2770>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f527370>), '__pregel_call': functools.partial(<function _call at 0x10f480eb0>, <weakref at 0x10f5e1490; to 'langgraph.types.PregelExecutableTask' at 0x10f536170>, retry_policy=None, futures=<weakref at 0x10f5e14e0; to 'langgraph.pregel._runner.FuturesDict' at 0x10f54df20>, schedule_task=<bound method SyncPregelLoop.accept_push of <langgraph.pregel._loop.SyncPregelLoop object at 0x10f5bac10>>, submit=<weakref at 0x10f5447d0; to 'langgraph.pregel._executor.BackgroundExecutor' at 0x10f5ba990>)}}",
+          "return_value": null,
+          "latency_ms": 0.22,
+          "span_id": "5b40b37adcf08212",
+          "call_index": 1
+        }
+      ],
+      "span_ids": [
+        "5b40b37adcf08212"
+      ],
+      "verdict": "PASS",
+      "failure_reasons": []
+    },
+    {
+      "framework": "langgraph",
+      "task_id": "qual_add",
+      "phase": "guaranteed_fault",
+      "input_text": "You MUST call the calculator tool with the expression '3571 + 8429' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "12000",
+      "required_tool": "calculator",
+      "output": "EXCEPTION: ToolCallAPIError: Tool API returned HTTP 503",
+      "latency_ms": 1328.2522920053452,
+      "answer_present": false,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": null,
+      "tool_return_correct": false,
+      "fault_injected": true,
+      "fault_at_required_tool": true,
+      "fault_exception_type": "ToolCallAPIError",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "expression='3571 + 8429', run_manager=<langchain_core.callbacks.manager.CallbackManagerForToolRun object at 0x10f704c30>, config={'tags': [], 'metadata': {'langgraph_step': 2, 'langgraph_node': 'tools', 'langgraph_triggers': ('branch:to:tools',), 'langgraph_path': ('__pregel_pull', 'tools'), 'langgraph_checkpoint_ns': 'tools:818cfbb2-445b-ea93-6ad9-88b95fbfaf43', 'checkpoint_ns': 'tools:818cfbb2-445b-ea93-6ad9-88b95fbfaf43'}, 'callbacks': <langchain_core.callbacks.manager.CallbackManager object at 0x10f70d950>, 'recursion_limit': 10, 'configurable': {'__pregel_runtime': Runtime(context=None, store=None, stream_writer=<function Pregel.stream.<locals>.stream_writer at 0x10f602770>, heartbeat=<function _no_op_heartbeat at 0x10f401b10>, previous=None, execution_info=ExecutionInfo(checkpoint_id='1f1ddfa3-428b-6176-8001-d67af98a9bee', checkpoint_ns='tools:818cfbb2-445b-ea93-6ad9-88b95fbfaf43', task_id='818cfbb2-445b-ea93-6ad9-88b95fbfaf43', thread_id=None, run_id=None, node_attempt=1, node_first_attempt_time=1794420211.1846569), server_info=None, control=<langgraph.runtime.RunControl object at 0x10f527580>), '__pregel_replay_state': None, '__pregel_task_id': '818cfbb2-445b-ea93-6ad9-88b95fbfaf43', '__pregel_send': <built-in method extend of collections.deque object at 0x10f608f40>, '__pregel_read': functools.partial(<function local_read at 0x10f403690>, PregelScratchpad(step=2, stop=10, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f6069b0>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f6068c0>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f601d20>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f606a10>), {'messages': <langgraph.channels.binop.BinaryOperatorAggregate object at 0x10f7106c0>, '__start__': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f710580>, '__pregel_tasks': <langgraph.channels.topic.Topic object at 0x10f710440>, 'branch:to:agent': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f710b00>, 'branch:to:tools': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f710d40>}, {}, PregelTaskWrites(path=('__pregel_pull', 'tools'), name='tools', writes=deque([('__error__', ToolCallAPIError('Tool API returned HTTP 503'))]), triggers=('branch:to:tools',))), '__pregel_checkpointer': None, 'checkpoint_map': {'': '1f1ddfa3-428b-6176-8001-d67af98a9bee'}, 'checkpoint_id': None, 'checkpoint_ns': 'tools:818cfbb2-445b-ea93-6ad9-88b95fbfaf43', '__pregel_scratchpad': PregelScratchpad(step=2, stop=10, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f6069b0>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f6068c0>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f601d20>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f606a10>), '__pregel_call': functools.partial(<function _call at 0x10f480eb0>, <weakref at 0x10f701350; to 'langgraph.types.PregelExecutableTask' at 0x10f5377f0>, retry_policy=None, futures=<weakref at 0x10f701580; to 'langgraph.pregel._runner.FuturesDict' at 0x10f708050>, schedule_task=<bound method SyncPregelLoop.accept_push of <langgraph.pregel._loop.SyncPregelLoop object at 0x10f5e9450>>, submit=<weakref at 0x10f70d550; to 'langgraph.pregel._executor.BackgroundExecutor' at 0x10f5c5350>)}}",
+          "return_value": null,
+          "latency_ms": 0.18,
+          "span_id": "399846208a3cd045",
+          "call_index": 1
+        }
+      ],
+      "span_ids": [
+        "399846208a3cd045"
+      ],
+      "verdict": "PASS",
+      "failure_reasons": []
+    },
+    {
+      "framework": "langchain",
+      "task_id": "qual_multiply",
+      "phase": "baseline",
+      "input_text": "You MUST call the calculator tool with the expression '7919 * 6841' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "54173879",
+      "required_tool": "calculator",
+      "output": "The result of the expression '7919 * 6841' is 54173879.",
+      "latency_ms": 2670.499125000788,
+      "answer_present": true,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": "54173879",
+      "tool_return_correct": true,
+      "fault_injected": false,
+      "fault_at_required_tool": false,
+      "fault_exception_type": "",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "expression='7919 * 6841', run_manager=<langchain_core.callbacks.manager.CallbackManagerForToolRun object at 0x10f5c7230>, config={'tags': [], 'metadata': {'ls_integration': 'langchain_create_agent', 'langgraph_step': 2, 'langgraph_node': 'tools', 'langgraph_triggers': ('__pregel_push',), 'langgraph_path': ('__pregel_push', 0, False), 'langgraph_checkpoint_ns': 'tools:0a008c17-396e-9b99-2cf4-4d24952cfc45', 'checkpoint_ns': 'tools:0a008c17-396e-9b99-2cf4-4d24952cfc45'}, 'callbacks': <langchain_core.callbacks.manager.CallbackManager object at 0x10f807e50>, 'recursion_limit': 25, 'configurable': {'__pregel_runtime': Runtime(context=None, store=None, stream_writer=<function Pregel.stream.<locals>.stream_writer at 0x10f7f4670>, heartbeat=<function _no_op_heartbeat at 0x10f401b10>, previous=None, execution_info=ExecutionInfo(checkpoint_id='1f1ddfa3-4fbd-661e-8001-e3247aeea872', checkpoint_ns='tools:0a008c17-396e-9b99-2cf4-4d24952cfc45', task_id='0a008c17-396e-9b99-2cf4-4d24952cfc45', thread_id=None, run_id=None, node_attempt=1, node_first_attempt_time=1794420212.5682502), server_info=None, control=<langgraph.runtime.RunControl object at 0x10f7e0790>), '__pregel_replay_state': None, '__pregel_task_id': '0a008c17-396e-9b99-2cf4-4d24952cfc45', '__pregel_send': <built-in method extend of collections.deque object at 0x10f519210>, '__pregel_read': functools.partial(<function local_read at 0x10f403690>, PregelScratchpad(step=2, stop=25, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e01f0>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e0340>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f7f5220>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e0250>), {'messages': <langgraph.channels.binop.BinaryOperatorAggregate object at 0x10f51e580>, 'jump_to': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f51dec0>, 'structured_response': <langgraph.channels.last_value.LastValue object at 0x10f51dbc0>, '__start__': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f51e480>, '__pregel_tasks': <langgraph.channels.topic.Topic object at 0x10f51f880>, 'branch:to:model': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f51cfc0>, 'branch:to:tools': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f51e0c0>}, {}, PregelTaskWrites(path=('__pregel_push', 0, False), name='tools', writes=deque([('messages', [ToolMessage(content='54173879', name='calculator', id='a7a742b4-2943-4ac9-9dd9-c38c593f6b12', tool_call_id='ed1179d8-37c6-4369-b3ff-bc8cb047991c')]), ('branch:to:model', None)]), triggers=('__pregel_push',))), '__pregel_checkpointer': None, 'checkpoint_map': {'': '1f1ddfa3-4fbd-661e-8001-e3247aeea872'}, 'checkpoint_id': None, 'checkpoint_ns': 'tools:0a008c17-396e-9b99-2cf4-4d24952cfc45', '__pregel_scratchpad': PregelScratchpad(step=2, stop=25, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e01f0>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e0340>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f7f5220>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e0250>), '__pregel_call': functools.partial(<function _call at 0x10f480eb0>, <weakref at 0x10f80f740; dead>, retry_policy=None, futures=<weakref at 0x10f80fab0; dead>, schedule_task=<bound method SyncPregelLoop.accept_push of <langgraph.pregel._loop.SyncPregelLoop object at 0x10f5bbed0>>, submit=<weakref at 0x10f805950; to 'langgraph.pregel._executor.BackgroundExecutor' at 0x10f5c5e00>)}}",
+          "return_value": "54173879",
+          "latency_ms": 0.27,
+          "span_id": "c80cc8d26381c7ec",
+          "call_index": 1
+        }
+      ],
+      "span_ids": [
+        "c80cc8d26381c7ec"
+      ],
+      "verdict": "PASS",
+      "failure_reasons": []
+    },
+    {
+      "framework": "langchain",
+      "task_id": "qual_add",
+      "phase": "baseline",
+      "input_text": "You MUST call the calculator tool with the expression '3571 + 8429' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "12000",
+      "required_tool": "calculator",
+      "output": "The result of the expression '3571 + 8429' is 12000.",
+      "latency_ms": 2542.1990000031656,
+      "answer_present": true,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": "12000",
+      "tool_return_correct": true,
+      "fault_injected": false,
+      "fault_at_required_tool": false,
+      "fault_exception_type": "",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "expression='3571 + 8429', run_manager=<langchain_core.callbacks.manager.CallbackManagerForToolRun object at 0x10f7271d0>, config={'tags': [], 'metadata': {'ls_integration': 'langchain_create_agent', 'langgraph_step': 2, 'langgraph_node': 'tools', 'langgraph_triggers': ('__pregel_push',), 'langgraph_path': ('__pregel_push', 0, False), 'langgraph_checkpoint_ns': 'tools:efcd3715-be37-7733-1f85-ef1433f9f9d6', 'checkpoint_ns': 'tools:efcd3715-be37-7733-1f85-ef1433f9f9d6'}, 'callbacks': <langchain_core.callbacks.manager.CallbackManager object at 0x10f81c6d0>, 'recursion_limit': 25, 'configurable': {'__pregel_runtime': Runtime(context=None, store=None, stream_writer=<function Pregel.stream.<locals>.stream_writer at 0x10f7f7110>, heartbeat=<function _no_op_heartbeat at 0x10f401b10>, previous=None, execution_info=ExecutionInfo(checkpoint_id='1f1ddfa3-6942-69c2-8001-cfcd634a6ff3', checkpoint_ns='tools:efcd3715-be37-7733-1f85-ef1433f9f9d6', task_id='efcd3715-be37-7733-1f85-ef1433f9f9d6', thread_id=None, run_id=None, node_attempt=1, node_first_attempt_time=1794420215.244202), server_info=None, control=<langgraph.runtime.RunControl object at 0x10f7e1900>), '__pregel_replay_state': None, '__pregel_task_id': 'efcd3715-be37-7733-1f85-ef1433f9f9d6', '__pregel_send': <built-in method extend of collections.deque object at 0x10f793f10>, '__pregel_read': functools.partial(<function local_read at 0x10f403690>, PregelScratchpad(step=2, stop=25, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e1c00>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e1ab0>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f7f7d70>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e1fc0>), {'messages': <langgraph.channels.binop.BinaryOperatorAggregate object at 0x10f51eac0>, 'jump_to': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f51ebc0>, 'structured_response': <langgraph.channels.last_value.LastValue object at 0x10f51d080>, '__start__': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f51df00>, '__pregel_tasks': <langgraph.channels.topic.Topic object at 0x10f51e9c0>, 'branch:to:model': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f51d480>, 'branch:to:tools': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f51c400>}, {}, PregelTaskWrites(path=('__pregel_push', 0, False), name='tools', writes=deque([('messages', [ToolMessage(content='12000', name='calculator', id='6a2bf2f6-4a2a-40fc-b591-e2a15dcc04e4', tool_call_id='f7c0a8ea-c155-4fd4-819d-bb78c0ba9580')]), ('branch:to:model', None)]), triggers=('__pregel_push',))), '__pregel_checkpointer': None, 'checkpoint_map': {'': '1f1ddfa3-6942-69c2-8001-cfcd634a6ff3'}, 'checkpoint_id': None, 'checkpoint_ns': 'tools:efcd3715-be37-7733-1f85-ef1433f9f9d6', '__pregel_scratchpad': PregelScratchpad(step=2, stop=25, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e1c00>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e1ab0>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f7f7d70>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e1fc0>), '__pregel_call': functools.partial(<function _call at 0x10f480eb0>, <weakref at 0x10f81a980; dead>, retry_policy=None, futures=<weakref at 0x10f81aac0; dead>, schedule_task=<bound method SyncPregelLoop.accept_push of <langgraph.pregel._loop.SyncPregelLoop object at 0x10f5bbc50>>, submit=<weakref at 0x10f8246d0; to 'langgraph.pregel._executor.BackgroundExecutor' at 0x10f726f90>)}}",
+          "return_value": "12000",
+          "latency_ms": 0.18,
+          "span_id": "e9a5101e84e17bc4",
+          "call_index": 1
+        }
+      ],
+      "span_ids": [
+        "e9a5101e84e17bc4"
+      ],
+      "verdict": "PASS",
+      "failure_reasons": []
+    },
+    {
+      "framework": "langchain",
+      "task_id": "qual_multiply",
+      "phase": "guaranteed_fault",
+      "input_text": "You MUST call the calculator tool with the expression '7919 * 6841' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "54173879",
+      "required_tool": "calculator",
+      "output": "EXCEPTION: ToolCallAPIError: Tool API returned HTTP 503",
+      "latency_ms": 1331.2264999985928,
+      "answer_present": false,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": null,
+      "tool_return_correct": false,
+      "fault_injected": true,
+      "fault_at_required_tool": true,
+      "fault_exception_type": "ToolCallAPIError",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "expression='7919 * 6841', run_manager=<langchain_core.callbacks.manager.CallbackManagerForToolRun object at 0x10f47fbd0>, config={'tags': [], 'metadata': {'ls_integration': 'langchain_create_agent', 'langgraph_step': 2, 'langgraph_node': 'tools', 'langgraph_triggers': ('__pregel_push',), 'langgraph_path': ('__pregel_push', 0, False), 'langgraph_checkpoint_ns': 'tools:8f80d968-01ad-2c77-b2e1-ae7a690fdbe9', 'checkpoint_ns': 'tools:8f80d968-01ad-2c77-b2e1-ae7a690fdbe9'}, 'callbacks': <langchain_core.callbacks.manager.CallbackManager object at 0x10f84ee50>, 'recursion_limit': 25, 'configurable': {'__pregel_runtime': Runtime(context=None, store=None, stream_writer=<function Pregel.stream.<locals>.stream_writer at 0x10f8452d0>, heartbeat=<function _no_op_heartbeat at 0x10f401b10>, previous=None, execution_info=ExecutionInfo(checkpoint_id='1f1ddfa3-81c4-6a72-8001-50c788324595', checkpoint_ns='tools:8f80d968-01ad-2c77-b2e1-ae7a690fdbe9', task_id='8f80d968-01ad-2c77-b2e1-ae7a690fdbe9', thread_id=None, run_id=None, node_attempt=1, node_first_attempt_time=1794420217.814023), server_info=None, control=<langgraph.runtime.RunControl object at 0x10f7e2f80>), '__pregel_replay_state': None, '__pregel_task_id': '8f80d968-01ad-2c77-b2e1-ae7a690fdbe9', '__pregel_send': <built-in method extend of collections.deque object at 0x10f840b80>, '__pregel_read': functools.partial(<function local_read at 0x10f403690>, PregelScratchpad(step=2, stop=25, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e1f60>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e30d0>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f7f57a0>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e26e0>), {'messages': <langgraph.channels.binop.BinaryOperatorAggregate object at 0x10f83f700>, 'jump_to': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f83e040>, 'structured_response': <langgraph.channels.last_value.LastValue object at 0x10f83f740>, '__start__': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f83ee80>, '__pregel_tasks': <langgraph.channels.topic.Topic object at 0x10f83e200>, 'branch:to:model': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f83f640>, 'branch:to:tools': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f83cac0>}, {}, PregelTaskWrites(path=('__pregel_push', 0, False), name='tools', writes=deque([('__error__', ToolCallAPIError('Tool API returned HTTP 503'))]), triggers=('__pregel_push',))), '__pregel_checkpointer': None, 'checkpoint_map': {'': '1f1ddfa3-81c4-6a72-8001-50c788324595'}, 'checkpoint_id': None, 'checkpoint_ns': 'tools:8f80d968-01ad-2c77-b2e1-ae7a690fdbe9', '__pregel_scratchpad': PregelScratchpad(step=2, stop=25, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e1f60>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e30d0>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f7f57a0>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e26e0>), '__pregel_call': functools.partial(<function _call at 0x10f480eb0>, <weakref at 0x10f80ff10; to 'langgraph.types.PregelExecutableTask' at 0x10f535130>, retry_policy=None, futures=<weakref at 0x10f80f420; to 'langgraph.pregel._runner.FuturesDict' at 0x10f535590>, schedule_task=<bound method SyncPregelLoop.accept_push of <langgraph.pregel._loop.SyncPregelLoop object at 0x10f5b9a90>>, submit=<weakref at 0x10f8384d0; to 'langgraph.pregel._executor.BackgroundExecutor' at 0x10f835040>)}}",
+          "return_value": null,
+          "latency_ms": 0.18,
+          "span_id": "174bd5f4bb33983c",
+          "call_index": 1
+        }
+      ],
+      "span_ids": [
+        "174bd5f4bb33983c"
+      ],
+      "verdict": "PASS",
+      "failure_reasons": []
+    },
+    {
+      "framework": "langchain",
+      "task_id": "qual_add",
+      "phase": "guaranteed_fault",
+      "input_text": "You MUST call the calculator tool with the expression '3571 + 8429' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "12000",
+      "required_tool": "calculator",
+      "output": "EXCEPTION: ToolCallAPIError: Tool API returned HTTP 503",
+      "latency_ms": 1324.4120000017574,
+      "answer_present": false,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": null,
+      "tool_return_correct": false,
+      "fault_injected": true,
+      "fault_at_required_tool": true,
+      "fault_exception_type": "ToolCallAPIError",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "expression='3571 + 8429', run_manager=<langchain_core.callbacks.manager.CallbackManagerForToolRun object at 0x10f837130>, config={'tags': [], 'metadata': {'ls_integration': 'langchain_create_agent', 'langgraph_step': 2, 'langgraph_node': 'tools', 'langgraph_triggers': ('__pregel_push',), 'langgraph_path': ('__pregel_push', 0, False), 'langgraph_checkpoint_ns': 'tools:0e2e9f3b-3848-05fb-e622-07e9f94e84fa', 'checkpoint_ns': 'tools:0e2e9f3b-3848-05fb-e622-07e9f94e84fa'}, 'callbacks': <langchain_core.callbacks.manager.CallbackManager object at 0x10f83b550>, 'recursion_limit': 25, 'configurable': {'__pregel_runtime': Runtime(context=None, store=None, stream_writer=<function Pregel.stream.<locals>.stream_writer at 0x10f847950>, heartbeat=<function _no_op_heartbeat at 0x10f401b10>, previous=None, execution_info=ExecutionInfo(checkpoint_id='1f1ddfa3-8e8e-6a6e-8001-4fe3b5fcbcc8', checkpoint_ns='tools:0e2e9f3b-3848-05fb-e622-07e9f94e84fa', task_id='0e2e9f3b-3848-05fb-e622-07e9f94e84fa', thread_id=None, run_id=None, node_attempt=1, node_first_attempt_time=1794420219.155112), server_info=None, control=<langgraph.runtime.RunControl object at 0x10f868880>), '__pregel_replay_state': None, '__pregel_task_id': '0e2e9f3b-3848-05fb-e622-07e9f94e84fa', '__pregel_send': <built-in method extend of collections.deque object at 0x10f8427a0>, '__pregel_read': functools.partial(<function local_read at 0x10f403690>, PregelScratchpad(step=2, stop=25, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e3be0>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e0a90>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f846400>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e3e50>), {'messages': <langgraph.channels.binop.BinaryOperatorAggregate object at 0x10f7d9b40>, 'jump_to': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f7dbc00>, 'structured_response': <langgraph.channels.last_value.LastValue object at 0x10f7d9500>, '__start__': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f7dbb40>, '__pregel_tasks': <langgraph.channels.topic.Topic object at 0x10f7d9a80>, 'branch:to:model': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f7d9dc0>, 'branch:to:tools': <langgraph.channels.ephemeral_value.EphemeralValue object at 0x10f7d9e00>}, {}, PregelTaskWrites(path=('__pregel_push', 0, False), name='tools', writes=deque([('__error__', ToolCallAPIError('Tool API returned HTTP 503'))]), triggers=('__pregel_push',))), '__pregel_checkpointer': None, 'checkpoint_map': {'': '1f1ddfa3-8e8e-6a6e-8001-4fe3b5fcbcc8'}, 'checkpoint_id': None, 'checkpoint_ns': 'tools:0e2e9f3b-3848-05fb-e622-07e9f94e84fa', '__pregel_scratchpad': PregelScratchpad(step=2, stop=25, call_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e3be0>, interrupt_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e0a90>, get_null_resume=<function _scratchpad.<locals>.get_null_resume at 0x10f846400>, resume=[], subgraph_counter=<langgraph.pregel._algo.LazyAtomicCounter object at 0x10f7e3e50>), '__pregel_call': functools.partial(<function _call at 0x10f480eb0>, <weakref at 0x10f84a980; to 'langgraph.types.PregelExecutableTask' at 0x10f73fed0>, retry_policy=None, futures=<weakref at 0x10f84ac50; to 'langgraph.pregel._runner.FuturesDict' at 0x10f73f610>, schedule_task=<bound method SyncPregelLoop.accept_push of <langgraph.pregel._loop.SyncPregelLoop object at 0x10f5bbd90>>, submit=<weakref at 0x10f83b2d0; to 'langgraph.pregel._executor.BackgroundExecutor' at 0x10f8367a0>)}}",
+          "return_value": null,
+          "latency_ms": 0.18,
+          "span_id": "63ca6e8b0c54e6fe",
+          "call_index": 1
+        }
+      ],
+      "span_ids": [
+        "63ca6e8b0c54e6fe"
+      ],
+      "verdict": "PASS",
+      "failure_reasons": []
+    },
+    {
+      "framework": "autogen",
+      "task_id": "qual_multiply",
+      "phase": "baseline",
+      "input_text": "You MUST call the calculator tool with the expression '7919 * 6841' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "54173879",
+      "required_tool": "calculator",
+      "output": "",
+      "latency_ms": 8398.253624996869,
+      "answer_present": false,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": "54173879",
+      "tool_return_correct": true,
+      "fault_injected": false,
+      "fault_at_required_tool": false,
+      "fault_exception_type": "",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "'7919 * 6841'",
+          "return_value": "54173879",
+          "latency_ms": 0.33,
+          "span_id": "3aba3f42028ffa3a",
+          "call_index": 1
+        },
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "'7919 * 6841'",
+          "return_value": "54173879",
+          "latency_ms": 0.14,
+          "span_id": "c8049ccc6119a471",
+          "call_index": 2
+        },
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "'7919 * 6841'",
+          "return_value": "54173879",
+          "latency_ms": 0.26,
+          "span_id": "97dcf2ed5038defe",
+          "call_index": 3
+        },
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "'7919 * 6841'",
+          "return_value": "54173879",
+          "latency_ms": 0.27,
+          "span_id": "4615df1b46020569",
+          "call_index": 4
+        }
+      ],
+      "span_ids": [
+        "3aba3f42028ffa3a",
+        "c8049ccc6119a471",
+        "97dcf2ed5038defe",
+        "4615df1b46020569"
+      ],
+      "verdict": "FAIL",
+      "failure_reasons": [
+        "Expected answer '54173879' not in output"
+      ]
+    },
+    {
+      "framework": "autogen",
+      "task_id": "qual_add",
+      "phase": "baseline",
+      "input_text": "You MUST call the calculator tool with the expression '3571 + 8429' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "12000",
+      "required_tool": "calculator",
+      "output": "",
+      "latency_ms": 7345.229124999605,
+      "answer_present": false,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": "12000",
+      "tool_return_correct": true,
+      "fault_injected": false,
+      "fault_at_required_tool": false,
+      "fault_exception_type": "",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "'3571 + 8429'",
+          "return_value": "12000",
+          "latency_ms": 0.25,
+          "span_id": "426e721708c17d25",
+          "call_index": 1
+        },
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "'3571 + 8429'",
+          "return_value": "12000",
+          "latency_ms": 0.15,
+          "span_id": "b8f87a928871ae4b",
+          "call_index": 2
+        },
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "'3571 + 8429'",
+          "return_value": "12000",
+          "latency_ms": 0.25,
+          "span_id": "2313c5ff42107308",
+          "call_index": 3
+        },
+        {
+          "tool_name": "calculator",
+          "injected": false,
+          "exception": null,
+          "call_args": "'3571 + 8429'",
+          "return_value": "12000",
+          "latency_ms": 0.28,
+          "span_id": "a20d4c77f7f031d3",
+          "call_index": 4
+        }
+      ],
+      "span_ids": [
+        "426e721708c17d25",
+        "b8f87a928871ae4b",
+        "2313c5ff42107308",
+        "a20d4c77f7f031d3"
+      ],
+      "verdict": "FAIL",
+      "failure_reasons": [
+        "Expected answer '12000' not in output"
+      ]
+    },
+    {
+      "framework": "autogen",
+      "task_id": "qual_multiply",
+      "phase": "guaranteed_fault",
+      "input_text": "You MUST call the calculator tool with the expression '7919 * 6841' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "54173879",
+      "required_tool": "calculator",
+      "output": "",
+      "latency_ms": 6918.961625007796,
+      "answer_present": false,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": null,
+      "tool_return_correct": false,
+      "fault_injected": true,
+      "fault_at_required_tool": true,
+      "fault_exception_type": "ToolCallAPIError",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "'7919 * 6841'",
+          "return_value": null,
+          "latency_ms": 0.26,
+          "span_id": "989c4181e9c4e7c0",
+          "call_index": 1
+        },
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "'7919 * 6841'",
+          "return_value": null,
+          "latency_ms": 0.18,
+          "span_id": "5ffdc832e9e05b0e",
+          "call_index": 2
+        },
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "'7919 * 6841'",
+          "return_value": null,
+          "latency_ms": 0.13,
+          "span_id": "2decaef15e5c81cf",
+          "call_index": 3
+        }
+      ],
+      "span_ids": [
+        "989c4181e9c4e7c0",
+        "5ffdc832e9e05b0e",
+        "2decaef15e5c81cf"
+      ],
+      "verdict": "PASS",
+      "failure_reasons": []
+    },
+    {
+      "framework": "autogen",
+      "task_id": "qual_add",
+      "phase": "guaranteed_fault",
+      "input_text": "You MUST call the calculator tool with the expression '3571 + 8429' and report the exact numeric result. Do NOT compute this yourself.",
+      "expected_answer": "12000",
+      "required_tool": "calculator",
+      "output": "",
+      "latency_ms": 7343.845875002444,
+      "answer_present": false,
+      "tool_executed": true,
+      "required_tool_called": true,
+      "tool_expression_matched": true,
+      "tool_return_value": null,
+      "tool_return_correct": false,
+      "fault_injected": true,
+      "fault_at_required_tool": true,
+      "fault_exception_type": "ToolCallAPIError",
+      "injector_log": [
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "'3571 + 8429'",
+          "return_value": null,
+          "latency_ms": 0.19,
+          "span_id": "1b738fb2cdf42a49",
+          "call_index": 1
+        },
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "'3571 + 8429'",
+          "return_value": null,
+          "latency_ms": 0.19,
+          "span_id": "8ee1932e582fcffd",
+          "call_index": 2
+        },
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "'3571 + 8429'",
+          "return_value": null,
+          "latency_ms": 0.18,
+          "span_id": "777b315bce976688",
+          "call_index": 3
+        },
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "'3571 + 8429'",
+          "return_value": null,
+          "latency_ms": 0.21,
+          "span_id": "346ce119249af533",
+          "call_index": 4
+        },
+        {
+          "tool_name": "calculator",
+          "injected": true,
+          "exception": "ToolCallAPIError",
+          "call_args": "'3571 + 8429'",
+          "return_value": null,
+          "latency_ms": 0.21,
+          "span_id": "b895a5bc306d03e6",
+          "call_index": 5
+        }
+      ],
+      "span_ids": [
+        "1b738fb2cdf42a49",
+        "8ee1932e582fcffd",
+        "777b315bce976688",
+        "346ce119249af533",
+        "b895a5bc306d03e6"
+      ],
+      "verdict": "PASS",
+      "failure_reasons": []
+    }
+  ],
+  "captured_spans": [
+    {
+      "name": "langgraph.node.agent",
+      "trace_id": "b1cb30fc3f5059cc6e0282e2010d0007",
+      "span_id": "6ad66390605ecf81",
+      "parent_span_id": "bec0f16cd94c10c5",
+      "status": "UNSET",
+      "attributes": {},
+      "start_ns": 1794420201068699000,
+      "end_ns": 1794420204538858000,
+      "duration_ms": 3470.16
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "b1cb30fc3f5059cc6e0282e2010d0007",
+      "span_id": "f510fe981cc381f9",
+      "parent_span_id": "bec0f16cd94c10c5",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420204547525000,
+      "end_ns": 1794420204547854000,
+      "duration_ms": 0.33
+    },
+    {
+      "name": "langgraph.node.agent",
+      "trace_id": "b1cb30fc3f5059cc6e0282e2010d0007",
+      "span_id": "0d3947d43792cf78",
+      "parent_span_id": "bec0f16cd94c10c5",
+      "status": "UNSET",
+      "attributes": {},
+      "start_ns": 1794420204548543000,
+      "end_ns": 1794420205916848000,
+      "duration_ms": 1368.31
+    },
+    {
+      "name": "langgraph.agent.invoke",
+      "trace_id": "b1cb30fc3f5059cc6e0282e2010d0007",
+      "span_id": "bec0f16cd94c10c5",
+      "parent_span_id": null,
+      "status": "UNSET",
+      "attributes": {
+        "framework": "langgraph",
+        "input.length": 134,
+        "latency_ms": 4850.411332998192
+      },
+      "start_ns": 1794420201067434000,
+      "end_ns": 1794420205918085000,
+      "duration_ms": 4850.65
+    },
+    {
+      "name": "langgraph.node.agent",
+      "trace_id": "9c456313d0072a68bbf050d7228493c0",
+      "span_id": "9bdbbeb7daa6e109",
+      "parent_span_id": "c4be8f09a82b9de4",
+      "status": "UNSET",
+      "attributes": {},
+      "start_ns": 1794420205943904000,
+      "end_ns": 1794420207268943000,
+      "duration_ms": 1325.04
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "9c456313d0072a68bbf050d7228493c0",
+      "span_id": "3120d7d634483378",
+      "parent_span_id": "c4be8f09a82b9de4",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420207271075000,
+      "end_ns": 1794420207271256000,
+      "duration_ms": 0.18
+    },
+    {
+      "name": "langgraph.node.agent",
+      "trace_id": "9c456313d0072a68bbf050d7228493c0",
+      "span_id": "728be6ba0e7b010c",
+      "parent_span_id": "c4be8f09a82b9de4",
+      "status": "UNSET",
+      "attributes": {},
+      "start_ns": 1794420207271874000,
+      "end_ns": 1794420208499225000,
+      "duration_ms": 1227.35
+    },
+    {
+      "name": "langgraph.agent.invoke",
+      "trace_id": "9c456313d0072a68bbf050d7228493c0",
+      "span_id": "c4be8f09a82b9de4",
+      "parent_span_id": null,
+      "status": "UNSET",
+      "attributes": {
+        "framework": "langgraph",
+        "input.length": 134,
+        "latency_ms": 2557.040458996198
+      },
+      "start_ns": 1794420205943058000,
+      "end_ns": 1794420208500250000,
+      "duration_ms": 2557.19
+    },
+    {
+      "name": "langgraph.node.agent",
+      "trace_id": "02fe3c616e6fb229a100f3fad6315db3",
+      "span_id": "e664c3c497258f05",
+      "parent_span_id": "45382980cda6d37e",
+      "status": "UNSET",
+      "attributes": {},
+      "start_ns": 1794420208522680000,
+      "end_ns": 1794420209833868000,
+      "duration_ms": 1311.19
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "02fe3c616e6fb229a100f3fad6315db3",
+      "span_id": "5b40b37adcf08212",
+      "parent_span_id": "45382980cda6d37e",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420209836175000,
+      "end_ns": 1794420209839087000,
+      "duration_ms": 2.91
+    },
+    {
+      "name": "langgraph.agent.invoke",
+      "trace_id": "02fe3c616e6fb229a100f3fad6315db3",
+      "span_id": "45382980cda6d37e",
+      "parent_span_id": null,
+      "status": "ERROR",
+      "attributes": {
+        "framework": "langgraph",
+        "input.length": 134
+      },
+      "start_ns": 1794420208521929000,
+      "end_ns": 1794420209846253000,
+      "duration_ms": 1324.32
+    },
+    {
+      "name": "langgraph.node.agent",
+      "trace_id": "9b81a1c741613a8335dcae80a3196533",
+      "span_id": "b4894660cb7e3839",
+      "parent_span_id": "4559d69aa8d66415",
+      "status": "UNSET",
+      "attributes": {},
+      "start_ns": 1794420209863786000,
+      "end_ns": 1794420211183396000,
+      "duration_ms": 1319.61
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "9b81a1c741613a8335dcae80a3196533",
+      "span_id": "399846208a3cd045",
+      "parent_span_id": "4559d69aa8d66415",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420211186267000,
+      "end_ns": 1794420211187078000,
+      "duration_ms": 0.81
+    },
+    {
+      "name": "langgraph.agent.invoke",
+      "trace_id": "9b81a1c741613a8335dcae80a3196533",
+      "span_id": "4559d69aa8d66415",
+      "parent_span_id": null,
+      "status": "ERROR",
+      "attributes": {
+        "framework": "langgraph",
+        "input.length": 134
+      },
+      "start_ns": 1794420209863016000,
+      "end_ns": 1794420211191189000,
+      "duration_ms": 1328.17
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "ceb8904c33fc8d512d700ad87fb037d9",
+      "span_id": "c80cc8d26381c7ec",
+      "parent_span_id": "3e0df80e92f74f9f",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420212569707000,
+      "end_ns": 1794420212569861000,
+      "duration_ms": 0.15
+    },
+    {
+      "name": "langchain.agent.invoke",
+      "trace_id": "ceb8904c33fc8d512d700ad87fb037d9",
+      "span_id": "3e0df80e92f74f9f",
+      "parent_span_id": null,
+      "status": "UNSET",
+      "attributes": {
+        "framework": "langchain",
+        "latency_ms": 2670.347083010711
+      },
+      "start_ns": 1794420211239720000,
+      "end_ns": 1794420213910140000,
+      "duration_ms": 2670.42
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "2dd33aa91cf23fc28448b48a2aca976a",
+      "span_id": "e9a5101e84e17bc4",
+      "parent_span_id": "356ddf8dc42aafe4",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420215245252000,
+      "end_ns": 1794420215245366000,
+      "duration_ms": 0.11
+    },
+    {
+      "name": "langchain.agent.invoke",
+      "trace_id": "2dd33aa91cf23fc28448b48a2aca976a",
+      "span_id": "356ddf8dc42aafe4",
+      "parent_span_id": null,
+      "status": "UNSET",
+      "attributes": {
+        "framework": "langchain",
+        "latency_ms": 2541.9927909970284
+      },
+      "start_ns": 1794420213929437000,
+      "end_ns": 1794420216471508000,
+      "duration_ms": 2542.07
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "c69dce9d1516477ed48dfa33f64b4f78",
+      "span_id": "174bd5f4bb33983c",
+      "parent_span_id": "25f175a79e66971a",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420217815395000,
+      "end_ns": 1794420217816183000,
+      "duration_ms": 0.79
+    },
+    {
+      "name": "langchain.agent.invoke",
+      "trace_id": "c69dce9d1516477ed48dfa33f64b4f78",
+      "span_id": "25f175a79e66971a",
+      "parent_span_id": null,
+      "status": "ERROR",
+      "attributes": {
+        "framework": "langchain"
+      },
+      "start_ns": 1794420216491804000,
+      "end_ns": 1794420217822936000,
+      "duration_ms": 1331.13
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "186903b6086e27433b59b94d5dd1cc83",
+      "span_id": "63ca6e8b0c54e6fe",
+      "parent_span_id": "3652f9292c423f21",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420219156819000,
+      "end_ns": 1794420219157617000,
+      "duration_ms": 0.8
+    },
+    {
+      "name": "langchain.agent.invoke",
+      "trace_id": "186903b6086e27433b59b94d5dd1cc83",
+      "span_id": "3652f9292c423f21",
+      "parent_span_id": null,
+      "status": "ERROR",
+      "attributes": {
+        "framework": "langchain"
+      },
+      "start_ns": 1794420217837339000,
+      "end_ns": 1794420219161697000,
+      "duration_ms": 1324.36
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "9161972686e9752234715fe7d0815a02",
+      "span_id": "3aba3f42028ffa3a",
+      "parent_span_id": "e803ebf449740420",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420222817340000,
+      "end_ns": 1794420222817463000,
+      "duration_ms": 0.12
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "9161972686e9752234715fe7d0815a02",
+      "span_id": "c8049ccc6119a471",
+      "parent_span_id": "e803ebf449740420",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 2,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420224007360000,
+      "end_ns": 1794420224007432000,
+      "duration_ms": 0.07
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "9161972686e9752234715fe7d0815a02",
+      "span_id": "97dcf2ed5038defe",
+      "parent_span_id": "e803ebf449740420",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 3,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420226269902000,
+      "end_ns": 1794420226270031000,
+      "duration_ms": 0.13
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "9161972686e9752234715fe7d0815a02",
+      "span_id": "4615df1b46020569",
+      "parent_span_id": "e803ebf449740420",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 4,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420227460206000,
+      "end_ns": 1794420227460342000,
+      "duration_ms": 0.14
+    },
+    {
+      "name": "autogen.agent.invoke",
+      "trace_id": "9161972686e9752234715fe7d0815a02",
+      "span_id": "e803ebf449740420",
+      "parent_span_id": null,
+      "status": "UNSET",
+      "attributes": {
+        "framework": "autogen",
+        "latency_ms": 8398.121500009438,
+        "tool_call_count": 4
+      },
+      "start_ns": 1794420220249137000,
+      "end_ns": 1794420228647363000,
+      "duration_ms": 8398.23
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "392a27e603fdc20cb7939bc6997ca1f3",
+      "span_id": "426e721708c17d25",
+      "parent_span_id": "404bdb80ac00f102",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420231222513000,
+      "end_ns": 1794420231222643000,
+      "duration_ms": 0.13
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "392a27e603fdc20cb7939bc6997ca1f3",
+      "span_id": "b8f87a928871ae4b",
+      "parent_span_id": "404bdb80ac00f102",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 2,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420232412979000,
+      "end_ns": 1794420232413055000,
+      "duration_ms": 0.08
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "392a27e603fdc20cb7939bc6997ca1f3",
+      "span_id": "2313c5ff42107308",
+      "parent_span_id": "404bdb80ac00f102",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 3,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420233607010000,
+      "end_ns": 1794420233607134000,
+      "duration_ms": 0.12
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "392a27e603fdc20cb7939bc6997ca1f3",
+      "span_id": "a20d4c77f7f031d3",
+      "parent_span_id": "404bdb80ac00f102",
+      "status": "UNSET",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 4,
+        "failure.injected": false,
+        "failure.type": "none"
+      },
+      "start_ns": 1794420234798156000,
+      "end_ns": 1794420234798300000,
+      "duration_ms": 0.14
+    },
+    {
+      "name": "autogen.agent.invoke",
+      "trace_id": "392a27e603fdc20cb7939bc6997ca1f3",
+      "span_id": "404bdb80ac00f102",
+      "parent_span_id": null,
+      "status": "UNSET",
+      "attributes": {
+        "framework": "autogen",
+        "latency_ms": 7345.057124999585,
+        "tool_call_count": 4
+      },
+      "start_ns": 1794420228647757000,
+      "end_ns": 1794420235992913000,
+      "duration_ms": 7345.16
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "08dd0640c2ea926381078161ad1c2f10",
+      "span_id": "989c4181e9c4e7c0",
+      "parent_span_id": "749add90cb5435d5",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420238301597000,
+      "end_ns": 1794420238302748000,
+      "duration_ms": 1.15
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "08dd0640c2ea926381078161ad1c2f10",
+      "span_id": "5ffdc832e9e05b0e",
+      "parent_span_id": "749add90cb5435d5",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 2,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420239493985000,
+      "end_ns": 1794420239494637000,
+      "duration_ms": 0.65
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "08dd0640c2ea926381078161ad1c2f10",
+      "span_id": "2decaef15e5c81cf",
+      "parent_span_id": "749add90cb5435d5",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 3,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420241700681000,
+      "end_ns": 1794420241701192000,
+      "duration_ms": 0.51
+    },
+    {
+      "name": "autogen.agent.invoke",
+      "trace_id": "08dd0640c2ea926381078161ad1c2f10",
+      "span_id": "749add90cb5435d5",
+      "parent_span_id": null,
+      "status": "UNSET",
+      "attributes": {
+        "framework": "autogen",
+        "latency_ms": 6918.780791005702,
+        "tool_call_count": 3
+      },
+      "start_ns": 1794420235993208000,
+      "end_ns": 1794420242912091000,
+      "duration_ms": 6918.88
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "f3780f02917514462b1eec4b8114fd9a",
+      "span_id": "1b738fb2cdf42a49",
+      "parent_span_id": "218ed78b5cb7a8a2",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 1,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420244226522000,
+      "end_ns": 1794420244227288000,
+      "duration_ms": 0.77
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "f3780f02917514462b1eec4b8114fd9a",
+      "span_id": "8ee1932e582fcffd",
+      "parent_span_id": "218ed78b5cb7a8a2",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 2,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420245433830000,
+      "end_ns": 1794420245434537000,
+      "duration_ms": 0.71
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "f3780f02917514462b1eec4b8114fd9a",
+      "span_id": "777b315bce976688",
+      "parent_span_id": "218ed78b5cb7a8a2",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 3,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420246638384000,
+      "end_ns": 1794420246638976000,
+      "duration_ms": 0.59
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "f3780f02917514462b1eec4b8114fd9a",
+      "span_id": "346ce119249af533",
+      "parent_span_id": "218ed78b5cb7a8a2",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 4,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420247850310000,
+      "end_ns": 1794420247851054000,
+      "duration_ms": 0.74
+    },
+    {
+      "name": "tool.call.calculator",
+      "trace_id": "f3780f02917514462b1eec4b8114fd9a",
+      "span_id": "b895a5bc306d03e6",
+      "parent_span_id": "218ed78b5cb7a8a2",
+      "status": "ERROR",
+      "attributes": {
+        "tool.name": "calculator",
+        "tool.call_index": 5,
+        "failure.injected": true,
+        "failure.type": "api_error"
+      },
+      "start_ns": 1794420249051824000,
+      "end_ns": 1794420249052511000,
+      "duration_ms": 0.69
+    },
+    {
+      "name": "autogen.agent.invoke",
+      "trace_id": "f3780f02917514462b1eec4b8114fd9a",
+      "span_id": "218ed78b5cb7a8a2",
+      "parent_span_id": null,
+      "status": "UNSET",
+      "attributes": {
+        "framework": "autogen",
+        "latency_ms": 7343.657459001406,
+        "tool_call_count": 5
+      },
+      "start_ns": 1794420242912434000,
+      "end_ns": 1794420250256196000,
+      "duration_ms": 7343.76
+    }
+  ],
+  "n_spans": 42
+}

@@ -1,0 +1,96 @@
+{
+  "description": "Authoritative source map for paper tables. Each entry maps a (model, framework) cell to its batch directory. The analyze_cross_model.py script does not automatically produce the hybrid Qwen column; use this map to select the correct batch per framework.",
+  "generated": "2026-11-12",
+  "tables": {
+    "phase2_main": {
+      "llama3.1": {
+        "batch": "20261111_113514",
+        "frameworks": {
+          "langgraph": "20261111_113514",
+          "langchain": "20261111_113514",
+          "autogen": "20261111_113514"
+        },
+        "notes": "Single batch, all frameworks. Historical output extractor.",
+        "config": {
+          "seed": 42,
+          "injection_probability": 0.20,
+          "autogen_temperature": "not explicitly set (library default)"
+        }
+      },
+      "mistral:7b": {
+        "batch": "20261111_233435",
+        "frameworks": {
+          "langgraph": "20261111_233435",
+          "langchain": "20261111_233435",
+          "autogen": "20261111_233435"
+        },
+        "notes": "Incomplete: AutoGen baseline 5/30, injection conditions not attempted. 305 executed trials of 330 saved records.",
+        "config": {
+          "seed": 42,
+          "injection_probability": 0.20,
+          "autogen_temperature": "not explicitly set (library default)"
+        }
+      },
+      "qwen2.5:7b": {
+        "frameworks": {
+          "langgraph": "20261112_040156",
+          "langchain": "20261112_040156",
+          "autogen": "20261112_063451"
+        },
+        "notes": "Hybrid column. LG/LC from original batch; AutoGen from rerun with corrected output extractor. Do NOT use 20261112_040156 AutoGen results (historical extractor).",
+        "config": {
+          "seed": 42,
+          "injection_probability": 0.20,
+          "autogen_temperature": "not explicitly set (library default)"
+        }
+      }
+    },
+    "diagnostic": {
+      "llama3.1": {
+        "batch": "diagnostic_20261112_113543",
+        "config": {
+          "temperature": 0.0,
+          "injection": "none (diagnostic compares direct client vs AutoGen shim, no fault injection)"
+        }
+      },
+      "qwen2.5:7b": {
+        "batch": "diagnostic_20261112_113622",
+        "config": {
+          "temperature": 0.0,
+          "injection": "none (diagnostic compares direct client vs AutoGen shim, no fault injection)"
+        }
+      }
+    },
+    "qualification": {
+      "llama3.1": {
+        "batch": "qualification_20261111_211913",
+        "trials": 12,
+        "passed": 10
+      },
+      "mistral:7b": {
+        "batch": "qualification_20261111_233116",
+        "trials": 12,
+        "passed": 8
+      },
+      "qwen2.5:7b": {
+        "batch": "qualification_20261111_233320",
+        "trials": 12,
+        "passed": 10
+      }
+    }
+  },
+  "model_digests": {
+    "note": "Identified post-hoc from the same Ollama installation. Historical batch metadata record model_digest: unknown.",
+    "llama3.1": "46e0c10c039e",
+    "mistral:7b": "6577803aa9a0",
+    "qwen2.5:7b": "845dbda0ea48"
+  },
+  "validation_rules": [
+    "Each (model, framework) cell must map to exactly one batch directory",
+    "Qwen AutoGen must use 20261112_063451, not 20261112_040156",
+    "Mistral AutoGen injection conditions are absent — do not report zeros",
+    "Phase 2 batches use seed 42, p=0.20; AutoGen temperature was not explicitly set in historical runs",
+    "Diagnostic runs use explicit T=0 for both paths; no fault injection is performed",
+    "Baseline conditions have p=0 (no injection); injection conditions have p=0.20"
+  ]
+}
