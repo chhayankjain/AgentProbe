@@ -1,0 +1,56 @@
+name: Bug Report
+description: Report a bug in AgentProbe
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting a bug! Please fill in the details below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the behavior.
+      placeholder: |
+        1. Install with `pip install -e ".[ollama]"`
+        2. Run `python experiments/run_benchmarks.py --frameworks langgraph --tasks tool_use --baseline-only`
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Python version, OS, and relevant package versions.
+      placeholder: |
+        - OS: macOS 15 / Ubuntu 22.04
+        - Python: 3.12.0
+        - AgentProbe: 1.1.0
+        - Ollama: 0.3.x
+        - Model: llama3.1:latest
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / traceback
+      description: Paste any relevant error output.
+      render: shell
