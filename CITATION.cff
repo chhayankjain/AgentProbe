@@ -15,10 +15,11 @@ authors:
     given-names: Eugene
     affiliation: Boston University
     orcid: "https://orcid.org/0000-0002-3836-1851"
-version: "1.1.0"
+version: "1.2.0"
 date-released: "2026-11-14"
 license: MIT
 repository-code: "https://github.com/chhayankjain/AgentProbe"
+url: "https://pypi.org/project/agentprobe-toolkit/"
 keywords:
   - llm-agents
   - fault-injection

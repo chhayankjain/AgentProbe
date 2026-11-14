@@ -49,8 +49,7 @@ class Settings:
         """Return the OpenAI API key or raise :exc:`RuntimeError`."""
         if not self.openai_api_key:
             raise RuntimeError(
-                "OPENAI_API_KEY is required but not set. "
-                "Add it to your environment or .env file."
+                "OPENAI_API_KEY is required but not set. Add it to your environment or .env file."
             )
         return self.openai_api_key
 

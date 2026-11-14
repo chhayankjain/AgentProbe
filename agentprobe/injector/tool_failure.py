@@ -43,9 +43,10 @@ import asyncio
 import functools
 import random
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, TypeVar
+from enum import StrEnum
+from typing import Any, TypeVar
 
 from opentelemetry.trace import Status, StatusCode
 
@@ -94,7 +95,7 @@ class ToolCallAPIError(ToolCallError):
 # ---------------------------------------------------------------------------
 
 
-class ToolFailureType(str, Enum):
+class ToolFailureType(StrEnum):
     NONE = "none"
     TIMEOUT = "timeout"
     MALFORMED_OUTPUT = "malformed_output"
@@ -191,7 +192,9 @@ class ToolFailureInjector:
 
         return wrapper  # type: ignore[return-value]
 
-    def call(self, fn: Callable[..., T], *args: Any, tool_name: str | None = None, **kwargs: Any) -> T:
+    def call(
+        self, fn: Callable[..., T], *args: Any, tool_name: str | None = None, **kwargs: Any
+    ) -> T:
         """Directly invoke a function with failure injection (no decoration needed).
 
         Args:
@@ -202,7 +205,9 @@ class ToolFailureInjector:
         """
         return self._execute_sync(fn, tool_name or fn.__name__, *args, **kwargs)  # type: ignore[return-value]
 
-    async def call_async(self, fn: Callable[..., T], *args: Any, tool_name: str | None = None, **kwargs: Any) -> T:
+    async def call_async(
+        self, fn: Callable[..., T], *args: Any, tool_name: str | None = None, **kwargs: Any
+    ) -> T:
         """Directly invoke an async function with failure injection."""
         return await self._execute_async(fn, tool_name or fn.__name__, *args, **kwargs)  # type: ignore[return-value]
 
@@ -367,14 +372,10 @@ class ToolFailureInjector:
     def _build_exception(self) -> ToolCallError:
         match self.config.failure_type:
             case ToolFailureType.TIMEOUT:
-                return ToolCallTimeout(
-                    f"Tool call timed out after {self.config.timeout_seconds}s"
-                )
+                return ToolCallTimeout(f"Tool call timed out after {self.config.timeout_seconds}s")
             case ToolFailureType.MALFORMED_OUTPUT:
                 payload = self.config.malformed_payload or _random_malformed_payload()
-                return ToolCallMalformedOutput(
-                    f"Tool returned unparseable output: {payload!r}"
-                )
+                return ToolCallMalformedOutput(f"Tool returned unparseable output: {payload!r}")
             case ToolFailureType.RATE_LIMIT:
                 return ToolCallRateLimited(retry_after=self.config.retry_after_seconds)
             case ToolFailureType.API_ERROR:
@@ -389,13 +390,13 @@ class ToolFailureInjector:
 
 
 _MALFORMED_PAYLOADS = [
-    '{"result": ',          # truncated JSON
-    "not json at all",      # plain string
-    '{"result": null,}',    # trailing comma (invalid JSON)
-    "\x00\x01\x02\xff",    # binary garbage
-    "undefined",            # JavaScript undefined leak
+    '{"result": ',  # truncated JSON
+    "not json at all",  # plain string
+    '{"result": null,}',  # trailing comma (invalid JSON)
+    "\x00\x01\x02\xff",  # binary garbage
+    "undefined",  # JavaScript undefined leak
     "<html>502 Bad Gateway</html>",  # HTML error page instead of JSON
-    "",                     # empty response
+    "",  # empty response
 ]
 
 

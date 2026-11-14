@@ -22,8 +22,8 @@ Usage::
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -122,9 +122,7 @@ class ResponseGrader:
                 f"outputs ({len(outputs)}) and expected ({len(expected)}) must have same length"
             )
         if had_errors is not None and len(had_errors) != len(outputs):
-            raise ValueError(
-                f"had_errors ({len(had_errors)}) must match outputs ({len(outputs)})"
-            )
+            raise ValueError(f"had_errors ({len(had_errors)}) must match outputs ({len(outputs)})")
 
         if had_errors is None:
             had_errors = [False] * len(outputs)
@@ -149,9 +147,7 @@ class ResponseGrader:
 
         # Silent failure: incorrect response AND no exception was raised
         silent_failures = sum(
-            1
-            for g, err in zip(grades, had_errors)
-            if not g.is_correct and not err
+            1 for g, err in zip(grades, had_errors) if not g.is_correct and not err
         )
 
         return BatchGradeResult(

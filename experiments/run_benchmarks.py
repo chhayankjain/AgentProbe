@@ -39,6 +39,7 @@ from rich.table import Table
 from agentprobe.benchmark.metadata import capture_metadata
 from agentprobe.benchmark.metrics import MetricsCalculator
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner
+from agentprobe.benchmark.tasks import corpus_task_fn
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
 from agentprobe.observer.tracer import AgentProbeTracer
 
@@ -155,8 +156,13 @@ def run_matrix(
     llm_backend: str,
     model: str,
     save: bool,
+    query_set: str = "paper",
 ) -> list[dict[str, Any]]:
-    """Run the full benchmark matrix and return aggregated metrics."""
+    """Run the full benchmark matrix and return aggregated metrics.
+
+    ``query_set="paper"`` uses the five-prompt set from the paper (runner default);
+    ``"corpus"`` cycles the full graded corpora in ``agentprobe.benchmark.tasks``.
+    """
     tracer = AgentProbeTracer(service_name="agentprobe-benchmark", console=False)
     calc = MetricsCalculator()
     all_metrics = []
@@ -184,7 +190,8 @@ def run_matrix(
                     seed=42,
                 )
 
-                runner = BenchmarkRunner(agent=agent, config=config)
+                task_fn = corpus_task_fn(task) if query_set == "corpus" else None
+                runner = BenchmarkRunner(agent=agent, config=config, task_fn=task_fn)
                 runs = runner.run()
                 metrics = calc.compute(runs, framework=framework, task=task, failure_type=ft_name)
                 all_metrics.append(metrics.to_dict())
@@ -247,6 +254,11 @@ def main() -> None:
     parser.add_argument("--model", default="llama3.1")
     parser.add_argument("--baseline-only", action="store_true")
     parser.add_argument("--save-results", action="store_true")
+    parser.add_argument(
+        "--query-set", default="paper", choices=["paper", "corpus"],
+        help="'paper' = the 5 prompts/task used in the paper (default); "
+             "'corpus' = the full graded corpora in agentprobe.benchmark.tasks",
+    )
 
     args = parser.parse_args()
 
@@ -265,6 +277,7 @@ def main() -> None:
         llm_backend=args.llm,
         model=args.model,
         save=args.save_results,
+        query_set=args.query_set,
     )
 
     print_results_table(all_metrics)

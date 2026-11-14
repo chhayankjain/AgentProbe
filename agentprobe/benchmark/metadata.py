@@ -146,8 +146,15 @@ def _get_dependency_versions() -> dict[str, str]:
     """Return versions of key dependencies."""
     deps: dict[str, str] = {}
     for pkg in [
-        "langgraph", "langchain", "langchain_core", "langchain_community",
-        "opentelemetry", "pydantic", "numpy", "pandas", "scipy",
+        "langgraph",
+        "langchain",
+        "langchain_core",
+        "langchain_community",
+        "opentelemetry",
+        "pydantic",
+        "numpy",
+        "pandas",
+        "scipy",
     ]:
         try:
             mod = __import__(pkg)
@@ -158,6 +165,7 @@ def _get_dependency_versions() -> dict[str, str]:
     # pyautogen uses a different import name
     try:
         import autogen  # type: ignore[import-untyped]
+
         deps["pyautogen"] = getattr(autogen, "__version__", "unknown")
     except ImportError:
         deps["pyautogen"] = "not installed"

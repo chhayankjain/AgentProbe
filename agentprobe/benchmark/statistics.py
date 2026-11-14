@@ -29,7 +29,6 @@ from typing import Literal
 import numpy as np
 from scipy import stats
 
-
 # ---------------------------------------------------------------------------
 # Confidence Intervals
 # ---------------------------------------------------------------------------
@@ -69,9 +68,7 @@ def proportion_ci(
     p_hat = successes / total
     denominator = 1 + z**2 / total
     centre = (p_hat + z**2 / (2 * total)) / denominator
-    margin = (z / denominator) * math.sqrt(
-        p_hat * (1 - p_hat) / total + z**2 / (4 * total**2)
-    )
+    margin = (z / denominator) * math.sqrt(p_hat * (1 - p_hat) / total + z**2 / (4 * total**2))
     return (max(0.0, centre - margin), min(1.0, centre + margin))
 
 
@@ -436,9 +433,7 @@ def build_comparison_report(
             if len(np.asarray(f.latencies)) >= 2
         ]
         if len(lat_groups) >= 3:
-            report.omnibus_latency = compare_multiple_groups(
-                lat_groups, alpha=alpha
-            )
+            report.omnibus_latency = compare_multiple_groups(lat_groups, alpha=alpha)
 
     return report
 

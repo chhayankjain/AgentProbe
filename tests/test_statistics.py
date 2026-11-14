@@ -13,8 +13,8 @@ import pytest
 
 from agentprobe.benchmark.statistics import (
     FrameworkData,
-    StatisticalReport,
     HypothesisTestResult,
+    StatisticalReport,
     build_comparison_report,
     cohens_d,
     cohens_h,
@@ -24,7 +24,6 @@ from agentprobe.benchmark.statistics import (
     mean_ci,
     proportion_ci,
 )
-
 
 # ===================================================================
 # proportion_ci
@@ -311,9 +310,7 @@ class TestBuildComparisonReport:
             assert pw.failure_rate_effect is not None
             assert pw.latency_effect is not None
             # Effect magnitude should be a valid string
-            assert pw.failure_rate_effect[1] in (
-                "negligible", "small", "medium", "large"
-            )
+            assert pw.failure_rate_effect[1] in ("negligible", "small", "medium", "large")
 
     def test_pairwise_failure_rates_correct(self):
         fws = self._make_frameworks()
