@@ -29,7 +29,8 @@ Usage::
 from __future__ import annotations
 
 import time
-from typing import Annotated, Any, Sequence, TypedDict
+from collections.abc import Sequence
+from typing import Annotated, Any, TypedDict
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool

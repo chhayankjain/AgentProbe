@@ -40,7 +40,6 @@ try:
         Gauge,
         Histogram,
         start_http_server,
-        REGISTRY,
     )
 
     _PROMETHEUS_AVAILABLE = True
@@ -173,9 +172,7 @@ class PrometheusExporter:
             return
         self._failure_rate_gauge.labels(framework=framework).set(rate)
 
-    def record_task_result(
-        self, framework: str, task: str, success: bool
-    ) -> None:
+    def record_task_result(self, framework: str, task: str, success: bool) -> None:
         if not self._available:
             return
         if success:

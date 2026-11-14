@@ -7,7 +7,7 @@ even if the first trial succeeded.
 
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -18,11 +18,16 @@ from experiments.run_experiment_v2 import (
 )
 
 
-def _make_record(run_id: int, success: bool = True, grade_correct: bool = True,
-                 output: str = "Paris", status: str = "completed",
-                 failure_type: str = "none",
-                 injector_calls: int = 0,
-                 injector_injections: int = 0) -> EnhancedRunRecord:
+def _make_record(
+    run_id: int,
+    success: bool = True,
+    grade_correct: bool = True,
+    output: str = "Paris",
+    status: str = "completed",
+    failure_type: str = "none",
+    injector_calls: int = 0,
+    injector_injections: int = 0,
+) -> EnhancedRunRecord:
     return EnhancedRunRecord(
         run_id=run_id,
         framework="langgraph",
@@ -57,12 +62,24 @@ def _good_injection() -> ConditionOutcome:
     """A normal injection outcome with tool calls and injections."""
     return ConditionOutcome(
         records=[
-            _make_record(0, success=True, grade_correct=True, output="Paris",
-                         failure_type="api_error", injector_calls=5,
-                         injector_injections=2),
-            _make_record(1, success=False, grade_correct=False, output="Error",
-                         failure_type="api_error", injector_calls=5,
-                         injector_injections=2),
+            _make_record(
+                0,
+                success=True,
+                grade_correct=True,
+                output="Paris",
+                failure_type="api_error",
+                injector_calls=5,
+                injector_injections=2,
+            ),
+            _make_record(
+                1,
+                success=False,
+                grade_correct=False,
+                output="Error",
+                failure_type="api_error",
+                injector_calls=5,
+                injector_injections=2,
+            ),
         ],
         invocation_hung=False,
     )
@@ -73,8 +90,7 @@ def _hung_baseline() -> ConditionOutcome:
     return ConditionOutcome(
         records=[
             _make_record(0, success=True, grade_correct=True, output="Paris"),
-            _make_record(1, success=False, grade_correct=False, output="",
-                         status="completed"),
+            _make_record(1, success=False, grade_correct=False, output="", status="completed"),
         ],
         invocation_hung=True,
     )
@@ -84,12 +100,24 @@ def _hung_injection() -> ConditionOutcome:
     """Injection where a trial hung."""
     return ConditionOutcome(
         records=[
-            _make_record(0, success=True, grade_correct=True, output="Paris",
-                         failure_type="api_error", injector_calls=5,
-                         injector_injections=2),
-            _make_record(1, success=False, grade_correct=False, output="",
-                         failure_type="api_error", injector_calls=5,
-                         injector_injections=2),
+            _make_record(
+                0,
+                success=True,
+                grade_correct=True,
+                output="Paris",
+                failure_type="api_error",
+                injector_calls=5,
+                injector_injections=2,
+            ),
+            _make_record(
+                1,
+                success=False,
+                grade_correct=False,
+                output="",
+                failure_type="api_error",
+                injector_calls=5,
+                injector_injections=2,
+            ),
         ],
         invocation_hung=True,
     )
@@ -103,8 +131,10 @@ def test_pilot_rejects_hung_baseline(mock_run):
     with pytest.MonkeyPatch.context() as mp:
         mp.chdir("/tmp")
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmpdir:
             from pathlib import Path
+
             result = run_pilot("llama3.1", Path(tmpdir), seed=42)
 
     assert result is False, "Pilot should reject hung baseline invocation"
@@ -119,12 +149,13 @@ def test_pilot_rejects_hung_baseline(mock_run):
 def test_pilot_rejects_hung_injection(mock_run):
     """Pilot must abort immediately when injection hangs — only 2 conditions called."""
     mock_run.side_effect = [
-        _good_baseline(),   # langgraph baseline — OK
+        _good_baseline(),  # langgraph baseline — OK
         _hung_injection(),  # langgraph injection — hung → immediate abort
     ]
 
     import tempfile
     from pathlib import Path
+
     with tempfile.TemporaryDirectory() as tmpdir:
         result = run_pilot("llama3.1", Path(tmpdir), seed=42)
 
@@ -141,13 +172,17 @@ def test_pilot_passes_when_nothing_hung(mock_run):
     """Pilot should pass when all conditions complete without hanging."""
     # 3 frameworks × (baseline + injection) = 6 calls
     mock_run.side_effect = [
-        _good_baseline(), _good_injection(),  # langgraph
-        _good_baseline(), _good_injection(),  # langchain
-        _good_baseline(), _good_injection(),  # autogen
+        _good_baseline(),
+        _good_injection(),  # langgraph
+        _good_baseline(),
+        _good_injection(),  # langchain
+        _good_baseline(),
+        _good_injection(),  # autogen
     ]
 
     import tempfile
     from pathlib import Path
+
     with tempfile.TemporaryDirectory() as tmpdir:
         result = run_pilot("llama3.1", Path(tmpdir), seed=42)
 

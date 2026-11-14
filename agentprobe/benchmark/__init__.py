@@ -1,19 +1,10 @@
 """Benchmark suite for AgentProbe."""
 
-from agentprobe.benchmark.types import (
-    AgentFramework,
-    BenchmarkConfig,
-    BenchmarkMetrics,
-    BenchmarkResults,
-    RunResult,
-    TaskType,
-)
-
 from agentprobe.benchmark.statistics import (
     FrameworkData,
+    HypothesisTestResult,
     PairwiseComparison,
     StatisticalReport,
-    HypothesisTestResult,
     build_comparison_report,
     cohens_d,
     cohens_h,
@@ -22,6 +13,14 @@ from agentprobe.benchmark.statistics import (
     compare_proportions,
     mean_ci,
     proportion_ci,
+)
+from agentprobe.benchmark.types import (
+    AgentFramework,
+    BenchmarkConfig,
+    BenchmarkMetrics,
+    BenchmarkResults,
+    RunResult,
+    TaskType,
 )
 
 __all__ = [
