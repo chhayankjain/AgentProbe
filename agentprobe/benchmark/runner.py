@@ -37,15 +37,14 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-
-# Injector and classifier imports are lazy so this module is independently
-# testable before their respective feature branches are merged.
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import context as otel_context
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 
+from agentprobe.benchmark.metrics import _percentile
+from agentprobe.observer.classifier import FailureClassifier
 from agentprobe.observer.tracer import get_tracer
 
 if TYPE_CHECKING:
@@ -152,13 +151,15 @@ class BenchmarkRunner:
     """Runs benchmark experiments for one (framework, task, failure_config) triple.
 
     Args:
-        agent: An object with an ``invoke(input: dict) -> dict`` method.
-            Should be a LangGraph, LangChain, or AutoGen agent wrapper from
-            agentprobe.agents.*
+        agent: Any object satisfying :class:`agentprobe.agents.BaseAgent`
+            (``invoke(input: dict) -> dict`` plus ``reset()``), e.g. the
+            LangGraph, LangChain, or AutoGen adapters in ``agentprobe.agents``.
         config: Benchmark configuration.
         task_fn: Optional callable that generates task inputs per run.
             Signature: ``(run_id: int, task: str) -> dict``.
-            Defaults to the built-in task generator from agentprobe.benchmark.tasks.
+            Defaults to :func:`paper_task_fn`, the five-prompt set used in the
+            paper. Use ``agentprobe.benchmark.tasks.corpus_task_fn(task)`` to
+            run against the larger graded corpora instead.
     """
 
     def __init__(
@@ -169,23 +170,9 @@ class BenchmarkRunner:
     ) -> None:
         self.agent = agent
         self.config = config or BenchmarkConfig()
-        self._task_fn = task_fn or _default_task_fn
-        self._classifier: Any = None
-        try:
-            from agentprobe.observer.classifier import FailureClassifier
-
-            self._classifier = FailureClassifier()
-        except ImportError:
-            pass  # classifier module not yet merged
+        self._task_fn = task_fn or paper_task_fn
+        self._classifier: Any = FailureClassifier()
         self._invocation_hung = False
-        self._injector: Any = None
-        if self.config.failure_config is not None:
-            try:
-                from agentprobe.injector.tool_failure import ToolFailureInjector
-
-                self._injector = ToolFailureInjector(self.config.failure_config)
-            except ImportError:
-                pass  # injector module not yet merged; runner still functional
 
     def run(self) -> list[RunResult]:
         """Execute the full benchmark. Returns a list of RunResult objects."""
@@ -368,7 +355,7 @@ class BenchmarkRunner:
         rate = failures / total if total > 0 else 0.0
         recovered = sum(1 for r in executed if r.recovered)
         latencies = [r.latency_ms for r in executed]
-        p99 = sorted(latencies)[min(int(total * 0.99), total - 1)] if latencies else 0.0
+        p99 = _percentile(latencies, 99)
         line = (
             f"[green]Done[/green] — {total} executed | "
             f"failure_rate={rate:.1%} | "
@@ -400,38 +387,48 @@ class BenchmarkRunner:
 
 
 # ---------------------------------------------------------------------------
-# Default task generator
+# Default task generator — the paper's prompt set
 # ---------------------------------------------------------------------------
 
-
-def _default_task_fn(run_id: int, task: str) -> dict[str, Any]:
-    """Generate a task input dict for a given task type and run ID."""
-    _TOOL_USE_INPUTS = [
+#: The five prompts per task type used in every experiment reported in the paper
+#: (Phase 1, Phase 2, and cross-model validation). Run ``i`` receives prompt
+#: ``i % 5``. Kept verbatim so that published batches reproduce exactly.
+#: The larger graded corpora in :mod:`agentprobe.benchmark.tasks` are *not* the
+#: paper's prompts; use ``corpus_task_fn()`` from that module to benchmark
+#: against them instead.
+PAPER_PROMPTS: dict[str, list[str]] = {
+    "tool_use": [
         "What is the capital of France?",
         "Search for recent news about LLM reliability.",
         "Calculate 15% of 847.",
         "What is the current weather in San Francisco?",
         "Find the top 3 papers on multi-agent systems published in 2024.",
-    ]
-    _RAG_INPUTS = [
+    ],
+    "rag": [
         "Summarize the main contributions of the AgentProbe paper.",
         "What are the 5 failure categories in the AgentProbe taxonomy?",
         "How does AgentProbe measure MTTR?",
         "Compare LangGraph and LangChain reliability profiles.",
         "What observability gaps exist in current agentic frameworks?",
-    ]
-    _MULTI_AGENT_INPUTS = [
+    ],
+    "multi_agent": [
         "Research and then summarize the latest advances in LLM agents.",
         "Find relevant papers and write a literature review outline.",
         "Analyze the dataset and produce a visualization plan.",
         "Draft a blog post about AI reliability best practices.",
         "Create a benchmark plan for testing agent robustness.",
-    ]
+    ],
+}
 
-    inputs_map = {
-        "tool_use": _TOOL_USE_INPUTS,
-        "rag": _RAG_INPUTS,
-        "multi_agent": _MULTI_AGENT_INPUTS,
-    }
-    inputs = inputs_map.get(task, _TOOL_USE_INPUTS)
+
+def paper_task_fn(run_id: int, task: str) -> dict[str, Any]:
+    """Default ``task_fn``: cycle through :data:`PAPER_PROMPTS` for *task*.
+
+    Unknown task names fall back to the ``tool_use`` prompts.
+    """
+    inputs = PAPER_PROMPTS.get(task, PAPER_PROMPTS["tool_use"])
     return {"input": inputs[run_id % len(inputs)], "run_id": run_id}
+
+
+# Backwards-compatible alias used by the experiment scripts.
+_default_task_fn = paper_task_fn

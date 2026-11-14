@@ -71,7 +71,7 @@ def _build_provider(
         warnings.warn(
             "opentelemetry-exporter-otlp-proto-grpc is not installed. "
             "OTLP export is disabled. Install with: "
-            "pip install agentprobe[otlp]",
+            "pip install opentelemetry-exporter-otlp-proto-grpc",
             stacklevel=2,
         )
 

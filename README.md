@@ -6,9 +6,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/chhayankjain/AgentProbe)](https://github.com/chhayankjain/AgentProbe/releases)
 
-**Reliability & Observability Toolkit for Production Agentic LLM Systems**
+**Fault injection and observability toolkit for LLM agents**
 
-AgentProbe is an open source benchmarking toolkit that injects real-world failure modes into LangGraph, LangChain, and AutoGen agents, traces execution via OpenTelemetry, and measures reliability metrics (MTTR, failure rate, P99 latency) across frameworks and workloads.
+AgentProbe wraps an agent's tools with seeded, logged fault injectors (timeouts, malformed output, rate limits, API errors), traces every invocation and tool call with OpenTelemetry, and reports failure rate, recovery rate, MTTR, and latency percentiles across frameworks. It ships adapters for LangGraph, LangChain, and AutoGen, plus the scripts and data behind the companion paper.
 
 Companion to the paper: *"AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents"* (submitted to MAKE, MDPI, 2026).
 
@@ -16,23 +16,29 @@ Companion to the paper: *"AgentProbe: Systematic Fault Injection and Observabili
 
 ## Failure Taxonomy
 
-AgentProbe classifies agentic failures into five categories:
+AgentProbe organises agent failures into five categories. Only the first has been exercised in a published experiment; the status column says exactly what exists for each.
 
-| # | Category | Examples |
-|---|----------|---------|
-| 1 | **Tool Call** | API timeouts, malformed JSON output, rate limits (HTTP 429), server errors (5xx) |
-| 2 | **Orchestration** | Infinite loops, wrong conditional branching, state corruption, dropped handoffs |
-| 3 | **Context** | Context window overflow, lost message history, hallucinated history injection |
-| 4 | **Latency** | P99 spikes, cascading slowdowns, cold start delays, network jitter |
-| 5 | **Consistency** | Non-deterministic outputs, divergent multi-agent state |
+| # | Category | Examples | Status in this repo |
+|---|----------|----------|---------------------|
+| 1 | **Tool Call** | API timeouts, malformed output, rate limits (HTTP 429), server errors (5xx) | Injector implemented, **used in all paper experiments** (`injector/tool_failure.py`) |
+| 2 | **Orchestration** | Infinite loops, wrong branching, state corruption, dropped handoffs | Injector implemented and unit-tested, not yet used in an experiment (`injector/orchestration_failure.py`) |
+| 3 | **Context** | Context window overflow, lost history, hallucinated history | Injector implemented and unit-tested, not yet used in an experiment (`injector/context_failure.py`) |
+| 4 | **Latency** | P99 spikes, cascading slowdowns, jitter | Injector implemented; latency in the paper is a by-product of tool faults, not independently injected (`injector/latency_failure.py`) |
+| 5 | **Consistency** | Non-deterministic outputs, divergent multi-agent state | Detected only, via a Jaccard-similarity classifier; nothing is injected (`observer/classifier.py`) |
+
+Note that the current "malformed output" injector raises an exception at the tool boundary rather than returning corrupted data to the model, so it tests the agent's exception path, not its parsing. See issue [#28](https://github.com/chhayankjain/AgentProbe/issues/28).
 
 ---
 
 ## Quick Start
 
 ```bash
-# Install
+# Install (LangGraph + LangChain adapters, local Ollama backend)
 pip install -e ".[ollama]"
+
+# The AutoGen adapter targets pyautogen 0.1.14 and needs openai<1.0, which
+# conflicts with langchain-openai. Install it in its own environment:
+#   pip install -e ".[ollama,autogen]"
 
 # Start Ollama with Llama 3.1 (used in all paper experiments)
 ollama pull llama3.1
@@ -57,31 +63,33 @@ python experiments/run_benchmarks.py \
 
 ```python
 from langchain_ollama import ChatOllama
-from agentprobe import ToolFailureInjector, AgentProbeTracer
-from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
-from agentprobe.agents.langgraph_agent import LangGraphToolAgent
-from agentprobe.benchmark.runner import BenchmarkRunner, BenchmarkConfig
-from agentprobe.benchmark.metrics import MetricsCalculator
 
-# 1. Set up tracing
-tracer = AgentProbeTracer(
-    service_name="my-experiment",
-    otlp_endpoint="http://localhost:4317",  # optional
+from agentprobe import (
+    AgentProbeTracer,
+    BenchmarkConfig,
+    BenchmarkRunner,
+    MetricsCalculator,
+    ToolFailureConfig,
+    ToolFailureType,
 )
+from agentprobe.agents.langgraph_agent import LangGraphToolAgent
+
+# 1. Set up tracing (console by default; OTLP endpoint optional)
+tracer = AgentProbeTracer(service_name="my-experiment", otlp_endpoint="http://localhost:4317")
 
 # 2. Configure failure injection
 failure_config = ToolFailureConfig(
     failure_type=ToolFailureType.TIMEOUT,
-    failure_probability=0.2,    # 20% of tool calls will timeout
+    failure_probability=0.2,    # 20% of tool calls will time out
     timeout_seconds=5.0,
-    seed=42,                    # reproducible
+    seed=42,                    # reproducible injection sequence
 )
 
-# 3. Build agent
+# 3. Build an agent; it wraps its tools with a ToolFailureInjector internally
 llm = ChatOllama(model="llama3.1", temperature=0.0)
 agent = LangGraphToolAgent(llm=llm, failure_config=failure_config)
 
-# 4. Run benchmark
+# 4. Run the benchmark (defaults to the paper's five-prompt set)
 config = BenchmarkConfig(
     framework="langgraph",
     task="tool_use",
@@ -90,15 +98,49 @@ config = BenchmarkConfig(
     recovery_attempts=1,
     save_results_path="experiments/results/langgraph_tool_use_timeout",
 )
-runner = BenchmarkRunner(agent=agent, config=config)
-results = runner.run()
+results = BenchmarkRunner(agent=agent, config=config).run()
 
 # 5. Compute metrics
 metrics = MetricsCalculator().compute(results)
 print(f"Failure rate: {metrics.failure_rate:.1%}")
+print(f"Recovery rate: {metrics.recovery_rate}")
 print(f"MTTR: {metrics.mttr_ms:.0f}ms")
 print(f"P99 latency: {metrics.p99_latency_ms:.0f}ms")
+print(agent.get_injector_summary())
 ```
+
+### Injecting faults into your own tools
+
+The injector is framework-agnostic. Wrap any callable, or any LangChain `BaseTool`:
+
+```python
+from agentprobe import ToolFailureConfig, ToolFailureInjector, ToolFailureType
+
+injector = ToolFailureInjector(
+    ToolFailureConfig(failure_type=ToolFailureType.RATE_LIMIT, failure_probability=0.3, seed=7)
+)
+
+@injector.wrap
+def lookup_price(sku: str) -> float:
+    ...
+
+faulty_tool = injector.inject_langchain_tool(my_langchain_tool)   # in-place, keeps schema
+print(injector.summary())        # total_calls, injected_failures, failures_by_type, ...
+print(injector.injection_log)    # one record per call with args, return/exception, span_id
+```
+
+### Two prompt sets
+
+- **Paper prompts (default).** `BenchmarkRunner` cycles the five prompts per task in `agentprobe.benchmark.runner.PAPER_PROMPTS`. Every batch in the paper used these.
+- **Graded corpora.** `agentprobe.benchmark.tasks` holds 25 tool-use, 15 RAG, and 15 multi-agent queries with keyword graders. They have not been used in a published experiment. Run them with `task_fn=corpus_task_fn("tool_use")` or `run_benchmarks.py --query-set corpus`.
+
+### Metric definitions
+
+- **Failure**: the agent invocation raised an exception that reached the harness. A wrong-but-exception-free answer is *not* a failure here; use the grader for that.
+- **Recovery**: the harness re-invoked the agent once (injector still active) and that call succeeded. This is a harness-level retry, not agent-internal self-repair.
+- **MTTR**: mean latency of successful re-invocations, in ms.
+- **P50/P90/P99**: ceiling nearest-rank percentiles of per-run latency. For n < 100, P99 equals the sample maximum. Injected timeouts sleep for real, so latency under the timeout condition includes the injected delay.
+- **Recovery rate** is `None` when a condition had no failures.
 
 ## Architecture
 
@@ -114,14 +156,20 @@ agentprobe/
 │   ├── classifier.py            # Rule-based failure classification
 │   └── dashboard.py             # Prometheus metrics exporter
 ├── benchmark/
-│   ├── tasks/                   # tool_use, rag, multi_agent task definitions
-│   ├── runner.py                # Multi-run experiment orchestration
-│   └── metrics.py               # MTTR, failure rate, P99 computation
+│   ├── runner.py                # BenchmarkRunner + PAPER_PROMPTS (the paper's prompt set)
+│   ├── tasks/                   # Larger graded corpora (not used in the paper)
+│   ├── metrics.py               # Failure rate, recovery rate, MTTR, percentiles
+│   ├── grader.py                # Keyword / answer-presence grading
+│   ├── statistics.py            # Wilson CIs, Cohen's d/h, comparisons
+│   └── metadata.py              # Reproducibility metadata capture
 └── agents/
+    ├── base.py                  # BaseAgent protocol: invoke(dict) -> dict, reset()
     ├── langgraph_agent.py       # LangGraph ReAct agent
-    ├── langchain_agent.py       # LangChain AgentExecutor
-    └── autogen_agent.py         # AutoGen two-agent pipeline
+    ├── langchain_agent.py       # LangChain create_agent (compiles to LangGraph internally)
+    └── autogen_agent.py         # AutoGen two-agent pipeline (pyautogen 0.1.14 + compat shim)
 ```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the data flow and design decisions.
 
 ## Observability Stack
 
@@ -146,17 +194,17 @@ exporter.record_benchmark_run(results)
 
 ## Supported Frameworks & LLMs
 
-| Framework | Status |
-|-----------|--------|
-| LangGraph | Full support |
-| LangChain | Full support |
-| AutoGen | Full support |
+| Framework | Adapter | Validated in paper | Notes |
+|-----------|---------|--------------------|-------|
+| LangGraph | `LangGraphToolAgent` | Yes (Llama 3.1, Mistral 7B, Qwen2.5 7B) | Hand-built ReAct graph |
+| LangChain | `LangChainToolAgent` | Yes (same models) | Uses `create_agent`, which compiles to LangGraph; shares an execution path with the LangGraph adapter, so results converge |
+| AutoGen | `AutoGenToolAgent` | Yes, with caveats | Targets **pyautogen 0.1.14** through a `functions`→`tools` compatibility shim. Phase 1 found it silently bypassed tools; Phase 2 patched that. Modern `ag2` / `autogen-agentchat` 0.4+ is not yet supported ([roadmap](https://github.com/chhayankjain/AgentProbe/issues/38)) |
 
-| LLM Backend | Install | Notes |
-|-------------|---------|-------|
-| Ollama + Llama 3.1 | `pip install langchain-ollama` | Local, zero API cost |
-| OpenAI GPT-4o | `pip install langchain-openai` | Requires `OPENAI_API_KEY` |
-| Anthropic Claude | `pip install langchain-anthropic` | Requires `ANTHROPIC_API_KEY` |
+| LLM Backend | Install extra | Validated in paper | Notes |
+|-------------|---------------|--------------------|-------|
+| Ollama (Llama 3.1 8B, Mistral 7B, Qwen2.5 7B, Q4_K_M) | `.[ollama]` | Yes | Local, zero API cost. The Phase 2, qualification, and diagnostic scripts are Ollama-only |
+| OpenAI (GPT-4o etc.) | `.[openai]` | **No** | Wired into `run_benchmarks.py --llm openai` for LangGraph/LangChain only; never run for the paper. See [#26](https://github.com/chhayankjain/AgentProbe/issues/26) |
+| Anthropic (Claude) | `.[anthropic]` | **No** | Same as OpenAI |
 
 ## Running Tests
 
@@ -258,7 +306,7 @@ Diagnostic artifacts are saved to `experiments/results_v2/diagnostic_*/`.
 
 ### Analysis
 
-Phase 2 uses the corrected summary at `experiments/results_v2/` (not the original `experiments/results/combined_summary.json`, which contains known counting bugs). The paper's tables are derived from:
+Phase 2 uses the corrected summaries under `experiments/results_v2/`. The original Phase 1 output (now at `experiments/archive_v1/results/combined_summary.json`) contains known counting bugs and is kept only for the historical record. The paper's tables are derived from:
 - **Phase 2 batch (Llama 3.1):** `experiments/results_v2/20261111_113514/`
 - **Phase 2 batch (Mistral 7B):** `experiments/results_v2/20261111_233435/`
 - **Phase 2 batch (Qwen2.5 7B LG/LC):** `experiments/results_v2/20261112_040156/`

@@ -24,6 +24,7 @@ Usage::
         ),
     )
     result = agent.invoke({"input": "What is the capital of France?"})
+    print(result["output"], result["latency_ms"])
 """
 
 from __future__ import annotations
@@ -157,6 +158,16 @@ class LangGraphToolAgent:
                 "latency_ms": latency_ms,
                 "framework": self.framework,
             }
+
+    def reset(self) -> None:
+        """No-op: each ``invoke()`` builds a fresh message list, so there is no
+        conversation state to clear. Injector state is intentionally preserved
+        (it is condition-wide); call ``agent.injector.reset()`` to clear it.
+        """
+
+    @property
+    def injector(self) -> ToolFailureInjector | None:
+        return self._injector
 
     def get_injector_summary(self) -> dict[str, Any]:
         if self._injector:
