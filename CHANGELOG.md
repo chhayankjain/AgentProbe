@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- `from agentprobe import ToolFailureInjector, AgentProbeTracer` (the README example) now works: the top-level package re-exports the public API
+- Removed the duplicate Pydantic `ToolFailureConfig`/`ToolFailureType` in `agentprobe/injector/types.py`; `agentprobe.injector` now exports the dataclass versions the injector actually accepts (the old export crashed `ToolFailureInjector` with `AttributeError`)
+- `BaseAgent` protocol now matches the real adapter surface (`invoke(dict) -> dict`, `reset()`, `get_injector_summary()`); all three adapters gained `reset()` and an `injector` property
+- Dependency floors corrected: `langchain>=1.0.0`, `langchain-core>=1.0.0`, `langgraph>=1.0.0` (the LangChain adapter needs `create_agent`); unused `langchain-community` dropped
+- Tracer no longer suggests a non-existent `agentprobe[otlp]` extra
+- Runner progress summary uses the same ceiling nearest-rank P99 as `MetricsCalculator`
+
+### Added
+- `agentprobe[autogen]` extra pinning `pyautogen==0.1.14` and `openai<1.0`
+- `agentprobe.benchmark.tasks.get_task()` and `corpus_task_fn()` to run the 55-query graded corpora through `BenchmarkRunner`; `run_benchmarks.py --query-set corpus`
+- `runner.PAPER_PROMPTS` / `paper_task_fn` naming the five-prompt set every published batch used
+
+### Removed
+- Dead Pydantic schema layer `agentprobe/benchmark/types.py` (`TaskType`, `AgentFramework`, Pydantic `RunResult`/`BenchmarkConfig`/`BenchmarkResults`/`BenchmarkMetrics`) that no runner code used
+
+### Changed
+- README rewritten to state which taxonomy categories, frameworks, and LLM backends were actually validated in the paper, with metric definitions
+- `ROADMAP.md` replaced by a pointer to the GitHub roadmap issue (the file described a pre-v1.0 build plan)
+
 ## [1.1.0] - 2026-11-14
 
 ### Added

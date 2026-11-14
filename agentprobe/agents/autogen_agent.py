@@ -17,6 +17,11 @@ point to an Ollama local server:
         ]
     }
 
+**Version pin:** this adapter targets ``pyautogen==0.1.14`` with ``openai<1.0``
+(install with ``pip install "agentprobe[autogen]"``). Modern AutoGen releases
+(``ag2`` / ``autogen-agentchat`` 0.4+) have a different API and are not yet
+supported; see the project roadmap.
+
 **Protocol fix (Nov 2026):** pyautogen 0.1.14 uses the legacy OpenAI
 ``functions`` / ``function_call`` format, but Ollama 0.31+ only handles
 the newer ``tools`` / ``tool_calls`` format.  :func:`_patch_openai_compat`
@@ -141,14 +146,7 @@ class AutoGenToolAgent:
 
             user_proxy, assistant = self._agents
             # Clear conversation history and response cache between runs
-            user_proxy.reset()
-            assistant.reset()
-            try:
-                from autogen.oai.completion import Completion
-
-                Completion.clear_cache()
-            except (ImportError, Exception):
-                pass
+            self.reset()
             user_proxy.initiate_chat(
                 assistant,
                 message=query,
@@ -181,6 +179,27 @@ class AutoGenToolAgent:
                 "framework": self.framework,
                 "tool_calls": len(tool_calls),
             }
+
+    def reset(self) -> None:
+        """Clear both agents' conversation history and pyautogen's on-disk
+        completion cache. Called automatically at the start of every
+        ``invoke()``. Injector state is intentionally preserved (condition-wide).
+        """
+        user_proxy, assistant = self._agents
+        if user_proxy is None or assistant is None:
+            return  # pyautogen not installed; invoke() will raise a clear ImportError
+        user_proxy.reset()
+        assistant.reset()
+        try:
+            from autogen.oai.completion import Completion
+
+            Completion.clear_cache()
+        except Exception:
+            pass
+
+    @property
+    def injector(self) -> ToolFailureInjector | None:
+        return self._injector
 
     def get_injector_summary(self) -> dict[str, Any]:
         if self._injector:
