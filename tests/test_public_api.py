@@ -40,13 +40,19 @@ class TestTopLevelExports:
         for name in agentprobe.__all__:
             assert hasattr(agentprobe, name), name
 
-    def test_version_matches_pyproject(self):
+    def test_version_consistent_across_release_files(self):
+        """RELEASE.md says the version lives in three places; keep them in sync."""
+        import re
         import tomllib
         from pathlib import Path
 
-        pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
-        version = tomllib.loads(pyproject.read_text())["project"]["version"]
-        assert agentprobe.__version__ == version
+        root = Path(__file__).resolve().parents[1]
+        project = tomllib.loads((root / "pyproject.toml").read_text())["project"]
+        assert project["name"] == "agentprobe-toolkit"
+        assert agentprobe.__version__ == project["version"]
+        cff = (root / "CITATION.cff").read_text()
+        m = re.search(r'^version:\s*"([^"]+)"', cff, re.MULTILINE)
+        assert m and m.group(1) == project["version"], "CITATION.cff version out of sync"
 
 
 class TestSingleToolFailureConfig:

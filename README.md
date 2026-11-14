@@ -4,6 +4,7 @@
 [![CodeQL](https://github.com/chhayankjain/AgentProbe/actions/workflows/codeql.yml/badge.svg)](https://github.com/chhayankjain/AgentProbe/actions/workflows/codeql.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/agentprobe-toolkit.svg)](https://pypi.org/project/agentprobe-toolkit/)
 [![GitHub release](https://img.shields.io/github/v/release/chhayankjain/AgentProbe)](https://github.com/chhayankjain/AgentProbe/releases)
 
 **Fault injection and observability toolkit for LLM agents**
@@ -30,15 +31,26 @@ Note that the current "malformed output" injector raises an exception at the too
 
 ---
 
-## Quick Start
+## Installation
 
 ```bash
-# Install (LangGraph + LangChain adapters, local Ollama backend)
-pip install -e ".[ollama]"
+# From PyPI (LangGraph + LangChain adapters, local Ollama backend)
+pip install "agentprobe-toolkit[ollama]"
+
+# From a clone, for development or to run the paper's experiments
+git clone https://github.com/chhayankjain/AgentProbe.git && cd AgentProbe
+pip install -e ".[dev,plotting,ollama]"
 
 # The AutoGen adapter targets pyautogen 0.1.14 and needs openai<1.0, which
 # conflicts with langchain-openai. Install it in its own environment:
-#   pip install -e ".[ollama,autogen]"
+#   pip install "agentprobe-toolkit[ollama,autogen]"
+```
+
+The distribution is named `agentprobe-toolkit` because `agentprobe` was already taken on PyPI by an unrelated project. The import name is `agentprobe`.
+
+## Quick Start
+
+```bash
 
 # Start Ollama with Llama 3.1 (used in all paper experiments)
 ollama pull llama3.1
@@ -209,7 +221,7 @@ exporter.record_benchmark_run(results)
 ## Running Tests
 
 ```bash
-pip install -e ".[dev,plotting]"
+pip install -e ".[dev,plotting]"   # from a clone
 pytest tests/ -v
 
 # Skip slow/integration tests
