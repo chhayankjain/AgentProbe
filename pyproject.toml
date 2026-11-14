@@ -3,14 +3,22 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentprobe"
-version = "1.1.0"
-description = "Reliability and observability toolkit for production agentic LLM systems"
+name = "agentprobe-toolkit"
+version = "1.2.0"
+description = "Fault injection and OpenTelemetry observability toolkit for evaluating the reliability of LLM agents (LangGraph, LangChain, AutoGen)"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
-authors = [{ name = "Chhayank Jain" }]
-keywords = ["llm", "agents", "reliability", "observability", "benchmarking", "langgraph"]
+authors = [
+    { name = "Chhayank Jain" },
+    { name = "Sarthak Pattnaik" },
+    { name = "Eugene Pinsky" },
+]
+maintainers = [{ name = "Chhayank Jain" }]
+keywords = [
+    "llm", "agents", "reliability", "observability", "benchmarking", "fault-injection",
+    "chaos-engineering", "opentelemetry", "langgraph", "langchain", "autogen",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -18,7 +26,11 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Monitoring",
+    "Typing :: Typed",
 ]
 dependencies = [
     # The LangChain adapter uses ``langchain.agents.create_agent`` (LangChain 1.x).
@@ -70,6 +82,25 @@ autogen = [
 Homepage = "https://github.com/chhayankjain/AgentProbe"
 Repository = "https://github.com/chhayankjain/AgentProbe"
 Issues = "https://github.com/chhayankjain/AgentProbe/issues"
+Changelog = "https://github.com/chhayankjain/AgentProbe/blob/main/CHANGELOG.md"
+Roadmap = "https://github.com/chhayankjain/AgentProbe/issues/38"
+
+# The distribution is ``agentprobe-toolkit`` (``agentprobe`` was already taken on PyPI);
+# the import name stays ``agentprobe``. Hatchling must be told explicitly, since it
+# would otherwise look for an ``agentprobe_toolkit`` package.
+[tool.hatch.build.targets.wheel]
+packages = ["agentprobe"]
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "agentprobe",
+    "tests",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CITATION.cff",
+    "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
