@@ -27,11 +27,20 @@ BaseAgent (base.py)
 └── AutoGenToolAgent (autogen_agent.py)      — AutoGen two-agent pipeline
 ```
 
-**Key interface:** `invoke(input: str) -> AgentResult`
+**Key interface** (the `BaseAgent` protocol in `agents/base.py`):
+
+```python
+framework: str
+invoke(input: dict) -> dict      # input["input"] is the query; returns {"output", "latency_ms", "framework", ...}
+reset() -> None                  # clear conversation state (never the injector)
+get_injector_summary() -> dict   # condition-wide injection stats
+```
 
 All adapters accept the same tools (calculator, web_search) and the same LLM configuration. The adapter is responsible for translating between the framework's native API and AgentProbe's common interface.
 
-**Adding a new framework:** Subclass `BaseAgent`, implement `invoke()`, and register in the experiment runner's framework dispatch.
+Note that `LangChainToolAgent` is built on `langchain.agents.create_agent`, which compiles to a LangGraph graph internally. The two adapters therefore share an execution path, which is why the paper reports identical LangGraph/LangChain failure patterns.
+
+**Adding a new framework:** Write a class that satisfies `BaseAgent` (it is a structural `Protocol`, no subclassing needed), wrap your tools with `ToolFailureInjector`, and register the class in `build_agent()` in `experiments/run_experiment_v2.py`.
 
 ### `agentprobe/injector/` — Fault Injectors
 
@@ -59,17 +68,21 @@ LatencyFailureInjector (latency_failure.py)  — P99 spikes, cascading delays
 runner.py      — BenchmarkRunner: orchestrates N runs, handles timeouts, retries, serialization
 metrics.py     — MetricsCalculator: computes failure rate, recovery rate, MTTR, percentile latencies
 statistics.py  — Wilson CIs, Cohen's d/h, comparison reports
-tasks/         — Query definitions for tool_use, rag, multi_agent task types
+tasks/         — Graded query corpora (25 tool_use, 15 rag, 15 multi_agent); NOT the paper's prompts
 grader.py      — Answer-string presence checker (substring match for assessable queries)
 metadata.py    — Captures experiment metadata (model, seed, git commit, pip freeze)
 ```
 
+**Two prompt sets.** The runner's default `task_fn` is `paper_task_fn`, which cycles the five prompts per task in `runner.PAPER_PROMPTS`. Every batch reported in the paper used this set. The larger graded corpora in `benchmark/tasks/` are available via `corpus_task_fn(task)` but have not been used in a published experiment.
+
 **Run lifecycle:**
-1. Runner creates agent + injector for the condition
+1. The experiment script creates the agent, which creates its own injector for the condition
 2. For each of N runs: invoke agent, catch exceptions, record success/failure/latency
-3. On failure: attempt recovery (single retry with injector still active)
+3. On failure: attempt recovery (the harness re-invokes the agent once, injector still active)
 4. Serialize results to JSON + CSV
 5. Compute summary metrics
+
+**Metric definitions.** "Failure" means the agent invocation raised an exception that reached the harness. "Recovery" means the harness's single re-invocation succeeded; it is a harness-level retry, not agent-internal self-repair. MTTR is the mean latency of successful re-invocations. P99 is ceiling nearest-rank, so for n < 100 it equals the sample maximum.
 
 ### `agentprobe/observer/` — Observability
 
@@ -138,7 +151,8 @@ tests/
 ├── test_experiment_state.py       — checkpoint validation and resume safety
 ├── test_pilot_hung.py             — hung invocation detection
 ├── test_qualification_checker.py  — answer validation logic
-├── test_tool_failure_injector.py  — injection probability and fault types
+├── test_tool_failure.py           — injection probability and fault types
+├── test_public_api.py             — public exports, BaseAgent protocol, config/injector compatibility
 ├── test_metadata.py               — metadata capture
 └── ...
 ```
