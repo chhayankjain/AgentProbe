@@ -61,7 +61,7 @@ class AgentMetrics:
     n_successes: int = 0
 
     # Recovery metrics
-    recovery_rate: float = 0.0          # fraction of failures that recovered
+    recovery_rate: float | None = None   # None when no failures; fraction otherwise
     mttr_ms: float = 0.0               # mean time to recovery (ms)
     mttr_ms_std: float = 0.0
 
@@ -89,7 +89,7 @@ class AgentMetrics:
             "failure_rate": round(self.failure_rate, 4),
             "n_failures": self.n_failures,
             "n_successes": self.n_successes,
-            "recovery_rate": round(self.recovery_rate, 4),
+            "recovery_rate": round(self.recovery_rate, 4) if self.recovery_rate is not None else None,
             "mttr_ms": round(self.mttr_ms, 2),
             "mean_latency_ms": round(self.mean_latency_ms, 2),
             "p50_latency_ms": round(self.p50_latency_ms, 2),
@@ -161,7 +161,7 @@ class MetricsCalculator:
 
         n = len(executed)
         failure_rate = len(failures) / n if n > 0 else 0.0
-        recovery_rate = len(recovered) / len(failures) if failures else 0.0
+        recovery_rate = len(recovered) / len(failures) if failures else None
 
         return AgentMetrics(
             framework=fw,
@@ -226,8 +226,15 @@ class MetricsCalculator:
 
 
 def _percentile(data: list[float], pct: int) -> float:
+    """Ceiling nearest-rank percentile.
+
+    For P99 at n=30, ceil(30 * 99/100) = 30, so this returns the sample
+    maximum — consistent with the paper's convention that P99 equals the
+    empirical sample maximum for n < 100.
+    """
     if not data:
         return 0.0
     sorted_data = sorted(data)
-    idx = max(0, int(len(sorted_data) * pct / 100) - 1)
-    return sorted_data[idx]
+    import math
+    idx = min(math.ceil(len(sorted_data) * pct / 100), len(sorted_data)) - 1
+    return sorted_data[max(0, idx)]

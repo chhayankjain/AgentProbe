@@ -54,10 +54,10 @@ class TestMetricsCalculator:
         m = MetricsCalculator().compute(runs)
         assert abs(m.recovery_rate - 0.4) < 0.001
 
-    def test_recovery_rate_zero_when_no_failures(self):
+    def test_recovery_rate_none_when_no_failures(self):
         runs = [_run(i, success=True) for i in range(5)]
         m = MetricsCalculator().compute(runs)
-        assert m.recovery_rate == 0.0
+        assert m.recovery_rate is None
 
     def test_mttr_computed_correctly(self):
         runs = [_run(i, success=False, recovered=True, recovery_latency=1000.0) for i in range(5)]
