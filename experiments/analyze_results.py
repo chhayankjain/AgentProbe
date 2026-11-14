@@ -108,7 +108,7 @@ def analyze_by_failure_type(results: list[dict]) -> None:
             table[key] = {"failures": 0, "total": 0, "recovery_rates": []}
         table[key]["failures"] += r["n_failures"]
         table[key]["total"] += r["n_runs"]
-        if r["recovery_rate"] > 0:
+        if r["recovery_rate"] is not None and r["recovery_rate"] > 0:
             table[key]["recovery_rates"].append(r["recovery_rate"])
 
     # Print as table
@@ -260,7 +260,7 @@ Framework & Failure Type & Failure Rate & Recovery Rate & P99 (ms) \\
         fr = r["failure_rate"]
         rr = r["recovery_rate"]
         fr_lo, fr_hi = proportion_ci(r["n_failures"], r["n_runs"])
-        n_recovered = int(r["recovery_rate"] * r["n_failures"]) if r["n_failures"] > 0 else 0
+        n_recovered = int((rr or 0) * r["n_failures"]) if r["n_failures"] > 0 else 0
         rr_lo, rr_hi = proportion_ci(n_recovered, r["n_failures"]) if r["n_failures"] > 0 else (0.0, 0.0)
 
         fr_str = f"{fr:.0%} [{fr_lo:.0%}, {fr_hi:.0%}]"

@@ -46,7 +46,8 @@ DEFAULT_BATCHES = [
     ("Qwen2.5 7B", "20261112_040156"),
 ]
 
-FIGURES_DIR = Path(__file__).parent.parent / "paper" / "figures"
+# Write to experiments/plots/ — the directory LaTeX reads via paper/plots symlink
+FIGURES_DIR = Path(__file__).parent / "plots"
 
 # Style
 MODEL_COLORS = ["#2196F3", "#FF9800", "#4CAF50"]

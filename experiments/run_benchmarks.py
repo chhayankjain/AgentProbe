@@ -218,7 +218,7 @@ def print_results_table(all_metrics: list[dict[str, Any]]) -> None:
             m["task"],
             m["failure_type"],
             f"{m['failure_rate']:.1%}",
-            f"{m['recovery_rate']:.1%}",
+            "N/A" if m['recovery_rate'] is None else f"{m['recovery_rate']:.1%}",
             f"{m['mttr_ms']:.0f}",
             f"{m['p99_latency_ms']:.0f}",
         )

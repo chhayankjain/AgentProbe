@@ -101,7 +101,7 @@ def plot_recovery_rate_heatmap(results: list[dict]) -> None:
                 if total_failures > 0:
                     # Approximate recovered count from recovery_rate × n_failures
                     total_recovered = sum(
-                        round(r["recovery_rate"] * r["n_failures"]) for r in matching
+                        round((r["recovery_rate"] or 0) * r["n_failures"]) for r in matching
                     )
                     data[i, j] = total_recovered / total_failures * 100
                 else:
@@ -242,7 +242,7 @@ def plot_summary_dashboard(results: list[dict]) -> None:
     for fw in frameworks:
         matching = [r for r in results if r["framework"] == fw and r["failure_type"] != "none"]
         total_f = sum(r["n_failures"] for r in matching)
-        total_recovered = sum(round(r["recovery_rate"] * r["n_failures"]) for r in matching)
+        total_recovered = sum(round((r["recovery_rate"] or 0) * r["n_failures"]) for r in matching)
         recovery_rates.append(total_recovered / total_f * 100 if total_f else 0)
 
     bars = ax.bar(fw_labels, recovery_rates, color=fw_colors, edgecolor="white")

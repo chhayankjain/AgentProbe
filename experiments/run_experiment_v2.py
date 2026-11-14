@@ -213,30 +213,137 @@ class EnhancedRunRecord:
 
 @dataclass
 class ExperimentState:
-    """Tracks which conditions have been completed for resume support."""
+    """Tracks which conditions have been completed for resume support.
+
+    Stores both a flat key (for file naming / backward compat) and
+    structured triples (framework, task, failure_type) so validation
+    can check record identity without ambiguous underscore splitting.
+    """
     completed_conditions: list[str] = field(default_factory=list)
     # condition key = "framework_task_failuretype"
+    # Structured map: key -> (framework, task, failure_type)
+    _condition_triples: dict[str, tuple[str, str, str]] = field(
+        default_factory=dict, repr=False
+    )
+
+    def _key(self, framework: str, task: str, failure_type: str) -> str:
+        return f"{framework}_{task}_{failure_type}"
 
     def is_done(self, framework: str, task: str, failure_type: str) -> bool:
-        key = f"{framework}_{task}_{failure_type}"
-        return key in self.completed_conditions
+        return self._key(framework, task, failure_type) in self.completed_conditions
 
     def mark_done(self, framework: str, task: str, failure_type: str) -> None:
-        key = f"{framework}_{task}_{failure_type}"
+        key = self._key(framework, task, failure_type)
         if key not in self.completed_conditions:
             self.completed_conditions.append(key)
+        self._condition_triples[key] = (framework, task, failure_type)
 
     def save(self, path: Path) -> None:
         with open(path, "w") as f:
-            json.dump({"completed_conditions": self.completed_conditions}, f, indent=2)
+            json.dump({
+                "completed_conditions": self.completed_conditions,
+                "condition_triples": {
+                    k: list(v) for k, v in self._condition_triples.items()
+                },
+            }, f, indent=2)
 
     @classmethod
     def load(cls, path: Path) -> "ExperimentState":
         if path.exists():
             with open(path) as f:
                 data = json.load(f)
-            return cls(completed_conditions=data.get("completed_conditions", []))
+            state = cls(
+                completed_conditions=data.get("completed_conditions", [])
+            )
+            # Restore structured triples if present (new format)
+            for k, v in data.get("condition_triples", {}).items():
+                if isinstance(v, list) and len(v) == 3:
+                    state._condition_triples[k] = tuple(v)
+            return state
         return cls()
+
+    def validate_checkpoint(
+        self, batch_dir: Path, n_runs: int
+    ) -> list[str]:
+        """Validate every checkpointed condition:
+        - Results file exists
+        - Exactly n_runs completed records (not fewer, not more)
+        - No duplicate run IDs
+        - Every record's framework/task/failure_type matches the expected triple
+
+        Returns a list of error messages (empty = all valid).
+        """
+        errors: list[str] = []
+        for key in self.completed_conditions:
+            triple = self._condition_triples.get(key)
+            json_path = batch_dir / f"{key}.json"
+
+            if not json_path.exists():
+                errors.append(
+                    f"Checkpoint claims '{key}' is done but "
+                    f"{json_path.name} is missing"
+                )
+                continue
+
+            with open(json_path) as f:
+                records = json.load(f)
+            completed = [r for r in records if r.get("status") == "completed"]
+
+            # Exact count
+            if len(completed) != n_runs:
+                errors.append(
+                    f"{json_path.name}: expected {n_runs} completed "
+                    f"records, found {len(completed)}"
+                )
+                continue
+
+            # Exact expected run IDs: 0 .. n_runs-1
+            expected_ids = set(range(n_runs))
+            run_ids = [r.get("run_id") for r in completed]
+            actual_ids = set(run_ids)
+            if len(actual_ids) < len(run_ids):
+                n_dupes = len(run_ids) - len(actual_ids)
+                errors.append(
+                    f"{json_path.name}: {n_dupes} duplicate run IDs"
+                )
+            if actual_ids != expected_ids:
+                missing = expected_ids - actual_ids
+                extra = actual_ids - expected_ids
+                parts = []
+                if missing:
+                    parts.append(f"missing IDs {sorted(missing)[:5]}{'...' if len(missing) > 5 else ''}")
+                if extra:
+                    parts.append(f"unexpected IDs {sorted(extra)[:5]}{'...' if len(extra) > 5 else ''}")
+                errors.append(
+                    f"{json_path.name}: run ID mismatch — {', '.join(parts)}"
+                )
+
+            # Identity match — require every record's condition labels
+            # to match the expected triple. For legacy checkpoints
+            # without stored triples, reject with a migration message.
+            if triple:
+                exp_fw, exp_task, exp_ft = triple
+            else:
+                errors.append(
+                    f"Legacy checkpoint without structured triples for "
+                    f"'{key}'. Re-run or delete the checkpoint to "
+                    f"enable full validation."
+                )
+                continue
+
+            for r in completed:
+                r_fw = r.get("framework", "")
+                r_task = r.get("task", "")
+                r_ft = r.get("failure_type", "")
+                if (r_fw, r_task, r_ft) != (exp_fw, exp_task, exp_ft):
+                    errors.append(
+                        f"{json_path.name}: record has "
+                        f"{r_fw}/{r_task}/{r_ft}, expected "
+                        f"{exp_fw}/{exp_task}/{exp_ft}"
+                    )
+                    break
+
+        return errors
 
 
 # ---------------------------------------------------------------------------
@@ -457,6 +564,18 @@ def run_experiment(
     state = ExperimentState.load(state_path)
     grader = ResponseGrader(threshold=0.5)
     failure_configs = build_failure_configs(seed)
+
+    # Validate checkpointed conditions on resume
+    if state.completed_conditions:
+        checkpoint_errors = state.validate_checkpoint(batch_dir, n_runs)
+        if checkpoint_errors:
+            _console.print("[red bold]Resume validation failed:[/red bold]")
+            for err in checkpoint_errors:
+                _console.print(f"  [red]• {err}[/red]")
+            _console.print(
+                "[red]Fix or remove the checkpoint to continue.[/red]"
+            )
+            return [], False
 
     all_records: list[EnhancedRunRecord] = []
     total_conditions = len(frameworks) * len(tasks) * len(failure_types)
@@ -738,7 +857,7 @@ def compute_summary(batch_dir: Path, all_records: list[EnhancedRunRecord]) -> No
             m["framework"], m["task"], m["failure_type"],
             str(m["n_runs"]),
             f"{m['failure_rate']:.1%}",
-            f"{m['recovery_rate']:.1%}",
+            "N/A" if m['recovery_rate'] is None else f"{m['recovery_rate']:.1%}",
             f"{m['kw_pass_rate']:.1%}",
             str(m["total_tool_calls"]),
             f"{m['p99_latency_ms']:.0f}",
@@ -837,7 +956,8 @@ def main() -> None:
         estimate_runtime(pilot_records, args.n_runs, n_conditions)
         return
 
-    # Save metadata before starting
+    # Save metadata — preserve original on resume, reject incompatible config
+    meta_path = batch_dir / "experiment_metadata.json"
     meta = capture_full_metadata(
         model=args.model,
         frameworks=args.frameworks,
@@ -846,10 +966,39 @@ def main() -> None:
         injection_probability=INJECTION_PROBABILITY,
         batch_dir=batch_dir,
     )
-    meta_path = batch_dir / "experiment_metadata.json"
-    with open(meta_path, "w") as f:
-        json.dump(meta, f, indent=2)
-    _console.print(f"[dim]Metadata saved to {meta_path}[/dim]")
+    if meta_path.exists():
+        with open(meta_path) as f:
+            original_meta = json.load(f)
+        # Reject changes to critical configuration fields
+        _compat_fields = [
+            ("model", "model"),
+            ("seed", "seed"),
+            ("n_runs_per_condition", "n_runs_per_condition"),
+            ("injection_probability", "injection_probability"),
+        ]
+        mismatches = []
+        for field_name, meta_key in _compat_fields:
+            orig_val = original_meta.get(meta_key)
+            new_val = meta.get(meta_key)
+            if orig_val is not None and orig_val != new_val:
+                mismatches.append(
+                    f"  {field_name}: original={orig_val}, current={new_val}"
+                )
+        if mismatches:
+            _console.print(
+                "[red bold]Resume rejected — configuration mismatch "
+                "with original metadata:[/red bold]"
+            )
+            for m in mismatches:
+                _console.print(f"[red]{m}[/red]")
+            sys.exit(1)
+        _console.print(
+            f"[dim]Resuming — original metadata preserved at {meta_path}[/dim]"
+        )
+    else:
+        with open(meta_path, "w") as f:
+            json.dump(meta, f, indent=2)
+        _console.print(f"[dim]Metadata saved to {meta_path}[/dim]")
 
     # Run experiment
     all_records, batch_ok = run_experiment(
