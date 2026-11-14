@@ -21,10 +21,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "langgraph>=0.2.0",
-    "langchain>=0.3.0",
-    "langchain-core>=0.3.0",
-    "langchain-community>=0.3.0",
+    # The LangChain adapter uses ``langchain.agents.create_agent`` (LangChain 1.x).
+    "langgraph>=1.0.0",
+    "langchain>=1.0.0",
+    "langchain-core>=1.0.0",
     "opentelemetry-api>=1.27.0",
     "opentelemetry-sdk>=1.27.0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.27.0",
@@ -58,6 +58,13 @@ openai = [
 anthropic = [
     "langchain-anthropic>=0.2.0",
 ]
+# The AutoGen adapter targets the legacy pyautogen 0.1.14 API, which requires the
+# pre-1.0 openai client. This extra conflicts with ``langchain-openai`` (needs
+# openai>=1); install it in a separate environment.
+autogen = [
+    "pyautogen==0.1.14",
+    "openai<1.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/chhayankjain/AgentProbe"
@@ -78,6 +85,14 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP"]
+ignore = [
+    "N806",   # variable in function should be lowercase (used for constant-like arrays)
+    "N818",   # exception name should end with Error (internal naming convention)
+    "E731",   # lambda assignment (used in metrics helper)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]  # allow long lines in tests
 
 [tool.mypy]
 python_version = "3.11"

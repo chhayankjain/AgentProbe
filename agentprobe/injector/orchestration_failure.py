@@ -30,9 +30,10 @@ from __future__ import annotations
 import functools
 import random
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Callable, TypeVar
+from enum import StrEnum
+from typing import Any, TypeVar
 
 from opentelemetry.trace import Status, StatusCode
 
@@ -73,7 +74,7 @@ class MissingHandoffError(OrchestrationError):
 # ---------------------------------------------------------------------------
 
 
-class OrchestrationFailureType(str, Enum):
+class OrchestrationFailureType(StrEnum):
     NONE = "none"
     INFINITE_LOOP = "infinite_loop"
     WRONG_BRANCH = "wrong_branch"
@@ -197,9 +198,7 @@ class OrchestrationFailureInjector:
             return False
         return self._rng.random() < self.config.failure_probability
 
-    def _execute_node(
-        self, fn: Callable, name: str, state: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _execute_node(self, fn: Callable, name: str, state: dict[str, Any]) -> dict[str, Any]:
         inject = self._should_inject()
         start = time.perf_counter()
 
@@ -224,9 +223,7 @@ class OrchestrationFailureInjector:
                         case OrchestrationFailureType.STATE_CORRUPTION:
                             return self._inject_state_corruption(fn, name, state, span, rec)
                         case OrchestrationFailureType.MISSING_HANDOFF:
-                            exc = MissingHandoffError(
-                                f"Handoff message dropped at node '{name}'"
-                            )
+                            exc = MissingHandoffError(f"Handoff message dropped at node '{name}'")
                             span.set_status(Status(StatusCode.ERROR, str(exc)))
                             rec.exception = exc
                             raise exc

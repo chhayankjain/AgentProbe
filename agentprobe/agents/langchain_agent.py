@@ -125,6 +125,15 @@ class LangChainToolAgent:
                 "framework": self.framework,
             }
 
+    def reset(self) -> None:
+        """No-op: each ``invoke()`` starts a new message list. Injector state is
+        intentionally preserved (condition-wide); use ``agent.injector.reset()``.
+        """
+
+    @property
+    def injector(self) -> ToolFailureInjector | None:
+        return self._injector
+
     def get_injector_summary(self) -> dict[str, Any]:
         if self._injector:
             return self._injector.summary()

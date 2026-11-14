@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from agentprobe.injector.latency_failure import (
     LatencyFailureConfig,
     LatencyFailureInjector,
@@ -112,7 +110,7 @@ class TestLatencyFailureInjector:
             fn()
 
         delays = [r.injected_delay_ms for r in injector.latency_log]
-        assert all(d >= 1.0 for d in delays)   # min 1ms
+        assert all(d >= 1.0 for d in delays)  # min 1ms
         assert all(d <= 10.0 for d in delays)  # max ~5ms + tolerance
 
     def test_p99_spike_marks_spike_calls(self):

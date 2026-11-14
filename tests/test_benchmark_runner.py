@@ -9,6 +9,7 @@ from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, RunRes
 # Optional — only available after feature/injector-tool-failure is merged
 try:
     from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
+
     _INJECTOR_AVAILABLE = True
 except ImportError:
     _INJECTOR_AVAILABLE = False
@@ -35,6 +36,7 @@ class AlwaysFailAgent:
 
 class FlipFlopAgent:
     """Fails on even run_ids (input-driven, no shared mutable state)."""
+
     framework = "mock"
 
     def invoke(self, input: dict) -> dict:
@@ -143,7 +145,15 @@ class TestBenchmarkRunner:
         runner = BenchmarkRunner(AlwaysSuccessAgent(), self._config(n_runs=1))
         r = runner.run()[0]
         d = r.to_dict()
-        for key in ["run_id", "framework", "task", "success", "latency_ms", "failure_type", "status"]:
+        for key in [
+            "run_id",
+            "framework",
+            "task",
+            "success",
+            "latency_ms",
+            "failure_type",
+            "status",
+        ]:
             assert key in d
 
     def test_custom_task_fn(self):
@@ -176,6 +186,7 @@ class TestBenchmarkRunner:
         runner.run()
 
         import os
+
         assert os.path.exists(save_path + ".csv")
         assert os.path.exists(save_path + ".json")
 
@@ -194,6 +205,7 @@ class TestTimeoutIsolation:
 
             def invoke(self, input: dict) -> dict:
                 import time
+
                 call_count["n"] += 1
                 time.sleep(5)  # will exceed the 100ms deadline
                 return {"output": "slow"}
@@ -213,9 +225,7 @@ class TestTimeoutIsolation:
         assert results[0].exception_type == "_HarnessTimeout"
         # Recovery must be skipped — only 1 invocation, not 2
         assert not results[0].recovered
-        assert call_count["n"] == 1, (
-            f"Expected 1 invocation (no recovery), got {call_count['n']}"
-        )
+        assert call_count["n"] == 1, f"Expected 1 invocation (no recovery), got {call_count['n']}"
 
     def test_upstream_timeout_preserves_type(self):
         """An agent raising TimeoutError should not be mislabeled as harness deadline."""
@@ -302,9 +312,7 @@ class TestTimeoutIsolation:
 
         assert len(rng_values) == 4
         # All values must be distinct (RNG advancing, not resetting)
-        assert len(set(rng_values)) == 4, (
-            f"RNG produced duplicate values: {rng_values}"
-        )
+        assert len(set(rng_values)) == 4, f"RNG produced duplicate values: {rng_values}"
 
     def test_large_output_not_misclassified(self):
         """A large successful output must not be recorded as a timeout."""
@@ -326,9 +334,7 @@ class TestTimeoutIsolation:
         results = runner.run()
 
         assert len(results) == 1
-        assert results[0].success, (
-            f"Large output was misclassified: {results[0].exception_type}"
-        )
+        assert results[0].success, f"Large output was misclassified: {results[0].exception_type}"
 
     def test_timeout_aborts_remaining_trials(self):
         """After a harness timeout, remaining trials must be skipped — no new invocations."""
@@ -339,6 +345,7 @@ class TestTimeoutIsolation:
 
             def invoke(self, input: dict) -> dict:
                 import time
+
                 call_count["n"] += 1
                 time.sleep(5)
                 return {"output": "slow"}
@@ -355,9 +362,7 @@ class TestTimeoutIsolation:
 
         assert len(results) == 3
         # Only the first trial should have been dispatched
-        assert call_count["n"] == 1, (
-            f"Expected 1 invocation, got {call_count['n']}"
-        )
+        assert call_count["n"] == 1, f"Expected 1 invocation, got {call_count['n']}"
         # First trial: actual timeout, status=completed (it was attempted)
         assert results[0].exception_type == "_HarnessTimeout"
         assert not results[0].success
@@ -377,18 +382,31 @@ class TestTimeoutIsolation:
 
         results = [
             RunResult(
-                run_id=0, framework="mock", task="tool_use",
-                failure_type="none", success=False, latency_ms=100.0,
-                status="completed", exception_type="_HarnessTimeout",
+                run_id=0,
+                framework="mock",
+                task="tool_use",
+                failure_type="none",
+                success=False,
+                latency_ms=100.0,
+                status="completed",
+                exception_type="_HarnessTimeout",
             ),
             RunResult(
-                run_id=1, framework="mock", task="tool_use",
-                failure_type="none", success=False, latency_ms=0.0,
+                run_id=1,
+                framework="mock",
+                task="tool_use",
+                failure_type="none",
+                success=False,
+                latency_ms=0.0,
                 status="skipped",
             ),
             RunResult(
-                run_id=2, framework="mock", task="tool_use",
-                failure_type="none", success=False, latency_ms=0.0,
+                run_id=2,
+                framework="mock",
+                task="tool_use",
+                failure_type="none",
+                success=False,
+                latency_ms=0.0,
                 status="skipped",
             ),
         ]
@@ -412,7 +430,11 @@ class TestTimeoutIsolation:
         """Agent invocation in the worker thread must inherit the benchmark span's trace."""
         from opentelemetry import trace
         from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter, SpanExportResult
+        from opentelemetry.sdk.trace.export import (
+            SimpleSpanProcessor,
+            SpanExporter,
+            SpanExportResult,
+        )
 
         class _CollectingExporter(SpanExporter):
             def __init__(self):
@@ -476,6 +498,7 @@ class TestTimeoutIsolation:
 
             def invoke(self, input: dict) -> dict:
                 import time
+
                 call_count["n"] += 1
                 if call_count["n"] == 1:
                     raise RuntimeError("initial failure")

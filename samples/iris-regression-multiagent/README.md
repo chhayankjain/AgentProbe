@@ -163,8 +163,8 @@ When complete, this repo integrates with AgentProbe:
 
 ```python
 from adapters import LangGraphIrisAgent
-from agentprobe.benchmark import BenchmarkRunner, BenchmarkConfig, ToolFailureConfig
-from agentprobe.injector.types import ToolFailureType
+from agentprobe.benchmark import BenchmarkRunner, BenchmarkConfig, MetricsCalculator
+from agentprobe.injector import ToolFailureConfig, ToolFailureType
 
 # Create agent
 agent = LangGraphIrisAgent(llm=...)
@@ -180,9 +180,9 @@ config = BenchmarkConfig(
     ),
 )
 
-runner = BenchmarkRunner()
-results = runner.run(agent, config)
-metrics = runner.compute_metrics(results)
+runner = BenchmarkRunner(agent=agent, config=config)
+results = runner.run()
+metrics = MetricsCalculator().compute(results)
 
 print(f"Failure rate under timeout injection: {metrics.failure_rate:.2%}")
 print(f"MTTR: {metrics.mttr_ms:.1f}ms")
