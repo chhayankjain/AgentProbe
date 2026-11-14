@@ -78,6 +78,14 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP"]
+ignore = [
+    "N806",   # variable in function should be lowercase (used for constant-like arrays)
+    "N818",   # exception name should end with Error (internal naming convention)
+    "E731",   # lambda assignment (used in metrics helper)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]  # allow long lines in tests
 
 [tool.mypy]
 python_version = "3.11"

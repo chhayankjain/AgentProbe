@@ -1,5 +1,11 @@
 # AgentProbe
 
+[![CI](https://github.com/chhayankjain/AgentProbe/actions/workflows/ci.yml/badge.svg)](https://github.com/chhayankjain/AgentProbe/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/chhayankjain/AgentProbe/actions/workflows/codeql.yml/badge.svg)](https://github.com/chhayankjain/AgentProbe/actions/workflows/codeql.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/chhayankjain/AgentProbe)](https://github.com/chhayankjain/AgentProbe/releases)
+
 **Reliability & Observability Toolkit for Production Agentic LLM Systems**
 
 AgentProbe is an open source benchmarking toolkit that injects real-world failure modes into LangGraph, LangChain, and AutoGen agents, traces execution via OpenTelemetry, and measures reliability metrics (MTTR, failure rate, P99 latency) across frameworks and workloads.
@@ -155,11 +161,14 @@ exporter.record_benchmark_run(results)
 ## Running Tests
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev,plotting]"
 pytest tests/ -v
 
 # Skip slow/integration tests
 pytest tests/ -v -m "not slow and not integration"
+
+# Lint
+ruff check agentprobe/ tests/
 ```
 
 ## Reproducing Paper Results

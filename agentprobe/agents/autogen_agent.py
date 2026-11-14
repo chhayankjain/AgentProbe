@@ -73,9 +73,7 @@ def _patch_openai_compat() -> None:
         # --- request: functions → tools ---
         if "functions" in kwargs and "tools" not in kwargs:
             functions = kwargs.pop("functions")
-            kwargs["tools"] = [
-                {"type": "function", "function": f} for f in functions
-            ]
+            kwargs["tools"] = [{"type": "function", "function": f} for f in functions]
         # Also remove function_call if present (incompatible with tools)
         kwargs.pop("function_call", None)
 
@@ -147,6 +145,7 @@ class AutoGenToolAgent:
             assistant.reset()
             try:
                 from autogen.oai.completion import Completion
+
                 Completion.clear_cache()
             except (ImportError, Exception):
                 pass
@@ -198,7 +197,9 @@ class AutoGenToolAgent:
 
                 if self._injector:
                     return self._injector.call(
-                        _web_search_impl, query, tool_name="web_search",
+                        _web_search_impl,
+                        query,
+                        tool_name="web_search",
                     )
                 return _web_search_impl(query)
 
@@ -214,7 +215,9 @@ class AutoGenToolAgent:
 
                 if self._injector:
                     return self._injector.call(
-                        _calculator_impl, expression, tool_name="calculator",
+                        _calculator_impl,
+                        expression,
+                        tool_name="calculator",
                     )
                 return _calculator_impl(expression)
 
