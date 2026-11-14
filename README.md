@@ -254,7 +254,6 @@ Phase 2 uses the corrected summary at `experiments/results_v2/` (not the origina
 - **Phase 2 batch (Mistral 7B):** `experiments/results_v2/20261111_233435/`
 - **Phase 2 batch (Qwen2.5 7B LG/LC):** `experiments/results_v2/20261112_040156/`
 - **Phase 2 batch (Qwen2.5 7B AutoGen rerun):** `experiments/results_v2/20261112_063451/` (corrected extractor)
-- **Corrected summary:** `review_outputs/20261111_recheck/corrected_summary.json`
 - **Qualification (Llama 3.1):** `experiments/results_v2/qualification_20261111_211913/` (12 trials, 10 passed)
 - **Qualification (Mistral 7B):** `experiments/results_v2/qualification_20261111_233116/` (12 trials, 8 passed)
 - **Qualification (Qwen2.5 7B):** `experiments/results_v2/qualification_20261111_233320/` (12 trials, 10 passed)
