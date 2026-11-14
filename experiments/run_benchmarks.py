@@ -12,8 +12,8 @@ Usage::
     # Baseline only (no failures)
     python experiments/run_benchmarks.py --frameworks langgraph --tasks tool_use --baseline-only
 
-    # Full matrix with Ollama/Llama-3
-    python experiments/run_benchmarks.py --llm ollama --model llama3
+    # Full matrix with Ollama/Llama 3.1
+    python experiments/run_benchmarks.py --llm ollama --model llama3.1
 
     # Quick smoke test (5 runs per config)
     python experiments/run_benchmarks.py --n-runs 5 --frameworks langgraph --tasks tool_use

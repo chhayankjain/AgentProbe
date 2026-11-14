@@ -34,7 +34,6 @@ import concurrent.futures
 import csv
 import json
 import time
-import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -353,7 +352,7 @@ class BenchmarkRunner:
             return False, 0.0, None
         if self._invocation_hung:
             return False, 0.0, None
-        for attempt in range(self.config.recovery_attempts):
+        for _ in range(self.config.recovery_attempts):
             start = time.perf_counter()
             try:
                 output = self._invoke_with_timeout(task_input)
