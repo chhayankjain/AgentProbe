@@ -7,10 +7,10 @@ import platform
 
 from agentprobe.benchmark.metadata import (
     ExperimentMetadata,
-    capture_metadata,
     _get_cpu_model,
     _get_git_info,
     _get_ram_gb,
+    capture_metadata,
 )
 
 
@@ -87,10 +87,24 @@ class TestToDict:
         meta = capture_metadata(model="test")
         d = meta.to_dict()
         expected_keys = {
-            "cpu_model", "cpu_count", "ram_gb", "os_name", "os_version", "arch",
-            "python_version", "agentprobe_version", "git_hash", "git_branch",
-            "git_dirty", "llm_backend", "model_name", "ollama_version",
-            "frameworks", "n_runs_per_cell", "seed", "timestamp_utc",
+            "cpu_model",
+            "cpu_count",
+            "ram_gb",
+            "os_name",
+            "os_version",
+            "arch",
+            "python_version",
+            "agentprobe_version",
+            "git_hash",
+            "git_branch",
+            "git_dirty",
+            "llm_backend",
+            "model_name",
+            "ollama_version",
+            "frameworks",
+            "n_runs_per_cell",
+            "seed",
+            "timestamp_utc",
             "dependency_versions",
         }
         assert expected_keys.issubset(d.keys())

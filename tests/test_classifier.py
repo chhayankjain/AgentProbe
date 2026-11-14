@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from agentprobe.observer.classifier import (
     FailureCategory,
     FailureClassifier,
@@ -18,8 +16,12 @@ from agentprobe.observer.classifier import (
 # ---------------------------------------------------------------------------
 
 
-class ToolCallTimeout(Exception): pass
-class ToolCallMalformedOutput(Exception): pass
+class ToolCallTimeout(Exception):
+    pass
+
+
+class ToolCallMalformedOutput(Exception):
+    pass
 
 
 class ToolCallRateLimited(Exception):
@@ -34,10 +36,20 @@ class ToolCallAPIError(Exception):
         super().__init__(str(status_code))
 
 
-class InfiniteLoopError(Exception): pass
-class StateCorruptionError(Exception): pass
-class WrongBranchError(Exception): pass
-class MissingHandoffError(Exception): pass
+class InfiniteLoopError(Exception):
+    pass
+
+
+class StateCorruptionError(Exception):
+    pass
+
+
+class WrongBranchError(Exception):
+    pass
+
+
+class MissingHandoffError(Exception):
+    pass
 
 
 class ContextWindowOverflow(Exception):
@@ -47,7 +59,8 @@ class ContextWindowOverflow(Exception):
         super().__init__(f"{token_count} > {token_limit}")
 
 
-class LostStateError(Exception): pass
+class LostStateError(Exception):
+    pass
 
 
 class TestFailureClassifier:

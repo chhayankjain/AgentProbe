@@ -118,7 +118,10 @@ TOOL_USE_QUERIES: list[ToolUseQuery] = [
     ),
     ToolUseQuery(
         query_id="tu_016",
-        input="Search for the boiling point of ethanol and then convert it from Celsius to Fahrenheit.",
+        input=(
+            "Search for the boiling point of ethanol"
+            " and then convert it from Celsius to Fahrenheit."
+        ),
         required_tools=["web_search", "calculator"],
         expected_answer_keywords=["173", "ethanol", "fahrenheit"],
     ),
@@ -142,7 +145,10 @@ TOOL_USE_QUERIES: list[ToolUseQuery] = [
     ),
     ToolUseQuery(
         query_id="tu_020",
-        input="Find the current price of gold per troy ounce in USD and calculate the value of 3.5 ounces.",
+        input=(
+            "Find the current price of gold per troy ounce in USD"
+            " and calculate the value of 3.5 ounces."
+        ),
         required_tools=["web_search", "calculator"],
         expected_answer_keywords=["gold", "ounce", "usd"],
     ),

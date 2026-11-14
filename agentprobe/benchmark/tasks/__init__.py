@@ -11,8 +11,8 @@ Task categories:
   - multi_agent  : Two-agent researcher + writer pipeline
 """
 
-from agentprobe.benchmark.tasks.tool_use import ToolUseTask
-from agentprobe.benchmark.tasks.rag import RAGTask
 from agentprobe.benchmark.tasks.multi_agent import MultiAgentTask
+from agentprobe.benchmark.tasks.rag import RAGTask
+from agentprobe.benchmark.tasks.tool_use import ToolUseTask
 
 __all__ = ["ToolUseTask", "RAGTask", "MultiAgentTask"]

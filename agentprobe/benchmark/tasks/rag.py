@@ -287,15 +287,15 @@ class RAGTask:
         inputs = []
         for q in self._queries:
             context_docs = self.retrieve(q.input)
-            context = "\n\n".join(
-                f"[{d['title']}]: {d['content']}" for d in context_docs
+            context = "\n\n".join(f"[{d['title']}]: {d['content']}" for d in context_docs)
+            inputs.append(
+                {
+                    "input": q.input,
+                    "context": context,
+                    "task": self.name,
+                    "query_id": q.query_id,
+                }
             )
-            inputs.append({
-                "input": q.input,
-                "context": context,
-                "task": self.name,
-                "query_id": q.query_id,
-            })
         return inputs
 
     def grade(self, query_id: str, output: str) -> bool:

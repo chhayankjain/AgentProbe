@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from agentprobe.benchmark.grader import (
-    BatchGradeResult,
     GradeResult,
     ResponseGrader,
 )
@@ -211,8 +210,8 @@ class TestSilentFailureDetection:
         result = grader.grade_batch(
             outputs=[
                 "wrong answer confidently",  # silent failure (wrong, no error)
-                "Error: API timeout",          # loud failure (wrong, had error)
-                "tokyo population million",    # correct
+                "Error: API timeout",  # loud failure (wrong, had error)
+                "tokyo population million",  # correct
             ],
             expected=[
                 ["tokyo", "population"],

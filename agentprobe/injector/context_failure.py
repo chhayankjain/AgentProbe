@@ -32,9 +32,10 @@ from __future__ import annotations
 import functools
 import random
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Callable
+from enum import StrEnum
+from typing import Any
 
 from opentelemetry.trace import Status, StatusCode
 
@@ -61,9 +62,7 @@ class ContextWindowOverflow(ContextError):
     def __init__(self, token_count: int, token_limit: int) -> None:
         self.token_count = token_count
         self.token_limit = token_limit
-        super().__init__(
-            f"Context overflow: {token_count} tokens exceeds limit of {token_limit}"
-        )
+        super().__init__(f"Context overflow: {token_count} tokens exceeds limit of {token_limit}")
 
 
 class LostStateError(ContextError):
@@ -79,7 +78,7 @@ class HallucinatedHistoryError(ContextError):
 # ---------------------------------------------------------------------------
 
 
-class ContextFailureType(str, Enum):
+class ContextFailureType(StrEnum):
     NONE = "none"
     OVERFLOW = "overflow"
     LOST_STATE = "lost_state"

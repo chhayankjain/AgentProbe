@@ -28,7 +28,6 @@ import statistics
 from dataclasses import dataclass, field
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # AgentMetrics dataclass
 # ---------------------------------------------------------------------------
@@ -53,13 +52,13 @@ class AgentMetrics:
     condition_complete: bool = True
 
     # Failure metrics
-    failure_rate: float = 0.0           # [0, 1]
+    failure_rate: float = 0.0  # [0, 1]
     n_failures: int = 0
     n_successes: int = 0
 
     # Recovery metrics
-    recovery_rate: float | None = None   # None when no failures; fraction otherwise
-    mttr_ms: float = 0.0               # mean time to recovery (ms)
+    recovery_rate: float | None = None  # None when no failures; fraction otherwise
+    mttr_ms: float = 0.0  # mean time to recovery (ms)
     mttr_ms_std: float = 0.0
 
     # Latency percentiles (total turn latency including injected delays)
@@ -86,7 +85,9 @@ class AgentMetrics:
             "failure_rate": round(self.failure_rate, 4),
             "n_failures": self.n_failures,
             "n_successes": self.n_successes,
-            "recovery_rate": round(self.recovery_rate, 4) if self.recovery_rate is not None else None,
+            "recovery_rate": round(self.recovery_rate, 4)
+            if self.recovery_rate is not None
+            else None,
             "mttr_ms": round(self.mttr_ms, 2),
             "mean_latency_ms": round(self.mean_latency_ms, 2),
             "p50_latency_ms": round(self.p50_latency_ms, 2),
@@ -115,7 +116,9 @@ class AgentMetrics:
 class MetricsCalculator:
     """Computes AgentProbe reliability metrics from a list of RunResult objects."""
 
-    def compute(self, runs: list[Any], framework: str = "", task: str = "", failure_type: str = "") -> AgentMetrics:
+    def compute(
+        self, runs: list[Any], framework: str = "", task: str = "", failure_type: str = ""
+    ) -> AgentMetrics:
         """Compute metrics from a list of :class:`~agentprobe.benchmark.runner.RunResult`.
 
         Args:
@@ -125,13 +128,13 @@ class MetricsCalculator:
             failure_type: Failure type (used for labeling; inferred from runs if empty).
         """
         if not runs:
-            return AgentMetrics(
-                framework=framework, task=task, failure_type=failure_type, n_runs=0
-            )
+            return AgentMetrics(framework=framework, task=task, failure_type=failure_type, n_runs=0)
 
         # Infer labels from first run if not provided
         first = runs[0]
-        _g = lambda obj, key, default="": obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)  # noqa: E731
+        _g = lambda obj, key, default="": (
+            obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
+        )  # noqa: E731
         fw = framework or _g(first, "framework", "unknown")
         tk = task or _g(first, "task", "unknown")
         ft = failure_type or _g(first, "failure_type", "none")
@@ -174,7 +177,9 @@ class MetricsCalculator:
             n_successes=len(successes),
             recovery_rate=recovery_rate,
             mttr_ms=statistics.mean(recovery_latencies) if recovery_latencies else 0.0,
-            mttr_ms_std=statistics.stdev(recovery_latencies) if len(recovery_latencies) > 1 else 0.0,
+            mttr_ms_std=statistics.stdev(recovery_latencies)
+            if len(recovery_latencies) > 1
+            else 0.0,
             mean_latency_ms=statistics.mean(latencies) if latencies else 0.0,
             std_latency_ms=statistics.stdev(latencies) if len(latencies) > 1 else 0.0,
             p50_latency_ms=_percentile(latencies, 50),
@@ -212,7 +217,11 @@ class MetricsCalculator:
     def _count_by_category(self, failures: list[Any]) -> dict[str, int]:
         counts: dict[str, int] = {}
         for r in failures:
-            cat = r.get("failure_category", "unknown") if isinstance(r, dict) else getattr(r, "failure_category", "unknown")
+            cat = (
+                r.get("failure_category", "unknown")
+                if isinstance(r, dict)
+                else getattr(r, "failure_category", "unknown")
+            )
             counts[cat] = counts.get(cat, 0) + 1
         return counts
 
@@ -233,5 +242,6 @@ def _percentile(data: list[float], pct: int) -> float:
         return 0.0
     sorted_data = sorted(data)
     import math
+
     idx = min(math.ceil(len(sorted_data) * pct / 100), len(sorted_data)) - 1
     return sorted_data[max(0, idx)]

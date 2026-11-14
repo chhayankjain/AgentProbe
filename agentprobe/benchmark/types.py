@@ -20,15 +20,15 @@ Usage::
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 from agentprobe.injector.types import ToolFailureConfig, ToolFailureType
 
 
-class TaskType(str, Enum):
+class TaskType(StrEnum):
     """Benchmark task category."""
 
     TOOL_USE = "tool_use"
@@ -36,7 +36,7 @@ class TaskType(str, Enum):
     MULTI_AGENT = "multi_agent"
 
 
-class AgentFramework(str, Enum):
+class AgentFramework(StrEnum):
     """Supported agent framework backends."""
 
     LANGGRAPH = "langgraph"
@@ -70,7 +70,7 @@ class RunResult(BaseModel):
     recovery_time_ms: float | None = None
     retries: int = 0
     error_message: str | None = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class BenchmarkConfig(BaseModel):

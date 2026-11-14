@@ -29,12 +29,12 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import math
 import random
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Callable, TypeVar
+from enum import StrEnum
+from typing import Any, TypeVar
 
 from agentprobe.observer.tracer import get_tracer
 
@@ -48,7 +48,7 @@ _tracer = get_tracer(__name__)
 # ---------------------------------------------------------------------------
 
 
-class LatencyFailureType(str, Enum):
+class LatencyFailureType(StrEnum):
     NONE = "none"
     P99_SPIKE = "p99_spike"
     CASCADING_SLOW = "cascading_slow"
@@ -229,15 +229,17 @@ class LatencyFailureInjector:
                 return fn(*args, **kwargs)
             finally:
                 end = time.perf_counter()
-                self._log.append(LatencyRecord(
-                    call_index=self._call_count,
-                    base_latency_ms=(end - fn_start) * 1000,
-                    injected_delay_ms=delay * 1000,
-                    total_latency_ms=(end - start) * 1000,
-                    failure_type=self.config.failure_type,
-                    was_spike=was_spike,
-                    was_cold_start=was_cold,
-                ))
+                self._log.append(
+                    LatencyRecord(
+                        call_index=self._call_count,
+                        base_latency_ms=(end - fn_start) * 1000,
+                        injected_delay_ms=delay * 1000,
+                        total_latency_ms=(end - start) * 1000,
+                        failure_type=self.config.failure_type,
+                        was_spike=was_spike,
+                        was_cold_start=was_cold,
+                    )
+                )
 
     async def _execute_async(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:
         self._call_count += 1
@@ -260,12 +262,14 @@ class LatencyFailureInjector:
                 return await fn(*args, **kwargs)
             finally:
                 end = time.perf_counter()
-                self._log.append(LatencyRecord(
-                    call_index=self._call_count,
-                    base_latency_ms=(end - fn_start) * 1000,
-                    injected_delay_ms=delay * 1000,
-                    total_latency_ms=(end - start) * 1000,
-                    failure_type=self.config.failure_type,
-                    was_spike=was_spike,
-                    was_cold_start=was_cold,
-                ))
+                self._log.append(
+                    LatencyRecord(
+                        call_index=self._call_count,
+                        base_latency_ms=(end - fn_start) * 1000,
+                        injected_delay_ms=delay * 1000,
+                        total_latency_ms=(end - start) * 1000,
+                        failure_type=self.config.failure_type,
+                        was_spike=was_spike,
+                        was_cold_start=was_cold,
+                    )
+                )

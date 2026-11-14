@@ -16,25 +16,29 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).parent.parent / "experiments"))
 
 from run_qualification import (
     BASELINE_CONFIG,
     GUARANTEED_FAULT_CONFIG,
     QUALIFICATION_TASKS,
-    QualificationTrial,
     run_trial,
 )
 
 
-def _make_mock_agent(tool_name: str, call_args: tuple, return_value: str | None,
-                     injected: bool = False, output: str = "12000",
-                     exception_type: type | None = None):
+def _make_mock_agent(
+    tool_name: str,
+    call_args: tuple,
+    return_value: str | None,
+    injected: bool = False,
+    output: str = "12000",
+    exception_type: type | None = None,
+):
     """Build a mock agent whose _injector log has exactly one record."""
     from agentprobe.injector.tool_failure import (
-        InjectionResult, ToolFailureType, ToolFailureInjector, ToolFailureConfig,
+        InjectionResult,
+        ToolFailureInjector,
+        ToolFailureType,
     )
 
     agent = MagicMock()
@@ -167,6 +171,7 @@ class TestGuaranteedFaultPhase:
     @patch("run_qualification.build_agent")
     def test_pass_fault_at_required_tool(self, mock_build):
         from agentprobe.injector.tool_failure import ToolCallAPIError
+
         mock_build.return_value = _make_mock_agent(
             tool_name="calculator",
             call_args=("3571 + 8429",),
@@ -175,14 +180,16 @@ class TestGuaranteedFaultPhase:
             output="EXCEPTION: ToolCallAPIError",
             exception_type=ToolCallAPIError,
         )
-        trial = run_trial("langgraph", TASK_ADD, "guaranteed_fault", "llama3.1",
-                          GUARANTEED_FAULT_CONFIG)
+        trial = run_trial(
+            "langgraph", TASK_ADD, "guaranteed_fault", "llama3.1", GUARANTEED_FAULT_CONFIG
+        )
         assert trial.verdict == "PASS", trial.failure_reasons
 
     @patch("run_qualification.build_agent")
     def test_fault_at_wrong_tool(self, mock_build):
         """Fault injected, but only at web_search, not calculator."""
         from agentprobe.injector.tool_failure import ToolCallAPIError
+
         mock_build.return_value = _make_mock_agent(
             tool_name="web_search",
             call_args=("query",),
@@ -191,8 +198,8 @@ class TestGuaranteedFaultPhase:
             output="EXCEPTION: ToolCallAPIError",
             exception_type=ToolCallAPIError,
         )
-        trial = run_trial("langgraph", TASK_ADD, "guaranteed_fault", "llama3.1",
-                          GUARANTEED_FAULT_CONFIG)
+        trial = run_trial(
+            "langgraph", TASK_ADD, "guaranteed_fault", "llama3.1", GUARANTEED_FAULT_CONFIG
+        )
         assert trial.verdict == "FAIL"
-        assert any("calculator" in r and "not injected" in r.lower()
-                    for r in trial.failure_reasons)
+        assert any("calculator" in r and "not injected" in r.lower() for r in trial.failure_reasons)

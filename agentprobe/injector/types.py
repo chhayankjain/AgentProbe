@@ -14,12 +14,12 @@ Usage::
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class ToolFailureType(str, Enum):
+class ToolFailureType(StrEnum):
     """The kind of failure to inject into a tool call."""
 
     NONE = "none"

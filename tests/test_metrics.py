@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-import pytest
-
-from agentprobe.benchmark.metrics import AgentMetrics, MetricsCalculator
+from agentprobe.benchmark.metrics import MetricsCalculator
 from agentprobe.benchmark.runner import RunResult
 
 
-def _run(run_id: int, success: bool, latency: float = 100.0,
-         recovered: bool = False, recovery_latency: float = 0.0) -> RunResult:
+def _run(
+    run_id: int,
+    success: bool,
+    latency: float = 100.0,
+    recovered: bool = False,
+    recovery_latency: float = 0.0,
+) -> RunResult:
     return RunResult(
         run_id=run_id,
         framework="test",
@@ -42,10 +45,9 @@ class TestMetricsCalculator:
         assert m.failure_rate == 1.0
 
     def test_mixed_failure_rate(self):
-        runs = (
-            [_run(i, success=True) for i in range(8)] +
-            [_run(i + 8, success=False) for i in range(2)]
-        )
+        runs = [_run(i, success=True) for i in range(8)] + [
+            _run(i + 8, success=False) for i in range(2)
+        ]
         m = MetricsCalculator().compute(runs)
         assert abs(m.failure_rate - 0.2) < 0.001
 
@@ -90,7 +92,9 @@ class TestMetricsCalculator:
 
     def test_labels_overridden_by_explicit_args(self):
         runs = [_run(0, success=True)]
-        m = MetricsCalculator().compute(runs, framework="langgraph", task="rag", failure_type="none")
+        m = MetricsCalculator().compute(
+            runs, framework="langgraph", task="rag", failure_type="none"
+        )
         assert m.framework == "langgraph"
         assert m.task == "rag"
         assert m.failure_type == "none"
@@ -100,9 +104,15 @@ class TestMetricsCalculator:
         m = MetricsCalculator().compute(runs)
         d = m.to_dict()
         required_keys = [
-            "framework", "task", "failure_type", "n_runs",
-            "failure_rate", "mttr_ms", "p50_latency_ms",
-            "p90_latency_ms", "p99_latency_ms",
+            "framework",
+            "task",
+            "failure_type",
+            "n_runs",
+            "failure_rate",
+            "mttr_ms",
+            "p50_latency_ms",
+            "p90_latency_ms",
+            "p99_latency_ms",
         ]
         for key in required_keys:
             assert key in d

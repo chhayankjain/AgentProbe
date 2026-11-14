@@ -30,16 +30,15 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Taxonomy
 # ---------------------------------------------------------------------------
 
 
-class FailureCategory(str, Enum):
+class FailureCategory(StrEnum):
     TOOL_CALL = "tool_call"
     ORCHESTRATION = "orchestration"
     CONTEXT = "context"
@@ -48,10 +47,10 @@ class FailureCategory(str, Enum):
     UNKNOWN = "unknown"
 
 
-class FailureSeverity(str, Enum):
-    LOW = "low"        # Transient, likely self-healing
+class FailureSeverity(StrEnum):
+    LOW = "low"  # Transient, likely self-healing
     MEDIUM = "medium"  # Impacts single agent turn
-    HIGH = "high"      # Impacts full task completion
+    HIGH = "high"  # Impacts full task completion
     CRITICAL = "critical"  # Causes cascading failures
 
 
@@ -257,9 +256,7 @@ class FailureClassifier:
     # Internal
     # ------------------------------------------------------------------
 
-    def _match_exception(
-        self, exc_type: str
-    ) -> tuple[FailureCategory, FailureSeverity]:
+    def _match_exception(self, exc_type: str) -> tuple[FailureCategory, FailureSeverity]:
         for prefix, category, severity in _EXCEPTION_RULES:
             if exc_type == prefix or exc_type.startswith(prefix):
                 return category, severity

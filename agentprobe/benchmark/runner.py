@@ -34,9 +34,13 @@ import concurrent.futures
 import csv
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+
+# Injector and classifier imports are lazy so this module is independently
+# testable before their respective feature branches are merged.
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry import context as otel_context
 from rich.console import Console
@@ -44,13 +48,8 @@ from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 
 from agentprobe.observer.tracer import get_tracer
 
-# Injector and classifier imports are lazy so this module is independently
-# testable before their respective feature branches are merged.
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
-    from agentprobe.observer.classifier import FailureClassifier as _ClassifierType
+    from agentprobe.injector.tool_failure import ToolFailureConfig
 
 _tracer = get_tracer(__name__)
 _console = Console()
@@ -137,7 +136,7 @@ class BenchmarkConfig:
     framework: str = "langgraph"
     task: str = "tool_use"
     n_runs: int = 30
-    failure_config: "ToolFailureConfig | None" = None
+    failure_config: ToolFailureConfig | None = None
     recovery_attempts: int = 1
     timeout_per_run_seconds: float = 60.0
     seed: int = 42
@@ -174,6 +173,7 @@ class BenchmarkRunner:
         self._classifier: Any = None
         try:
             from agentprobe.observer.classifier import FailureClassifier
+
             self._classifier = FailureClassifier()
         except ImportError:
             pass  # classifier module not yet merged
@@ -182,6 +182,7 @@ class BenchmarkRunner:
         if self.config.failure_config is not None:
             try:
                 from agentprobe.injector.tool_failure import ToolFailureInjector
+
                 self._injector = ToolFailureInjector(self.config.failure_config)
             except ImportError:
                 pass  # injector module not yet merged; runner still functional
@@ -189,9 +190,7 @@ class BenchmarkRunner:
     def run(self) -> list[RunResult]:
         """Execute the full benchmark. Returns a list of RunResult objects."""
         cfg = self.config
-        failure_type = (
-            cfg.failure_config.failure_type.value if cfg.failure_config else "none"
-        )
+        failure_type = cfg.failure_config.failure_type.value if cfg.failure_config else "none"
 
         _console.rule(
             f"[bold blue]AgentProbe Benchmark — {cfg.framework}/{cfg.task}/{failure_type}"
@@ -206,24 +205,24 @@ class BenchmarkRunner:
             TimeElapsedColumn(),
             console=_console,
         ) as progress:
-            task_bar = progress.add_task(
-                f"[cyan]Running {cfg.n_runs} trials...", total=cfg.n_runs
-            )
+            task_bar = progress.add_task(f"[cyan]Running {cfg.n_runs} trials...", total=cfg.n_runs)
 
             for run_id in range(cfg.n_runs):
                 if self._invocation_hung:
-                    results.append(RunResult(
-                        run_id=run_id,
-                        framework=cfg.framework,
-                        task=cfg.task,
-                        failure_type=failure_type,
-                        success=False,
-                        latency_ms=0.0,
-                        status="skipped",
-                        failure_category="harness_abort",
-                        exception_type="_HarnessTimeout",
-                        exception_msg="Skipped: prior trial timed out with lingering thread",
-                    ))
+                    results.append(
+                        RunResult(
+                            run_id=run_id,
+                            framework=cfg.framework,
+                            task=cfg.task,
+                            failure_type=failure_type,
+                            success=False,
+                            latency_ms=0.0,
+                            status="skipped",
+                            failure_category="harness_abort",
+                            exception_type="_HarnessTimeout",
+                            exception_msg="Skipped: prior trial timed out with lingering thread",
+                        )
+                    )
                     progress.advance(task_bar)
                     continue
                 result = self._run_single(run_id, failure_type)
@@ -335,9 +334,7 @@ class BenchmarkRunner:
                 return future.result()  # re-raises the worker exception
             # Worker still running — genuine deadline miss.
             self._invocation_hung = True
-            raise _HarnessTimeout(
-                f"Agent invocation exceeded {timeout}s wall-clock timeout"
-            )
+            raise _HarnessTimeout(f"Agent invocation exceeded {timeout}s wall-clock timeout")
 
     def _attempt_recovery(self, task_input: dict) -> tuple[bool, float, Any]:
         """Try to invoke the agent again after a failure.

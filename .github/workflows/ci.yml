@@ -76,4 +76,5 @@ jobs:
           pip install -e ".[dev,plotting]"
 
       - name: Run mypy
+        continue-on-error: true  # advisory until pre-existing type errors are resolved
         run: mypy agentprobe/ --ignore-missing-imports

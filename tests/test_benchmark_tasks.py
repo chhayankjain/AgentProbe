@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-
-from agentprobe.benchmark.tasks.tool_use import ToolUseTask, TOOL_USE_QUERIES
-from agentprobe.benchmark.tasks.rag import RAGTask, RAG_QUERIES, CORPUS
-from agentprobe.benchmark.tasks.multi_agent import MultiAgentTask, MULTI_AGENT_QUERIES
+from agentprobe.benchmark.tasks.multi_agent import MULTI_AGENT_QUERIES, MultiAgentTask
+from agentprobe.benchmark.tasks.rag import CORPUS, RAG_QUERIES, RAGTask
+from agentprobe.benchmark.tasks.tool_use import TOOL_USE_QUERIES, ToolUseTask
 
 
 class TestToolUseTask:
@@ -67,16 +65,12 @@ class TestToolUseTask:
 
     def test_grade_multi_step_density_query(self):
         task = ToolUseTask()
-        assert task.grade(
-            "tu_024",
-            "India has a higher population density than China."
-        )
+        assert task.grade("tu_024", "India has a higher population density than China.")
 
     def test_grade_merge_sort_query(self):
         task = ToolUseTask()
         assert task.grade(
-            "tu_025",
-            "Merge sort has O(n log n) time complexity using divide and conquer."
+            "tu_025", "Merge sort has O(n log n) time complexity using divide and conquer."
         )
 
 
@@ -117,7 +111,7 @@ class TestRAGTask:
         # rag_001: failure categories
         assert task.grade(
             "rag_001",
-            "AgentProbe defines tool call, orchestration, context, latency, and consistency failures."
+            "AgentProbe defines tool call, orchestration, context, latency, and consistency failures.",
         )
 
     def test_grade_wrong_answer(self):
@@ -143,14 +137,14 @@ class TestRAGTask:
         task = RAGTask()
         assert task.grade(
             "rag_006",
-            "AgentProbe injects faults via timeout delays, malformed JSON, and rate-limit errors at the injection boundary."
+            "AgentProbe injects faults via timeout delays, malformed JSON, and rate-limit errors at the injection boundary.",
         )
 
     def test_grade_chaos_engineering_query(self):
         task = RAGTask()
         assert task.grade(
             "rag_009",
-            "Chaos engineering uses a steady-state hypothesis and perturbation to test blast radius."
+            "Chaos engineering uses a steady-state hypothesis and perturbation to test blast radius.",
         )
 
     def test_multi_doc_query_exists(self):
@@ -210,14 +204,10 @@ class TestMultiAgentTask:
 
     def test_grade_protein_query(self):
         task = MultiAgentTask()
-        assert task.grade(
-            "ma_006",
-            "AlphaFold revolutionized protein structure prediction."
-        )
+        assert task.grade("ma_006", "AlphaFold revolutionized protein structure prediction.")
 
     def test_grade_healthcare_query(self):
         task = MultiAgentTask()
         assert task.grade(
-            "ma_015",
-            "Autonomous AI in healthcare has both benefit and risk considerations."
+            "ma_015", "Autonomous AI in healthcare has both benefit and risk considerations."
         )
