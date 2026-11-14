@@ -72,7 +72,7 @@ failure_config = ToolFailureConfig(
 )
 
 # 3. Build agent
-llm = ChatOllama(model="llama3", temperature=0.0)
+llm = ChatOllama(model="llama3.1", temperature=0.0)
 agent = LangGraphToolAgent(llm=llm, failure_config=failure_config)
 
 # 4. Run benchmark
@@ -148,7 +148,7 @@ exporter.record_benchmark_run(results)
 
 | LLM Backend | Install | Notes |
 |-------------|---------|-------|
-| Ollama + Llama-3 | `pip install langchain-ollama` | Local, zero API cost |
+| Ollama + Llama 3.1 | `pip install langchain-ollama` | Local, zero API cost |
 | OpenAI GPT-4o | `pip install langchain-openai` | Requires `OPENAI_API_KEY` |
 | Anthropic Claude | `pip install langchain-anthropic` | Requires `ANTHROPIC_API_KEY` |
 
@@ -227,7 +227,7 @@ python experiments/run_experiment_v2.py --model qwen2.5:7b --seed 42
 
 # Cross-model analysis
 python experiments/analyze_cross_model.py \
-    --batches experiments/results_v2/LLAMA_BATCH experiments/results_v2/MISTRAL_BATCH experiments/results_v2/QWEN_BATCH \
+    --batches experiments/results_v2/20261111_113514 experiments/results_v2/20261111_233435 experiments/results_v2/20261112_040156 \
     --models llama3.1 mistral:7b qwen2.5:7b
 ```
 

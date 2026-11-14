@@ -34,5 +34,5 @@ abstract: >-
   AgentProbe is an open-source fault-injection and observability toolkit
   for systematically evaluating the reliability of LLM-based intelligent
   agents. It implements a five-category failure taxonomy with configurable
-  injectors, OpenTelemetry-based tracing, and 15 benchmark queries
+  injectors, OpenTelemetry-based tracing, and benchmark queries
   spanning tool use, retrieval-style, and multi-agent-style prompts.
