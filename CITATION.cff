@@ -15,8 +15,8 @@ authors:
     given-names: Eugene
     affiliation: Boston University
     orcid: "https://orcid.org/0000-0002-3836-1851"
-version: "1.0.0"
-date-released: "2026-09-13"
+version: "1.1.0"
+date-released: "2026-11-14"
 license: MIT
 repository-code: "https://github.com/chhayankjain/AgentProbe"
 keywords:
