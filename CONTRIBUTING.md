@@ -10,7 +10,7 @@ git clone https://github.com/chhayankjain/AgentProbe.git
 cd AgentProbe
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev,plotting,ollama]"
+pip install -e ".[dev,plotting,ollama]"   # installs the agentprobe-toolkit distribution in editable mode
 
 # Run tests
 pytest tests/ -v

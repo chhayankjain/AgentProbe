@@ -1,6 +1,15 @@
 # Changelog
 
-## [Unreleased]
+## [1.2.0] - 2026-11-14
+
+First release published to PyPI, as **`agentprobe-toolkit`** (the name `agentprobe` was already
+taken by an unrelated project). The import name is unchanged: `import agentprobe`.
+
+### Added
+- PyPI distribution `agentprobe-toolkit` with Trusted Publishing release workflow
+  (`.github/workflows/release.yml`): tag `vX.Y.Z` publishes to PyPI; manual dispatch publishes to TestPyPI
+- Packaging check in CI (`python -m build`, `twine check`, wheel import smoke test)
+- Python 3.14 in the CI matrix and classifiers
 
 ### Fixed
 - `from agentprobe import ToolFailureInjector, AgentProbeTracer` (the README example) now works: the top-level package re-exports the public API
@@ -10,7 +19,7 @@
 - Tracer no longer suggests a non-existent `agentprobe[otlp]` extra
 - Runner progress summary uses the same ceiling nearest-rank P99 as `MetricsCalculator`
 
-### Added
+### Added (API)
 - `agentprobe[autogen]` extra pinning `pyautogen==0.1.14` and `openai<1.0`
 - `agentprobe.benchmark.tasks.get_task()` and `corpus_task_fn()` to run the 55-query graded corpora through `BenchmarkRunner`; `run_benchmarks.py --query-set corpus`
 - `runner.PAPER_PROMPTS` / `paper_task_fn` naming the five-prompt set every published batch used
