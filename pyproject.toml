@@ -43,7 +43,7 @@ dev = [
     "ruff>=0.7.0",
     "mypy>=1.11.0",
     "ipykernel>=6.29.0",
-    "nbformat>=5.10.0",
+    "nbformat>=5.11.1",
 ]
 plotting = [
     "matplotlib>=3.8.0",
