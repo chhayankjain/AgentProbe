@@ -50,7 +50,7 @@ plotting = [
     "pandas>=2.0.0",
 ]
 ollama = [
-    "langchain-ollama>=0.2.0",
+    "langchain-ollama>=1.1.0",
 ]
 openai = [
     "langchain-openai>=0.2.0",
