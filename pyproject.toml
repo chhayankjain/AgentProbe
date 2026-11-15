@@ -53,7 +53,7 @@ ollama = [
     "langchain-ollama>=0.2.0",
 ]
 openai = [
-    "langchain-openai>=0.2.0",
+    "langchain-openai>=1.7.4",
 ]
 anthropic = [
     "langchain-anthropic>=0.2.0",
