@@ -1,10 +1,14 @@
 version: 2
 updates:
+  # Python dependencies are declared as open-ended ">=" floors, not pins, so routine
+  # version bumps would only raise users' minimums without changing what CI tests.
+  # A limit of 0 disables those version-update PRs while still allowing Dependabot
+  # to open PRs for security advisories.
   - package-ecosystem: pip
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0
     labels:
       - dependencies
 
@@ -13,5 +17,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]
     labels:
       - ci
