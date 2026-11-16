@@ -3,7 +3,7 @@
 [![CI](https://github.com/chhayankjain/AgentProbe/actions/workflows/ci.yml/badge.svg)](https://github.com/chhayankjain/AgentProbe/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/chhayankjain/AgentProbe/actions/workflows/codeql.yml/badge.svg)](https://github.com/chhayankjain/AgentProbe/actions/workflows/codeql.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/chhayankjain/AgentProbe/blob/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/agentprobe-toolkit.svg)](https://pypi.org/project/agentprobe-toolkit/)
 [![GitHub release](https://img.shields.io/github/v/release/chhayankjain/AgentProbe)](https://github.com/chhayankjain/AgentProbe/releases)
 
@@ -181,7 +181,7 @@ agentprobe/
     └── autogen_agent.py         # AutoGen two-agent pipeline (pyautogen 0.1.14 + compat shim)
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the data flow and design decisions.
+See [ARCHITECTURE.md](https://github.com/chhayankjain/AgentProbe/blob/main/ARCHITECTURE.md) for the data flow and design decisions.
 
 ## Observability Stack
 
@@ -327,7 +327,7 @@ Phase 2 uses the corrected summaries under `experiments/results_v2/`. The origin
 - **Qualification (Mistral 7B):** `experiments/results_v2/qualification_20261111_233116/` (12 trials, 8 passed)
 - **Qualification (Qwen2.5 7B):** `experiments/results_v2/qualification_20261111_233320/` (12 trials, 10 passed)
 
-> **Source map:** The authoritative mapping from each paper table cell to its batch directory is in [`experiments/results_v2/paper_source_map.json`](experiments/results_v2/paper_source_map.json). The Qwen2.5 column combines two batches: LangGraph/LangChain from `20261112_040156` and AutoGen from `20261112_063451` (corrected output extractor). Llama and Mistral use their single original batches. The `analyze_cross_model.py` script does not automatically merge these; use the source map to select the correct batch per framework.
+> **Source map:** The authoritative mapping from each paper table cell to its batch directory is in [`experiments/results_v2/paper_source_map.json`](https://github.com/chhayankjain/AgentProbe/blob/main/experiments/results_v2/paper_source_map.json). The Qwen2.5 column combines two batches: LangGraph/LangChain from `20261112_040156` and AutoGen from `20261112_063451` (corrected output extractor). Llama and Mistral use their single original batches. The `analyze_cross_model.py` script does not automatically merge these; use the source map to select the correct batch per framework.
 
 > **Model digests:** All three models use Q4_K_M quantization. Ollama digest prefixes: Llama `46e0c10c039e`, Mistral `6577803aa9a0`, Qwen `845dbda0ea48`. The `experiment_metadata.json` files in historical batches record `model_digest: unknown` because digest capture was added after the experiments ran; the digests listed here were identified post-hoc from the same Ollama installation.
 
@@ -344,4 +344,4 @@ Phase 2 uses the corrected summaries under `experiments/results_v2/`. The origin
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/chhayankjain/AgentProbe/blob/main/LICENSE).
