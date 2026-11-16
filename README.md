@@ -156,6 +156,21 @@ print(injector.injection_log)    # one record per call with args, return/excepti
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    SCRIPT["experiment script<br/>or your code"] --> RUNNER["BenchmarkRunner<br/>N runs · timeout · 1 retry"]
+    RUNNER --> ADAPTER["Adapter<br/>LangGraph · LangChain · AutoGen"]
+    ADAPTER <--> LLM["LLM<br/>Ollama / OpenAI-compatible"]
+    ADAPTER --> INJ["ToolFailureInjector<br/>seeded · p per call"]
+    INJ -- "pass (1-p)" --> TOOL["tool fn"]
+    INJ -- "inject (p)" --> FAULT["raise timeout / 429 / 5xx / malformed"]
+    RUNNER --> METRICS["MetricsCalculator<br/>failure & recovery rate · MTTR · P99"]
+    RUNNER & ADAPTER & INJ --> OTEL["OpenTelemetry spans<br/>console · Jaeger"]
+    INJ --> LOG["injection log<br/>args · result · span_id"]
+```
+
+Full diagrams (per-trial sequence, injector internals, data flow, observability stack, CI/release) are in [ARCHITECTURE.md](https://github.com/chhayankjain/AgentProbe/blob/main/ARCHITECTURE.md).
+
 ```
 agentprobe/
 ├── injector/
@@ -181,7 +196,7 @@ agentprobe/
     └── autogen_agent.py         # AutoGen two-agent pipeline (pyautogen 0.1.14 + compat shim)
 ```
 
-See [ARCHITECTURE.md](https://github.com/chhayankjain/AgentProbe/blob/main/ARCHITECTURE.md) for the data flow and design decisions.
+See [ARCHITECTURE.md](https://github.com/chhayankjain/AgentProbe/blob/main/ARCHITECTURE.md) for design decisions.
 
 ## Observability Stack
 
