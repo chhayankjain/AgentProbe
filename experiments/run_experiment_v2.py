@@ -46,6 +46,7 @@ from rich.console import Console
 from rich.table import Table
 
 from agentprobe.benchmark.grader import ResponseGrader
+from agentprobe.llm import LLMSpec, add_llm_args, autogen_llm_config, build_chat_model, spec_from_args
 from agentprobe.benchmark.metrics import MetricsCalculator
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, RunResult
 from agentprobe.benchmark.metadata import capture_metadata
@@ -131,13 +132,32 @@ def build_failure_configs(seed: int) -> dict[str, ToolFailureConfig | None]:
 # Agent factory
 # ---------------------------------------------------------------------------
 
-def build_llm(model: str) -> Any:
-    from langchain_ollama import ChatOllama
-    return ChatOllama(model=model, temperature=0.0)
+# The active backend for this process. ``main()`` sets it from the CLI flags;
+# library callers can pass an explicit ``LLMSpec`` instead. Defaults to local
+# Ollama, exactly as every batch in the paper was run.
+_ACTIVE_LLM_SPEC: LLMSpec | None = None
+
+
+def set_active_llm_spec(spec: LLMSpec) -> None:
+    global _ACTIVE_LLM_SPEC
+    _ACTIVE_LLM_SPEC = spec
+
+
+def resolve_llm_spec(model: str, llm_spec: LLMSpec | None = None) -> LLMSpec:
+    """Return *llm_spec*, else the process-wide spec, else local Ollama for *model*."""
+    if llm_spec is not None:
+        return llm_spec
+    if _ACTIVE_LLM_SPEC is not None and _ACTIVE_LLM_SPEC.model == model:
+        return _ACTIVE_LLM_SPEC
+    return LLMSpec.from_provider("ollama", model=model)
+
+
+def build_llm(model: str, llm_spec: LLMSpec | None = None) -> Any:
+    return build_chat_model(resolve_llm_spec(model, llm_spec))
 
 
 def build_agent(framework: str, llm: Any, failure_config: ToolFailureConfig | None,
-                model: str = "llama3.1") -> Any:
+                model: str = "llama3.1", llm_spec: LLMSpec | None = None) -> Any:
     if framework == "langgraph":
         from agentprobe.agents.langgraph_agent import LangGraphToolAgent
         return LangGraphToolAgent(llm=llm, failure_config=failure_config)
@@ -146,13 +166,7 @@ def build_agent(framework: str, llm: Any, failure_config: ToolFailureConfig | No
         return LangChainToolAgent(llm=llm, failure_config=failure_config)
     elif framework == "autogen":
         from agentprobe.agents.autogen_agent import AutoGenToolAgent
-        llm_config = {
-            "config_list": [{
-                "model": model,
-                "api_base": "http://localhost:11434/v1",
-                "api_key": "ollama",
-            }]
-        }
+        llm_config = autogen_llm_config(resolve_llm_spec(model, llm_spec))
         return AutoGenToolAgent(llm_config=llm_config, failure_config=failure_config)
     else:
         raise ValueError(f"Unknown framework: {framework}")
@@ -907,7 +921,7 @@ def main() -> None:
                        default=FAILURE_TYPE_NAMES,
                        choices=FAILURE_TYPE_NAMES)
     parser.add_argument("--n-runs", type=int, default=30)
-    parser.add_argument("--model", default="llama3.1")
+    add_llm_args(parser, default_model="llama3.1")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--pilot", action="store_true",
                        help="Run minimal pilot to validate setup")
@@ -915,6 +929,15 @@ def main() -> None:
                        help="Resume from existing batch directory")
 
     args = parser.parse_args()
+    llm_spec = spec_from_args(args)
+    set_active_llm_spec(llm_spec)
+    if not llm_spec.is_local:
+        # Fail fast on a missing key rather than 450 trials later.
+        llm_spec.resolve_api_key()
+    _console.print(
+        f"[dim]LLM backend: {llm_spec.provider} · model={llm_spec.model} · "
+        f"base_url={llm_spec.resolved_base_url} · rpm={llm_spec.requests_per_minute}[/dim]"
+    )
 
     # Determine batch directory
     if args.resume:
@@ -966,6 +989,8 @@ def main() -> None:
         injection_probability=INJECTION_PROBABILITY,
         batch_dir=batch_dir,
     )
+    # Exact backend description (provider, model id, endpoint, key *variable*).
+    meta.update(llm_spec.describe())
     if meta_path.exists():
         with open(meta_path) as f:
             original_meta = json.load(f)
@@ -975,6 +1000,9 @@ def main() -> None:
             ("seed", "seed"),
             ("n_runs_per_condition", "n_runs_per_condition"),
             ("injection_probability", "injection_probability"),
+            # Absent in pre-provider batches (orig None => check skipped).
+            ("llm_provider", "llm_provider"),
+            ("llm_base_url", "llm_base_url"),
         ]
         mismatches = []
         for field_name, meta_key in _compat_fields:

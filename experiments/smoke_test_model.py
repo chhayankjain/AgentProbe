@@ -14,15 +14,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
+from agentprobe.llm import add_llm_args, autogen_llm_config, build_chat_model, spec_from_args
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Smoke test model tool calling")
-    parser.add_argument("--model", required=True)
+    add_llm_args(parser, default_model="llama3.1")
     parser.add_argument("--frameworks", nargs="+",
                        default=["langgraph", "langchain", "autogen"],
                        choices=["langgraph", "langchain", "autogen"])
     args = parser.parse_args()
+    spec = spec_from_args(args)
+    if not spec.is_local:
+        spec.resolve_api_key()
+    print(f"Backend: {spec.provider} · {spec.model} · {spec.resolved_base_url}")
 
     config = ToolFailureConfig(
         failure_type=ToolFailureType.NONE,
@@ -40,8 +45,7 @@ def main() -> None:
         start = time.perf_counter()
         try:
             if fw in ("langgraph", "langchain"):
-                from langchain_ollama import ChatOllama
-                llm = ChatOllama(model=args.model, temperature=0.0)
+                llm = build_chat_model(spec)
                 if fw == "langgraph":
                     from agentprobe.agents.langgraph_agent import LangGraphToolAgent
                     agent = LangGraphToolAgent(llm=llm, failure_config=config)
@@ -50,21 +54,14 @@ def main() -> None:
                     agent = LangChainToolAgent(llm=llm, failure_config=config)
             else:
                 from agentprobe.agents.autogen_agent import AutoGenToolAgent
-                llm_config = {
-                    "config_list": [{
-                        "model": args.model,
-                        "api_base": "http://localhost:11434/v1",
-                        "api_key": "ollama",
-                    }]
-                }
-                agent = AutoGenToolAgent(llm_config=llm_config, failure_config=config)
+                agent = AutoGenToolAgent(llm_config=autogen_llm_config(spec), failure_config=config)
 
             result = agent.invoke({"input": query})
             elapsed = time.perf_counter() - start
             output = str(result.get("output", ""))
 
             # Check tool execution
-            log = agent._injector.injection_log if agent._injector else []
+            log = agent.injector.injection_log if agent.injector else []
             tool_names = [r.tool_name for r in log]
             calc_called = any(r.tool_name == "calculator" for r in log)
             calc_return = next(

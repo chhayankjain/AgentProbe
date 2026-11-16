@@ -9,6 +9,12 @@ and maps them to the 5-category AgentProbe failure taxonomy:
   4. LATENCY         — high-latency spans / tail latency detection
   5. CONSISTENCY     — non-deterministic output patterns / divergent state
 
+Plus one out-of-taxonomy bucket:
+  INFRASTRUCTURE     — the LLM provider or transport itself failed (429, 5xx,
+                       connection errors). These are harness conditions, not
+                       agent behaviour, and are reported separately from the
+                       *injected* tool-call faults.
+
 Usage::
 
     classifier = FailureClassifier()
@@ -44,6 +50,7 @@ class FailureCategory(StrEnum):
     CONTEXT = "context"
     LATENCY = "latency"
     CONSISTENCY = "consistency"
+    INFRASTRUCTURE = "infrastructure"  # LLM provider / transport failure, not agent behaviour
     UNKNOWN = "unknown"
 
 
@@ -109,10 +116,20 @@ _EXCEPTION_RULES: list[tuple[str, FailureCategory, FailureSeverity]] = [
     ("LostStateError", FailureCategory.CONTEXT, FailureSeverity.MEDIUM),
     ("HallucinatedHistoryError", FailureCategory.CONTEXT, FailureSeverity.MEDIUM),
     ("ContextError", FailureCategory.CONTEXT, FailureSeverity.MEDIUM),
-    # Common LangChain / LLM API exceptions
-    ("RateLimitError", FailureCategory.TOOL_CALL, FailureSeverity.MEDIUM),
-    ("APITimeoutError", FailureCategory.TOOL_CALL, FailureSeverity.HIGH),
-    ("APIConnectionError", FailureCategory.TOOL_CALL, FailureSeverity.HIGH),
+    # LLM provider / transport exceptions (openai, anthropic, httpx, ollama clients).
+    # These are infrastructure events, deliberately NOT tool-call faults, so a
+    # provider-side 429 is never confused with an injected ToolCallRateLimited.
+    ("RateLimitError", FailureCategory.INFRASTRUCTURE, FailureSeverity.MEDIUM),
+    ("APITimeoutError", FailureCategory.INFRASTRUCTURE, FailureSeverity.HIGH),
+    ("APIConnectionError", FailureCategory.INFRASTRUCTURE, FailureSeverity.HIGH),
+    ("APIStatusError", FailureCategory.INFRASTRUCTURE, FailureSeverity.HIGH),
+    ("InternalServerError", FailureCategory.INFRASTRUCTURE, FailureSeverity.HIGH),
+    ("ServiceUnavailableError", FailureCategory.INFRASTRUCTURE, FailureSeverity.HIGH),
+    ("AuthenticationError", FailureCategory.INFRASTRUCTURE, FailureSeverity.CRITICAL),
+    ("ResponseError", FailureCategory.INFRASTRUCTURE, FailureSeverity.HIGH),
+    ("ConnectError", FailureCategory.INFRASTRUCTURE, FailureSeverity.HIGH),
+    ("ConnectTimeout", FailureCategory.INFRASTRUCTURE, FailureSeverity.HIGH),
+    ("ReadTimeout", FailureCategory.INFRASTRUCTURE, FailureSeverity.HIGH),
     ("BadRequestError", FailureCategory.CONTEXT, FailureSeverity.MEDIUM),
     ("InvalidRequestError", FailureCategory.CONTEXT, FailureSeverity.MEDIUM),
     ("GraphRecursionError", FailureCategory.ORCHESTRATION, FailureSeverity.CRITICAL),

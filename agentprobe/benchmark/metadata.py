@@ -59,6 +59,11 @@ class ExperimentMetadata:
     # Dependency versions
     dependency_versions: dict[str, str] = field(default_factory=dict)
 
+    #: Provider description from :meth:`agentprobe.llm.LLMSpec.describe`
+    #: (provider, exact model id, base URL, key *variable name*, throttle).
+    #: Empty for batches recorded before provider support was added.
+    llm_spec: dict[str, Any] = field(default_factory=dict)
+
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["frameworks"] = list(d["frameworks"])
@@ -150,6 +155,9 @@ def _get_dependency_versions() -> dict[str, str]:
         "langchain",
         "langchain_core",
         "langchain_community",
+        "langchain_openai",
+        "langchain_anthropic",
+        "openai",
         "opentelemetry",
         "pydantic",
         "numpy",
@@ -179,11 +187,21 @@ def capture_metadata(
     frameworks: list[str] | None = None,
     n_runs_per_cell: int = 10,
     seed: int = 42,
+    llm_spec: Any = None,
 ) -> ExperimentMetadata:
     """Capture full experiment metadata snapshot.
 
     Call this once at experiment start and save alongside results.
+
+    Args:
+        llm_spec: Optional :class:`agentprobe.llm.LLMSpec`; when given, its
+            ``describe()`` output is stored and ``llm_backend``/``model`` are
+            taken from it so hosted batches record the exact model id and
+            endpoint that produced them.
     """
+    if llm_spec is not None:
+        llm_backend = llm_spec.provider
+        model = llm_spec.model
     git_hash, git_branch, git_dirty = _get_git_info()
 
     try:
@@ -211,4 +229,5 @@ def capture_metadata(
         seed=seed,
         timestamp_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         dependency_versions=_get_dependency_versions(),
+        llm_spec=llm_spec.describe() if llm_spec is not None else {},
     )

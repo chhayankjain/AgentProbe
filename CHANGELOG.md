@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- `agentprobe.llm`: provider-agnostic LLM construction (`LLMSpec`, `build_chat_model`, `autogen_llm_config`) with presets for Ollama, OpenAI, Groq, OpenRouter, Cerebras, Mistral, GitHub Models, Google AI Studio (Gemini), Anthropic, and any OpenAI-compatible server. All five experiment scripts take `--provider/--model/--base-url/--api-key-env/--rpm/--max-retries/--llm-timeout`; the default is byte-for-byte the paper's Ollama setup
+- LLM backend errors (429/5xx/connection) are distinguished from injected tool faults: the runner re-dispatches the trial (`BenchmarkConfig.backend_error_retries`, backoff), then records `status="backend_error"` / category `infrastructure`; `MetricsCalculator` excludes them and reports `n_backend_errors`. `FailureClassifier` gains `FailureCategory.INFRASTRUCTURE`
+- `experiment_metadata.json` records the exact backend (`llm_provider`, `model_id`, `llm_base_url`, key variable name, throttle); `--resume` rejects a changed provider or endpoint
+
+### Changed
+- `run_benchmarks.py --llm {ollama,openai,anthropic}` replaced by `--provider` (same defaults)
+- Provider exceptions (`RateLimitError`, `APITimeoutError`, `APIConnectionError`, …) now classify as `infrastructure` instead of `tool_call`
+
 ## [1.2.0] - 2026-11-14
 
 First release published to PyPI, as **`agentprobe-toolkit`** (the name `agentprobe` was already

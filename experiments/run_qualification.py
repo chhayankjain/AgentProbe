@@ -50,6 +50,13 @@ from agentprobe.injector.tool_failure import (
     ToolFailureConfig,
     ToolFailureType,
 )
+from agentprobe.llm import (
+    LLMSpec,
+    add_llm_args,
+    autogen_llm_config,
+    build_chat_model,
+    spec_from_args,
+)
 
 # ---------------------------------------------------------------------------
 # Controlled tasks: answers require calculator tool execution
@@ -132,29 +139,36 @@ def spans_to_dicts(exporter: InMemorySpanExporter) -> list[dict[str, Any]]:
 # Agent builders
 # ---------------------------------------------------------------------------
 
+_ACTIVE_LLM_SPEC: LLMSpec | None = None
+
+
+def set_active_llm_spec(spec: LLMSpec) -> None:
+    global _ACTIVE_LLM_SPEC
+    _ACTIVE_LLM_SPEC = spec
+
+
+def resolve_llm_spec(model: str, llm_spec: LLMSpec | None = None) -> LLMSpec:
+    if llm_spec is not None:
+        return llm_spec
+    if _ACTIVE_LLM_SPEC is not None and _ACTIVE_LLM_SPEC.model == model:
+        return _ACTIVE_LLM_SPEC
+    return LLMSpec.from_provider("ollama", model=model)
+
+
 def build_agent(framework: str, model: str,
-                failure_config: ToolFailureConfig | None) -> Any:
+                failure_config: ToolFailureConfig | None,
+                llm_spec: LLMSpec | None = None) -> Any:
+    spec = resolve_llm_spec(model, llm_spec)
     if framework == "langgraph":
-        from langchain_ollama import ChatOllama
         from agentprobe.agents.langgraph_agent import LangGraphToolAgent
-        llm = ChatOllama(model=model, temperature=0.0)
-        return LangGraphToolAgent(llm=llm, failure_config=failure_config)
+        return LangGraphToolAgent(llm=build_chat_model(spec), failure_config=failure_config)
     elif framework == "langchain":
-        from langchain_ollama import ChatOllama
         from agentprobe.agents.langchain_agent import LangChainToolAgent
-        llm = ChatOllama(model=model, temperature=0.0)
-        return LangChainToolAgent(llm=llm, failure_config=failure_config)
+        return LangChainToolAgent(llm=build_chat_model(spec), failure_config=failure_config)
     elif framework == "autogen":
         from agentprobe.agents.autogen_agent import AutoGenToolAgent
-        llm_config = {
-            "config_list": [{
-                "model": model,
-                "api_base": "http://localhost:11434/v1",
-                "api_key": "ollama",
-            }]
-        }
         return AutoGenToolAgent(
-            llm_config=llm_config, failure_config=failure_config
+            llm_config=autogen_llm_config(spec), failure_config=failure_config
         )
     else:
         raise ValueError(f"Unknown framework: {framework}")
@@ -366,8 +380,12 @@ def main() -> None:
         default=["langgraph", "langchain", "autogen"],
         choices=["langgraph", "langchain", "autogen"],
     )
-    parser.add_argument("--model", default="llama3.1")
+    add_llm_args(parser, default_model="llama3.1")
     args = parser.parse_args()
+    llm_spec = spec_from_args(args)
+    set_active_llm_spec(llm_spec)
+    if not llm_spec.is_local:
+        llm_spec.resolve_api_key()
 
     # Setup tracing with in-memory exporter
     provider, span_exporter = setup_tracing()
@@ -448,6 +466,7 @@ def main() -> None:
     result = {
         "qualification_timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "model": args.model,
+        "llm": llm_spec.describe(),
         "frameworks": args.frameworks,
         "tasks": QUALIFICATION_TASKS,
         "baseline_config": {
