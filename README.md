@@ -237,7 +237,8 @@ exporter.record_benchmark_run(results)
 | Cerebras | `cerebras` | `.[openai]` | **No** | `CEREBRAS_API_KEY` |
 | Mistral | `mistral` | `.[openai]` | **No** | `MISTRAL_API_KEY` |
 | GitHub Models | `github` | `.[openai]` | **No** | `GITHUB_TOKEN` with the `models` permission |
-| Google AI Studio (Gemini) | `gemini` | `.[openai]` | **No** | `GEMINI_API_KEY`, via Google's OpenAI-compatible endpoint |
+| Google AI Studio (Gemini), AutoGen adapter | `gemini` | none | **No** | `GEMINI_API_KEY`, via Google's OpenAI-compatible endpoint; works with pyautogen's legacy client |
+| Google AI Studio (Gemini), LangGraph/LangChain adapters | `google` | `.[google]` | **No** | `GEMINI_API_KEY`, native `langchain-google-genai`. Required for Gemini 3 models: their tool calls carry thought signatures that the OpenAI-compatible endpoint drops on the second turn (HTTP 400) |
 | Anthropic (Claude) | `anthropic` | `.[anthropic]` | **No** | `ANTHROPIC_API_KEY`; LangGraph/LangChain adapters only |
 
 ### Hosted backends
@@ -254,9 +255,10 @@ python experiments/smoke_test_model.py --provider groq --model llama-3.3-70b-ver
 python experiments/run_experiment_v2.py --provider groq --model llama-3.3-70b-versatile --rpm 25 \
     --frameworks langgraph langchain
 
-# Google AI Studio
+# Google AI Studio: native client for LangGraph/LangChain, OpenAI-compatible endpoint for AutoGen
 export GEMINI_API_KEY=...
-python experiments/run_experiment_v2.py --provider gemini --model gemini-2.5-flash --frameworks langgraph langchain
+python experiments/run_experiment_v2.py --provider google --model gemini-flash-lite-latest --rpm 10 --frameworks langgraph langchain
+python experiments/run_experiment_v2.py --provider gemini --model gemini-flash-lite-latest --rpm 10 --frameworks autogen
 
 # Anything OpenAI-compatible
 python experiments/run_experiment_v2.py --provider openai-compatible --base-url http://localhost:8000/v1 \
@@ -272,6 +274,8 @@ Three things the harness does for hosted runs:
 - **AutoGen works with any OpenAI-compatible provider** through `api_base`, so hosted AutoGen runs need no extra packages. LangGraph/LangChain hosted runs need `langchain-openai` (`openai>=1`), which conflicts with the `[autogen]` extra (`openai<1`): use a separate environment for those.
 
 Hosted models change silently and are not seed-reproducible; treat hosted batches as a snapshot, not a replication of the paper.
+
+Free-tier notes from testing (November 2026): Google AI Studio's `gemini-3-flash-preview` allows 20 requests per day per project, enough for a smoke test but not a batch; the `*-flash-lite` models have separate, larger quotas, shown only inside AI Studio. Google now issues keys starting with `AQ.` as well as `AIza`. Groq's free tier is capped by tokens per day. Check the per-model quota in the provider console before launching a 450-run batch.
 
 ## Running Tests
 

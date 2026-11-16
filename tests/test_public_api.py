@@ -98,6 +98,39 @@ class TestSingleToolFailureConfig:
         assert injector.summary()["injected_failures"] == 1
 
 
+class TestMessageText:
+    """Gemini/Anthropic return content blocks; adapters must emit plain text."""
+
+    def test_plain_string_passthrough(self):
+        from langchain_core.messages import AIMessage
+
+        from agentprobe.agents.base import message_text
+
+        assert message_text(AIMessage(content="Paris")) == "Paris"
+
+    def test_content_blocks_joined_and_extras_dropped(self):
+        from langchain_core.messages import AIMessage
+
+        from agentprobe.agents.base import message_text
+
+        msg = AIMessage(
+            content=[
+                {"type": "text", "text": "The result is ", "extras": {"signature": "abc"}},
+                {"type": "text", "text": "4."},
+                {"type": "tool_use", "id": "x", "name": "calculator", "input": {}},
+            ]
+        )
+        assert message_text(msg) == "The result is 4."
+
+    def test_empty_and_none(self):
+        from langchain_core.messages import AIMessage
+
+        from agentprobe.agents.base import message_text
+
+        assert message_text(AIMessage(content="")) == ""
+        assert message_text(AIMessage(content=[])) == ""
+
+
 class TestAgentResult:
     def test_successful_result(self):
         r = AgentResult(success=True, output="42", duration_ms=100.0)

@@ -39,6 +39,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
+from agentprobe.agents.base import message_text
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
 from agentprobe.observer.tracer import get_tracer
 
@@ -154,7 +155,7 @@ class LangGraphToolAgent:
 
             final_message = result["messages"][-1]
             return {
-                "output": getattr(final_message, "content", str(final_message)),
+                "output": message_text(final_message),
                 "latency_ms": latency_ms,
                 "framework": self.framework,
             }

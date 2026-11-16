@@ -10,6 +10,10 @@ so one ``--provider/--model/--base-url/--api-key-env`` set of flags covers:
   ``mistral``, ``github`` (GitHub Models) and ``gemini`` (Google AI Studio's
   OpenAI-compatible endpoint). Use ``openai-compatible`` with an explicit
   ``--base-url`` for anything else (vLLM, LM Studio, llama.cpp server, ...).
+* **google** via ``langchain-google-genai`` (LangGraph/LangChain adapters only). Use this,
+  not ``gemini``, for Gemini 3 models with the LangChain adapters: their tool calls carry
+  *thought signatures* that must be echoed back, which the OpenAI-compatible endpoint
+  loses after the first turn (HTTP 400). AutoGen's legacy client works with ``gemini``.
 * **anthropic** via ``langchain-anthropic`` (LangGraph/LangChain adapters only).
 
 Two things matter when a hosted backend is used in a fault-injection study:
@@ -100,9 +104,18 @@ PROVIDER_PRESETS: dict[str, ProviderPreset] = {
         note="GitHub Models. A fine-grained PAT with 'models' permission.",
     ),
     "gemini": ProviderPreset(
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai",
         api_key_env="GEMINI_API_KEY",
         note="Google AI Studio's OpenAI-compatible endpoint.",
+    ),
+    "google": ProviderPreset(
+        base_url=None,
+        api_key_env="GEMINI_API_KEY",
+        openai_compatible=False,
+        note="Native Gemini client (langchain-google-genai). Required for the LangGraph/"
+        "LangChain adapters on Gemini 3 models, whose tool calls carry thought signatures "
+        "that the OpenAI-compatible endpoint drops on the second turn. AutoGen uses the "
+        "'gemini' preset instead.",
     ),
     "anthropic": ProviderPreset(
         base_url=None,
@@ -191,7 +204,9 @@ class LLMSpec:
 
     @property
     def resolved_base_url(self) -> str | None:
-        return self.base_url or self.preset.base_url
+        url = self.base_url or self.preset.base_url
+        # Clients append "/chat/completions"; a trailing slash yields "//" and a 404.
+        return url.rstrip("/") if url else None
 
     def resolve_api_key(self) -> str:
         """Return the API key from the environment, or a placeholder for local Ollama.
@@ -283,6 +298,27 @@ def build_chat_model(spec: LLMSpec) -> Any:
             kwargs["rate_limiter"] = limiter
         return ChatAnthropic(**kwargs)
 
+    if spec.provider == "google":
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+        except ImportError as e:  # pragma: no cover
+            raise ImportError(
+                "langchain-google-genai is required for provider 'google': "
+                'pip install "agentprobe-toolkit[google]"'
+            ) from e
+        kwargs = {
+            "model": spec.model,
+            "temperature": spec.temperature,
+            "google_api_key": spec.resolve_api_key(),
+            "max_retries": spec.max_retries,
+        }
+        if spec.timeout_seconds is not None:
+            kwargs["timeout"] = spec.timeout_seconds
+        limiter = _rate_limiter(spec)
+        if limiter is not None:
+            kwargs["rate_limiter"] = limiter
+        return ChatGoogleGenerativeAI(**kwargs)
+
     # Every other provider is OpenAI-compatible.
     try:
         from langchain_openai import ChatOpenAI
@@ -329,6 +365,22 @@ def autogen_llm_config(spec: LLMSpec) -> dict[str, Any]:
     if spec.timeout_seconds is not None:
         cfg["request_timeout"] = spec.timeout_seconds
     return cfg
+
+
+def autogen_agent_kwargs(spec: LLMSpec) -> dict[str, Any]:
+    """Extra constructor kwargs for :class:`~agentprobe.agents.autogen_agent.AutoGenToolAgent`.
+
+    Gemini's OpenAI-compatible endpoint rejects a request that ends with a
+    model turn (HTTP 400). pyautogen's user proxy replies to a finished answer
+    with an *empty* message, which Gemini drops, so the follow-up request ends
+    with the assistant's own answer and the adapter would spin in pyautogen's
+    retry loop. For that provider the conversation therefore terminates at the
+    first text-only assistant reply. Every other provider keeps the paper's
+    behaviour (loop until ``max_turns``).
+    """
+    if spec.provider == "gemini":
+        return {"stop_on_final_answer": True}
+    return {}
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +512,7 @@ __all__ = [
     "OLLAMA_OPENAI_COMPAT_URL",
     "build_chat_model",
     "autogen_llm_config",
+    "autogen_agent_kwargs",
     "is_llm_backend_error",
     "add_llm_args",
     "spec_from_args",

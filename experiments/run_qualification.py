@@ -53,6 +53,7 @@ from agentprobe.injector.tool_failure import (
 from agentprobe.llm import (
     LLMSpec,
     add_llm_args,
+    autogen_agent_kwargs,
     autogen_llm_config,
     build_chat_model,
     spec_from_args,
@@ -168,7 +169,9 @@ def build_agent(framework: str, model: str,
     elif framework == "autogen":
         from agentprobe.agents.autogen_agent import AutoGenToolAgent
         return AutoGenToolAgent(
-            llm_config=autogen_llm_config(spec), failure_config=failure_config
+            llm_config=autogen_llm_config(spec),
+            failure_config=failure_config,
+            **autogen_agent_kwargs(spec),
         )
     else:
         raise ValueError(f"Unknown framework: {framework}")

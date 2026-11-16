@@ -3,7 +3,10 @@
 ## [Unreleased]
 
 ### Added
-- `agentprobe.llm`: provider-agnostic LLM construction (`LLMSpec`, `build_chat_model`, `autogen_llm_config`) with presets for Ollama, OpenAI, Groq, OpenRouter, Cerebras, Mistral, GitHub Models, Google AI Studio (Gemini), Anthropic, and any OpenAI-compatible server. All five experiment scripts take `--provider/--model/--base-url/--api-key-env/--rpm/--max-retries/--llm-timeout`; the default is byte-for-byte the paper's Ollama setup
+- `agentprobe.llm`: provider-agnostic LLM construction (`LLMSpec`, `build_chat_model`, `autogen_llm_config`) with presets for Ollama, OpenAI, Groq, OpenRouter, Cerebras, Mistral, GitHub Models, Google AI Studio (`gemini` = OpenAI-compatible endpoint for AutoGen; `google` = native `langchain-google-genai` for LangGraph/LangChain, new `[google]` extra), Anthropic, and any OpenAI-compatible server.
+- `agentprobe.agents.base.message_text()`: adapters return plain text even when a provider (Gemini, Anthropic) returns content blocks
+- AutoGen compatibility shim restores provider extras (Gemini 3 thought signatures) on echoed function calls, which Gemini otherwise rejects with HTTP 400; Ollama requests are unchanged
+- `AutoGenToolAgent(stop_on_final_answer=True)` (set automatically for `--provider gemini` via `autogen_agent_kwargs`) ends the two-agent chat at the first text-only reply, because Gemini rejects requests that end with a model turn; the paper's loop-until-`max_turns` behaviour remains the default All five experiment scripts take `--provider/--model/--base-url/--api-key-env/--rpm/--max-retries/--llm-timeout`; the default is byte-for-byte the paper's Ollama setup
 - LLM backend errors (429/5xx/connection) are distinguished from injected tool faults: the runner re-dispatches the trial (`BenchmarkConfig.backend_error_retries`, backoff), then records `status="backend_error"` / category `infrastructure`; `MetricsCalculator` excludes them and reports `n_backend_errors`. `FailureClassifier` gains `FailureCategory.INFRASTRUCTURE`
 - `experiment_metadata.json` records the exact backend (`llm_provider`, `model_id`, `llm_base_url`, key variable name, throttle); `--resume` rejects a changed provider or endpoint
 

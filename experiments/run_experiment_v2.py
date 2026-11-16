@@ -46,7 +46,14 @@ from rich.console import Console
 from rich.table import Table
 
 from agentprobe.benchmark.grader import ResponseGrader
-from agentprobe.llm import LLMSpec, add_llm_args, autogen_llm_config, build_chat_model, spec_from_args
+from agentprobe.llm import (
+    LLMSpec,
+    add_llm_args,
+    autogen_agent_kwargs,
+    autogen_llm_config,
+    build_chat_model,
+    spec_from_args,
+)
 from agentprobe.benchmark.metrics import MetricsCalculator
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, RunResult
 from agentprobe.benchmark.metadata import capture_metadata
@@ -166,8 +173,12 @@ def build_agent(framework: str, llm: Any, failure_config: ToolFailureConfig | No
         return LangChainToolAgent(llm=llm, failure_config=failure_config)
     elif framework == "autogen":
         from agentprobe.agents.autogen_agent import AutoGenToolAgent
-        llm_config = autogen_llm_config(resolve_llm_spec(model, llm_spec))
-        return AutoGenToolAgent(llm_config=llm_config, failure_config=failure_config)
+        spec = resolve_llm_spec(model, llm_spec)
+        return AutoGenToolAgent(
+            llm_config=autogen_llm_config(spec),
+            failure_config=failure_config,
+            **autogen_agent_kwargs(spec),
+        )
     else:
         raise ValueError(f"Unknown framework: {framework}")
 

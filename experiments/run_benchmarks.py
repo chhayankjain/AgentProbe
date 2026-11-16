@@ -45,7 +45,14 @@ from agentprobe.benchmark.metrics import MetricsCalculator
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner
 from agentprobe.benchmark.tasks import corpus_task_fn
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
-from agentprobe.llm import LLMSpec, add_llm_args, autogen_llm_config, build_chat_model, spec_from_args
+from agentprobe.llm import (
+    LLMSpec,
+    add_llm_args,
+    autogen_agent_kwargs,
+    autogen_llm_config,
+    build_chat_model,
+    spec_from_args,
+)
 from agentprobe.observer.tracer import AgentProbeTracer
 
 _console = Console()
@@ -114,7 +121,11 @@ def build_agent(
     elif framework == "autogen":
         from agentprobe.agents.autogen_agent import AutoGenToolAgent
 
-        return AutoGenToolAgent(llm_config=autogen_llm_config(spec), failure_config=failure_config)
+        return AutoGenToolAgent(
+            llm_config=autogen_llm_config(spec),
+            failure_config=failure_config,
+            **autogen_agent_kwargs(spec),
+        )
     else:
         raise ValueError(f"Unknown framework: {framework}")
 

@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
-from agentprobe.llm import add_llm_args, autogen_llm_config, build_chat_model, spec_from_args
+from agentprobe.llm import add_llm_args, autogen_agent_kwargs, autogen_llm_config, build_chat_model, spec_from_args
 
 
 def main() -> None:
@@ -54,7 +54,11 @@ def main() -> None:
                     agent = LangChainToolAgent(llm=llm, failure_config=config)
             else:
                 from agentprobe.agents.autogen_agent import AutoGenToolAgent
-                agent = AutoGenToolAgent(llm_config=autogen_llm_config(spec), failure_config=config)
+                agent = AutoGenToolAgent(
+                    llm_config=autogen_llm_config(spec),
+                    failure_config=config,
+                    **autogen_agent_kwargs(spec),
+                )
 
             result = agent.invoke({"input": query})
             elapsed = time.perf_counter() - start

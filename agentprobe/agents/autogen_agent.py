@@ -54,14 +54,50 @@ _tracer = get_tracer(__name__)
 
 _COMPAT_PATCHED = False
 
+# Providers such as Gemini 3 attach provider extras (a ``thought_signature``
+# under ``extra_content``) to each tool call and reject the next request unless
+# the echoed function call carries them. pyautogen 0.1.14 stores only the legacy
+# ``function_call`` {name, arguments}, so the shim remembers the full
+# ``tool_calls`` entry per (name, arguments) and restores it on the way out.
+# Entries without extras are never rewritten, so Ollama requests are unchanged.
+_TOOL_CALL_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
+_TOOL_CALL_CACHE_MAX = 256
+
+
+def _remember_tool_call(tool_call: dict[str, Any]) -> None:
+    fn = tool_call.get("function", {})
+    key = (fn.get("name", ""), fn.get("arguments", ""))
+    if len(_TOOL_CALL_CACHE) >= _TOOL_CALL_CACHE_MAX:
+        _TOOL_CALL_CACHE.pop(next(iter(_TOOL_CALL_CACHE)))
+    _TOOL_CALL_CACHE[key] = dict(tool_call)
+
+
+def _restore_tool_calls(messages: list[Any]) -> list[Any]:
+    """Rewrite legacy assistant ``function_call`` messages whose original tool call
+    carried provider extras back into ``tool_calls`` form. Others pass through."""
+    out: list[Any] = []
+    for msg in messages:
+        if isinstance(msg, dict) and msg.get("role") == "assistant" and msg.get("function_call"):
+            fc = msg["function_call"]
+            cached = _TOOL_CALL_CACHE.get((fc.get("name", ""), fc.get("arguments", "")))
+            if cached is not None and cached.get("extra_content"):
+                rewritten = {k: v for k, v in msg.items() if k != "function_call"}
+                rewritten["tool_calls"] = [cached]
+                out.append(rewritten)
+                continue
+        out.append(msg)
+    return out
+
 
 def _patch_openai_compat() -> None:
     """Monkey-patch ``openai.ChatCompletion.create`` to bridge the
     ``functions`` ↔ ``tools`` protocol gap between pyautogen 0.1.14
-    and Ollama's OpenAI-compatible endpoint.
+    and OpenAI-compatible endpoints (Ollama, Gemini, Groq, ...).
 
-    Request:  ``functions`` list → ``tools`` list (wrapped in type/function)
-    Response: ``tool_calls`` list → single ``function_call`` dict
+    Request:  ``functions`` list → ``tools`` list (wrapped in type/function);
+              assistant ``function_call`` → ``tool_calls`` when the original
+              call carried provider extras (thought signatures).
+    Response: ``tool_calls`` list → single ``function_call`` dict.
 
     The patch is idempotent and applied at most once per process.
     """
@@ -81,6 +117,8 @@ def _patch_openai_compat() -> None:
             kwargs["tools"] = [{"type": "function", "function": f} for f in functions]
         # Also remove function_call if present (incompatible with tools)
         kwargs.pop("function_call", None)
+        if isinstance(kwargs.get("messages"), list):
+            kwargs["messages"] = _restore_tool_calls(kwargs["messages"])
 
         resp = _original_create(*args, **kwargs)
 
@@ -90,6 +128,7 @@ def _patch_openai_compat() -> None:
             tool_calls = msg.get("tool_calls")
             if tool_calls and not msg.get("function_call"):
                 first = tool_calls[0]
+                _remember_tool_call(first)
                 fn = first.get("function", {})
                 msg["function_call"] = {
                     "name": fn.get("name", ""),
@@ -111,6 +150,12 @@ class AutoGenToolAgent:
         llm_config: AutoGen llm_config dict (see AutoGen docs).
         failure_config: Optional tool failure injection configuration.
         max_turns: Maximum conversation turns between agents.
+        stop_on_final_answer: End the conversation at the first assistant
+            message that is plain text (no function call). ``False`` (the
+            paper's setting) lets pyautogen's user proxy keep auto-replying
+            with empty messages until ``max_turns``. Required for providers
+            that reject requests ending with a model turn (Gemini); see
+            :func:`agentprobe.llm.autogen_agent_kwargs`.
     """
 
     framework = "autogen"
@@ -120,9 +165,11 @@ class AutoGenToolAgent:
         llm_config: dict[str, Any],
         failure_config: ToolFailureConfig | None = None,
         max_turns: int = 5,
+        stop_on_final_answer: bool = False,
     ) -> None:
         self._llm_config = llm_config
         self._max_turns = max_turns
+        self._stop_on_final_answer = stop_on_final_answer
         self._injector = ToolFailureInjector(failure_config) if failure_config else None
         _patch_openai_compat()
         self._agents = self._build_agents()
@@ -290,11 +337,17 @@ class AutoGenToolAgent:
             )
 
             # Register functions on the user_proxy so it can execute them
+            def _is_final_answer(message: dict[str, Any]) -> bool:
+                return not message.get("function_call") and bool(
+                    (message.get("content") or "").strip()
+                )
+
             user_proxy = autogen.UserProxyAgent(
                 name="user_proxy",
                 human_input_mode="NEVER",
                 max_consecutive_auto_reply=self._max_turns,
                 code_execution_config=False,
+                is_termination_msg=_is_final_answer if self._stop_on_final_answer else None,
                 function_map={
                     "web_search": _web_search,
                     "calculator": _calculator,

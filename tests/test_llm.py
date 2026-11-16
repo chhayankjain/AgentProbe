@@ -12,6 +12,7 @@ from agentprobe.llm import (
     PROVIDER_PRESETS,
     LLMSpec,
     add_llm_args,
+    autogen_agent_kwargs,
     autogen_llm_config,
     build_chat_model,
     is_llm_backend_error,
@@ -71,6 +72,12 @@ class TestLLMSpec:
         assert d["llm_requests_per_minute"] == 20
         assert d["llm_is_local"] is False
 
+    def test_trailing_slash_stripped_from_base_url(self):
+        # Clients append "/chat/completions"; "…/openai/" would become "…/openai//chat/completions" (404).
+        spec = LLMSpec.from_provider("openai-compatible", model="m", base_url="http://h/v1/")
+        assert spec.resolved_base_url == "http://h/v1"
+        assert not LLMSpec.from_provider("gemini", model="m").resolved_base_url.endswith("/")
+
     def test_rpm_must_be_positive(self):
         with pytest.raises(ValueError):
             LLMSpec.from_provider("groq", model="m", requests_per_minute=0)
@@ -97,6 +104,13 @@ class TestBuilders:
     def test_autogen_rejects_non_openai_compatible(self):
         with pytest.raises(ValueError, match="not OpenAI-compatible"):
             autogen_llm_config(LLMSpec.from_provider("anthropic", model="claude"))
+
+    def test_autogen_agent_kwargs_only_for_gemini(self):
+        assert autogen_agent_kwargs(LLMSpec.from_provider("gemini", model="m")) == {
+            "stop_on_final_answer": True
+        }
+        assert autogen_agent_kwargs(LLMSpec.from_provider("ollama", model="m")) == {}
+        assert autogen_agent_kwargs(LLMSpec.from_provider("groq", model="m")) == {}
 
     def test_openai_compatible_chat_model(self, monkeypatch: pytest.MonkeyPatch):
         pytest.importorskip("langchain_openai")
