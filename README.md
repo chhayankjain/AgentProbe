@@ -401,6 +401,10 @@ Phase 2 uses the corrected summaries under `experiments/results_v2/`. The origin
 
 > **Model digests:** All three models use Q4_K_M quantization. Ollama digest prefixes: Llama `46e0c10c039e`, Mistral `6577803aa9a0`, Qwen `845dbda0ea48`. The `experiment_metadata.json` files in historical batches record `model_digest: unknown` because digest capture was added after the experiments ran; the digests listed here were identified post-hoc from the same Ollama installation.
 
+## Roadmap and contributing
+
+The goal: developers keep AgentProbe tests in their CI because they catch failures they care about. Next up is testing your own agent with deterministic fault scenarios (v1.4), then a pytest plugin with readable failure reports (v1.5). See [ROADMAP.md](https://github.com/chhayankjain/AgentProbe/blob/main/ROADMAP.md) for the full plan and [good first issues](https://github.com/chhayankjain/AgentProbe/labels/good%20first%20issue) to get started; no model or API key needed.
+
 ## Citation
 
 ```bibtex
