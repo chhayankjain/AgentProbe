@@ -4,7 +4,6 @@
 
 ### Added
 - `python -m agentprobe.demo`: a 60-second, network-free demo built on `agentprobe.fake_llm.ScriptedToolCallingModel`, a deterministic tool-calling chat model usable in CI and in users' own tests; `examples/quickstart.py` is the copyable version
-- README "Related tools" section comparing AgentProbe with AgentChaos, llmmas-otel, AgentChaosBench, ReliabilityBench, MCP-Injector, AgentCheck, agentic-chaos, agent-chaos, AgentDebugX, and the Princeton reliability metrics
 - `assets/social-preview.png` for the GitHub repository card
 - `agentprobe.llm`: provider-agnostic LLM construction (`LLMSpec`, `build_chat_model`, `autogen_llm_config`) with presets for Ollama, OpenAI, Groq, OpenRouter, Cerebras, Mistral, GitHub Models, Google AI Studio (`gemini` = OpenAI-compatible endpoint for AutoGen; `google` = native `langchain-google-genai` for LangGraph/LangChain, new `[google]` extra), Anthropic, and any OpenAI-compatible server.
 - `agentprobe.agents.base.message_text()`: adapters return plain text even when a provider (Gemini, Anthropic) returns content blocks
