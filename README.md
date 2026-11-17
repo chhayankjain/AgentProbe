@@ -403,7 +403,7 @@ Phase 2 uses the corrected summaries under `experiments/results_v2/`. The origin
 
 ## Roadmap and contributing
 
-The goal: developers keep AgentProbe tests in their CI because they catch failures they care about. Next up is testing your own agent with deterministic fault scenarios (v1.4), then a pytest plugin with readable failure reports (v1.5). See [ROADMAP.md](https://github.com/chhayankjain/AgentProbe/blob/main/ROADMAP.md) for the full plan and [good first issues](https://github.com/chhayankjain/AgentProbe/labels/good%20first%20issue) to get started; no model or API key needed.
+The goal: developers keep AgentProbe tests in their CI because they catch failures they care about. Next up (v1.4) is the smallest end-to-end workflow: add a fault test to the agent you already have, with proof the fault actually fired, and run it in pytest and CI. Design-partner feedback then shapes v1.5. See [ROADMAP.md](https://github.com/chhayankjain/AgentProbe/blob/main/ROADMAP.md) for the full plan and [good first issues](https://github.com/chhayankjain/AgentProbe/labels/good%20first%20issue) to get started; no model or API key needed.
 
 ## Citation
 
