@@ -227,11 +227,55 @@ exporter.record_benchmark_run(results)
 | LangChain | `LangChainToolAgent` | Yes (same models) | Uses `create_agent`, which compiles to LangGraph; shares an execution path with the LangGraph adapter, so results converge |
 | AutoGen | `AutoGenToolAgent` | Yes, with caveats | Targets **pyautogen 0.1.14** through a `functions`→`tools` compatibility shim. Phase 1 found it silently bypassed tools; Phase 2 patched that. Modern `ag2` / `autogen-agentchat` 0.4+ is not yet supported ([roadmap](https://github.com/chhayankjain/AgentProbe/issues/38)) |
 
-| LLM Backend | Install extra | Validated in paper | Notes |
-|-------------|---------------|--------------------|-------|
-| Ollama (Llama 3.1 8B, Mistral 7B, Qwen2.5 7B, Q4_K_M) | `.[ollama]` | Yes | Local, zero API cost. The Phase 2, qualification, and diagnostic scripts are Ollama-only |
-| OpenAI (GPT-4o etc.) | `.[openai]` | **No** | Wired into `run_benchmarks.py --llm openai` for LangGraph/LangChain only; never run for the paper. See [#26](https://github.com/chhayankjain/AgentProbe/issues/26) |
-| Anthropic (Claude) | `.[anthropic]` | **No** | Same as OpenAI |
+| LLM Backend | `--provider` | Install extra | Validated in paper | Notes |
+|-------------|--------------|---------------|--------------------|-------|
+| Ollama (Llama 3.1 8B, Mistral 7B, Qwen2.5 7B, Q4_K_M) | `ollama` (default) | `.[ollama]` | Yes | Local, zero API cost. Every number in the paper comes from this backend |
+| Any OpenAI-compatible server (vLLM, LM Studio, llama.cpp, ...) | `openai-compatible --base-url …` | `.[openai]` | **No** | |
+| OpenAI | `openai` | `.[openai]` | **No** | `OPENAI_API_KEY` |
+| Groq | `groq` | `.[openai]` | **No** | `GROQ_API_KEY`; free tier is token-per-day limited, use `--rpm` |
+| OpenRouter | `openrouter` | `.[openai]` | **No** | `OPENROUTER_API_KEY`; `:free` models share a low daily cap |
+| Cerebras | `cerebras` | `.[openai]` | **No** | `CEREBRAS_API_KEY` |
+| Mistral | `mistral` | `.[openai]` | **No** | `MISTRAL_API_KEY` |
+| GitHub Models | `github` | `.[openai]` | **No** | `GITHUB_TOKEN` with the `models` permission |
+| Google AI Studio (Gemini), AutoGen adapter | `gemini` | none | **No** | `GEMINI_API_KEY`, via Google's OpenAI-compatible endpoint; works with pyautogen's legacy client |
+| Google AI Studio (Gemini), LangGraph/LangChain adapters | `google` | `.[google]` | **No** | `GEMINI_API_KEY`, native `langchain-google-genai`. Required for Gemini 3 models: their tool calls carry thought signatures that the OpenAI-compatible endpoint drops on the second turn (HTTP 400) |
+| Anthropic (Claude) | `anthropic` | `.[anthropic]` | **No** | `ANTHROPIC_API_KEY`; LangGraph/LangChain adapters only |
+
+### Hosted backends
+
+Every experiment script (`run_experiment_v2.py`, `run_qualification.py`, `run_benchmarks.py`, `smoke_test_model.py`, `autogen_diagnostic.py`) takes the same flags, defined in `agentprobe.llm`:
+
+```bash
+# Default: identical to the paper's runs
+python experiments/run_experiment_v2.py --model llama3.1
+
+# Groq free tier, throttled to stay under the daily token budget
+export GROQ_API_KEY=...
+python experiments/smoke_test_model.py --provider groq --model llama-3.3-70b-versatile --frameworks langgraph
+python experiments/run_experiment_v2.py --provider groq --model llama-3.3-70b-versatile --rpm 25 \
+    --frameworks langgraph langchain
+
+# Google AI Studio: native client for LangGraph/LangChain, OpenAI-compatible endpoint for AutoGen
+export GEMINI_API_KEY=...
+python experiments/run_experiment_v2.py --provider google --model gemini-flash-lite-latest --rpm 10 --frameworks langgraph langchain
+python experiments/run_experiment_v2.py --provider gemini --model gemini-flash-lite-latest --rpm 10 --frameworks autogen
+
+# Anything OpenAI-compatible
+python experiments/run_experiment_v2.py --provider openai-compatible --base-url http://localhost:8000/v1 \
+    --api-key-env VLLM_KEY --model my-model
+```
+
+Flags: `--provider`, `--model`, `--base-url`, `--api-key-env`, `--rpm` (client-side throttle), `--max-retries` (client retries on 429/5xx/timeouts, default 6), `--llm-timeout`.
+
+Three things the harness does for hosted runs:
+
+- **Backend errors are not agent failures.** A provider-side 429, 5xx, or connection error that survives client retries is re-dispatched by the runner (`backend_error_retries`, default 2, with backoff), and if it still fails the trial is recorded as `status="backend_error"` with category `infrastructure` and **excluded from every metric**. It is never confused with an *injected* `ToolCallRateLimited`. Conditions with backend errors are marked incomplete.
+- **Exact backend is recorded.** `experiment_metadata.json` gains `llm_provider`, `model_id`, `llm_base_url`, `llm_api_key_env` (the variable *name*, never the key), `llm_requests_per_minute`, so a batch says which hosted model produced it. `--resume` refuses a batch whose provider or endpoint changed.
+- **AutoGen works with any OpenAI-compatible provider** through `api_base`, so hosted AutoGen runs need no extra packages. LangGraph/LangChain hosted runs need `langchain-openai` (`openai>=1`), which conflicts with the `[autogen]` extra (`openai<1`): use a separate environment for those.
+
+Hosted models change silently and are not seed-reproducible; treat hosted batches as a snapshot, not a replication of the paper.
+
+Free-tier notes from testing (November 2026): Google AI Studio's `gemini-3-flash-preview` allows 20 requests per day per project, enough for a smoke test but not a batch; the `*-flash-lite` models have separate, larger quotas, shown only inside AI Studio. Google now issues keys starting with `AQ.` as well as `AIza`. Groq's free tier is capped by tokens per day. Check the per-model quota in the provider console before launching a 450-run batch.
 
 ## Running Tests
 
@@ -262,14 +306,14 @@ python experiments/run_benchmarks.py \
     --frameworks langgraph langchain \
     --tasks tool_use rag multi_agent \
     --failure-types none timeout malformed_output rate_limit api_error \
-    --n-runs 30 --llm ollama --model llama3.1 --save-results
+    --n-runs 30 --provider ollama --model llama3.1 --save-results
 
 # AutoGen (10 runs per condition)
 python experiments/run_benchmarks.py \
     --frameworks autogen \
     --tasks tool_use rag multi_agent \
     --failure-types none timeout malformed_output rate_limit api_error \
-    --n-runs 10 --llm ollama --model llama3.1 --save-results
+    --n-runs 10 --provider ollama --model llama3.1 --save-results
 ```
 
 ### Phase 2 — Patched Validation (450 runs)

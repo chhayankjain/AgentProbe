@@ -44,6 +44,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 
 from agentprobe.benchmark.metrics import _percentile
+from agentprobe.llm import is_llm_backend_error
 from agentprobe.observer.classifier import FailureClassifier
 from agentprobe.observer.tracer import get_tracer
 
@@ -71,10 +72,14 @@ class _HarnessTimeout(Exception):
 class RunResult:
     """Result of a single benchmark run (one agent invocation).
 
-    The ``status`` field distinguishes executed trials from those skipped
-    after a harness timeout aborted the condition:
-      - ``"completed"`` — trial was dispatched and finished (success or failure).
-      - ``"skipped"``   — trial was never dispatched (prior timeout lingering).
+    The ``status`` field distinguishes executed trials from those that
+    produced no valid observation:
+      - ``"completed"``     — trial was dispatched and finished (success or failure).
+      - ``"skipped"``       — trial was never dispatched (prior timeout lingering).
+      - ``"backend_error"`` — the LLM provider/transport failed (429, 5xx,
+        connection error) even after in-place retries. This is an
+        infrastructure event, not an agent failure, and is kept separate from
+        *injected* tool faults.
 
     Only ``"completed"`` trials should be included in error-rate, recovery,
     and latency calculations.
@@ -94,6 +99,7 @@ class RunResult:
     recovery_latency_ms: float = 0.0
     recovery_output: str = ""
     output: str = ""
+    backend_retries: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -112,6 +118,7 @@ class RunResult:
             "recovery_latency_ms": round(self.recovery_latency_ms, 2),
             "recovery_output": self.recovery_output,
             "output": self.output,
+            "backend_retries": self.backend_retries,
         }
 
 
@@ -130,6 +137,12 @@ class BenchmarkConfig:
         timeout_per_run_seconds: Wall-clock timeout per run.
         seed: Global RNG seed for reproducibility.
         save_results_path: If set, writes CSV/JSON results to this path.
+        backend_error_retries: How many times to re-dispatch a trial whose
+            *LLM provider* failed (429/5xx/connection error) before recording
+            it as ``status="backend_error"``. Injected tool faults never
+            trigger this path.
+        backend_error_backoff_seconds: Sleep before each backend-error
+            re-dispatch (doubles each attempt).
     """
 
     framework: str = "langgraph"
@@ -140,6 +153,8 @@ class BenchmarkConfig:
     timeout_per_run_seconds: float = 60.0
     seed: int = 42
     save_results_path: str | None = None
+    backend_error_retries: int = 2
+    backend_error_backoff_seconds: float = 30.0
 
 
 # ---------------------------------------------------------------------------
@@ -228,6 +243,35 @@ class BenchmarkRunner:
     # ------------------------------------------------------------------
 
     def _run_single(self, run_id: int, failure_type: str) -> RunResult:
+        """Run one trial, re-dispatching on LLM backend errors.
+
+        A provider-side failure (rate limit, 5xx, connection reset) is not an
+        observation about the agent, so the trial is retried in place up to
+        ``backend_error_retries`` times with exponential backoff. If it still
+        fails, the trial is recorded with ``status="backend_error"`` and
+        excluded from all metrics.
+        """
+        cfg = self.config
+        attempt = 0
+        while True:
+            result = self._run_single_once(run_id, failure_type)
+            if result.status != "backend_error":
+                result.backend_retries = attempt
+                return result
+            if attempt >= cfg.backend_error_retries or self._invocation_hung:
+                result.backend_retries = attempt
+                return result
+            delay = cfg.backend_error_backoff_seconds * (2**attempt)
+            _console.print(
+                f"  [yellow]LLM backend error on run {run_id} "
+                f"({result.exception_type}); retrying in {delay:.0f}s "
+                f"({attempt + 1}/{cfg.backend_error_retries})[/yellow]"
+            )
+            if delay > 0:
+                time.sleep(delay)
+            attempt += 1
+
+    def _run_single_once(self, run_id: int, failure_type: str) -> RunResult:
         cfg = self.config
         task_input = self._task_fn(run_id, cfg.task)
 
@@ -255,6 +299,20 @@ class BenchmarkRunner:
                 )
             except Exception as exc:
                 latency_ms = (time.perf_counter() - start) * 1000
+                if not isinstance(exc, _HarnessTimeout) and is_llm_backend_error(exc):
+                    # Infrastructure failure: no recovery attempt, not an agent failure.
+                    return RunResult(
+                        run_id=run_id,
+                        framework=cfg.framework,
+                        task=cfg.task,
+                        failure_type=failure_type,
+                        success=False,
+                        latency_ms=latency_ms,
+                        status="backend_error",
+                        failure_category="infrastructure",
+                        exception_type=type(exc).__name__,
+                        exception_msg=str(exc)[:200],
+                    )
                 category = "unknown"
                 if self._classifier is not None:
                     event = self._classifier.classify_exception(exc, framework=cfg.framework)
@@ -349,7 +407,8 @@ class BenchmarkRunner:
 
     def _summary_line(self, results: list[RunResult]) -> str:
         executed = [r for r in results if r.status == "completed"]
-        skipped = len(results) - len(executed)
+        backend_errors = sum(1 for r in results if r.status == "backend_error")
+        skipped = len(results) - len(executed) - backend_errors
         total = len(executed)
         failures = sum(1 for r in executed if not r.success)
         rate = failures / total if total > 0 else 0.0
@@ -364,6 +423,8 @@ class BenchmarkRunner:
         )
         if skipped:
             line += f" | [yellow]{skipped} skipped (condition incomplete)[/yellow]"
+        if backend_errors:
+            line += f" | [red]{backend_errors} LLM backend errors (excluded)[/red]"
         return line
 
     def _save(self, results: list[RunResult], path: str) -> None:

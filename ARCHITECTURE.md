@@ -43,7 +43,7 @@ flowchart TB
     end
 
     subgraph EXT["external"]
-        LLM["LLM backend<br/>Ollama (paper) · OpenAI-compatible"]
+        LLM["LLM backend via llm.py<br/>Ollama (paper) · Groq · OpenRouter · Gemini ·<br/>any OpenAI-compatible · Anthropic"]
         OTELB["Jaeger / Tempo<br/>OTLP :4317"]
         PROMS["Prometheus → Grafana"]
     end
@@ -287,6 +287,10 @@ metadata.py    — ExperimentMetadata capture (model, seed, git commit, pip free
 **Two prompt sets.** The runner's default `task_fn` is `paper_task_fn`, which cycles the five prompts per task in `runner.PAPER_PROMPTS`. Every batch reported in the paper used this set. The larger graded corpora are available via `corpus_task_fn(task)` but have not been used in a published experiment.
 
 **Metric definitions.** "Failure" means the agent invocation raised an exception that reached the harness. "Recovery" means the harness's single re-invocation succeeded. MTTR is the mean latency of successful re-invocations. P99 is ceiling nearest-rank, so for n < 100 it equals the sample maximum. `recovery_rate` is `None` when a condition had no failures.
+
+### `agentprobe/llm.py` — provider-agnostic backends
+
+`LLMSpec` describes a backend (provider preset, exact model id, endpoint, key *variable*, throttle, retries); `build_chat_model()` returns the LangChain model for the LangGraph/LangChain adapters and `autogen_llm_config()` the `llm_config` for AutoGen. Every experiment script takes the same `--provider …` flags via `add_llm_args()`; the default is the paper's local Ollama. `is_llm_backend_error()` is what lets the runner keep provider-side 429/5xx events (recorded as `status="backend_error"`, excluded from metrics) apart from *injected* tool faults.
 
 ### `agentprobe/observer/` — observability
 

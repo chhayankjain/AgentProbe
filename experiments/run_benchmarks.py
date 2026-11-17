@@ -13,7 +13,11 @@ Usage::
     python experiments/run_benchmarks.py --frameworks langgraph --tasks tool_use --baseline-only
 
     # Full matrix with Ollama/Llama 3.1
-    python experiments/run_benchmarks.py --llm ollama --model llama3.1
+    python experiments/run_benchmarks.py --provider ollama --model llama3.1
+
+    # Hosted OpenAI-compatible backend (LangGraph/LangChain; needs langchain-openai)
+    GROQ_API_KEY=... python experiments/run_benchmarks.py --provider groq \
+        --model llama-3.3-70b-versatile --rpm 25 --frameworks langgraph
 
     # Quick smoke test (5 runs per config)
     python experiments/run_benchmarks.py --n-runs 5 --frameworks langgraph --tasks tool_use
@@ -41,6 +45,14 @@ from agentprobe.benchmark.metrics import MetricsCalculator
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner
 from agentprobe.benchmark.tasks import corpus_task_fn
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
+from agentprobe.llm import (
+    LLMSpec,
+    add_llm_args,
+    autogen_agent_kwargs,
+    autogen_llm_config,
+    build_chat_model,
+    spec_from_args,
+)
 from agentprobe.observer.tracer import AgentProbeTracer
 
 _console = Console()
@@ -83,62 +95,37 @@ FAILURE_CONFIGS: dict[str, ToolFailureConfig | None] = {
 # LLM factory
 # ---------------------------------------------------------------------------
 
-def build_llm(llm_backend: str, model: str) -> Any:
-    """Build a LangChain LLM from CLI arguments."""
-    if llm_backend == "ollama":
-        try:
-            from langchain_ollama import ChatOllama
-            return ChatOllama(model=model, temperature=0.0)
-        except ImportError as e:
-            _console.print(
-                "[red]langchain-ollama not installed. "
-                "Run: pip install 'agentprobe[ollama]'[/red]"
-            )
-            raise SystemExit(1) from e
-
-    elif llm_backend == "openai":
-        try:
-            from langchain_openai import ChatOpenAI
-            return ChatOpenAI(model=model, temperature=0.0)
-        except ImportError as e:
-            _console.print("[red]langchain-openai not installed.[/red]")
-            raise SystemExit(1) from e
-
-    elif llm_backend == "anthropic":
-        try:
-            from langchain_anthropic import ChatAnthropic
-            return ChatAnthropic(model=model, temperature=0.0)
-        except ImportError as e:
-            _console.print("[red]langchain-anthropic not installed.[/red]")
-            raise SystemExit(1) from e
-
-    else:
-        raise ValueError(f"Unknown LLM backend: {llm_backend}")
+def build_llm(spec: LLMSpec) -> Any:
+    """LangChain chat model for the LangGraph/LangChain adapters."""
+    try:
+        return build_chat_model(spec)
+    except ImportError as e:
+        _console.print(f"[red]{e}[/red]")
+        sys.exit(1)
 
 
 def build_agent(
     framework: str,
     llm: Any,
     failure_config: ToolFailureConfig | None,
-    model: str = "llama3.1",
-    ollama_base_url: str = "http://localhost:11434/v1",
+    spec: LLMSpec,
 ) -> Any:
     if framework == "langgraph":
         from agentprobe.agents.langgraph_agent import LangGraphToolAgent
+
         return LangGraphToolAgent(llm=llm, failure_config=failure_config)
     elif framework == "langchain":
         from agentprobe.agents.langchain_agent import LangChainToolAgent
+
         return LangChainToolAgent(llm=llm, failure_config=failure_config)
     elif framework == "autogen":
         from agentprobe.agents.autogen_agent import AutoGenToolAgent
-        llm_config = {
-            "config_list": [{
-                "model": model,
-                "api_base": ollama_base_url,
-                "api_key": "ollama",
-            }]
-        }
-        return AutoGenToolAgent(llm_config=llm_config, failure_config=failure_config)
+
+        return AutoGenToolAgent(
+            llm_config=autogen_llm_config(spec),
+            failure_config=failure_config,
+            **autogen_agent_kwargs(spec),
+        )
     else:
         raise ValueError(f"Unknown framework: {framework}")
 
@@ -153,8 +140,7 @@ def run_matrix(
     tasks: list[str],
     failure_types: list[str],
     n_runs: int,
-    llm_backend: str,
-    model: str,
+    spec: LLMSpec,
     save: bool,
     query_set: str = "paper",
 ) -> list[dict[str, Any]]:
@@ -168,11 +154,11 @@ def run_matrix(
     all_metrics = []
 
     for framework in frameworks:
-        llm = build_llm(llm_backend, model)
+        llm = build_llm(spec) if framework in ("langgraph", "langchain") else None
         for task in tasks:
             for ft_name in failure_types:
                 failure_config = FAILURE_CONFIGS[ft_name]
-                agent = build_agent(framework, llm, failure_config, model=model)
+                agent = build_agent(framework, llm, failure_config, spec=spec)
 
                 save_path = (
                     str(RESULTS_DIR / f"{framework}_{task}_{ft_name}")
@@ -250,8 +236,7 @@ def main() -> None:
         choices=list(FAILURE_CONFIGS.keys()),
     )
     parser.add_argument("--n-runs", type=int, default=30)
-    parser.add_argument("--llm", default="ollama", choices=["ollama", "openai", "anthropic"])
-    parser.add_argument("--model", default="llama3.1")
+    add_llm_args(parser, default_model="llama3.1")
     parser.add_argument("--baseline-only", action="store_true")
     parser.add_argument("--save-results", action="store_true")
     parser.add_argument(
@@ -261,6 +246,9 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    spec = spec_from_args(args)
+    if not spec.is_local:
+        spec.resolve_api_key()
 
     if args.baseline_only:
         failure_types = ["none"]
@@ -274,8 +262,7 @@ def main() -> None:
         tasks=args.tasks,
         failure_types=failure_types,
         n_runs=args.n_runs,
-        llm_backend=args.llm,
-        model=args.model,
+        spec=spec,
         save=args.save_results,
         query_set=args.query_set,
     )
@@ -291,10 +278,11 @@ def main() -> None:
         # Save experiment metadata for reproducibility
         meta = capture_metadata(
             model=args.model,
-            llm_backend=args.llm,
+            llm_backend=spec.provider,
             frameworks=args.frameworks,
             n_runs_per_cell=args.n_runs,
             seed=42,
+            llm_spec=spec,
         )
         meta_path = RESULTS_DIR / "experiment_metadata.json"
         with open(meta_path, "w") as f:

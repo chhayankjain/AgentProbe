@@ -29,6 +29,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agentprobe.llm import add_llm_args, spec_from_args
+
 # ---------------------------------------------------------------------------
 # Shared tool definitions (identical for both paths)
 # ---------------------------------------------------------------------------
@@ -138,6 +140,7 @@ def run_direct_client(
     base_url: str,
     task: dict,
     max_turns: int = 5,
+    api_key: str = "ollama",
 ) -> dict[str, Any]:
     """Run a task through the OpenAI-compatible API directly.
 
@@ -152,7 +155,7 @@ def run_direct_client(
     old_base = openai.api_base
     old_key = openai.api_key
     openai.api_base = base_url
-    openai.api_key = "ollama"
+    openai.api_key = api_key
 
     trace: dict[str, Any] = {
         "path": "direct_client",
@@ -283,6 +286,7 @@ def run_autogen_shim(
     base_url: str,
     task: dict,
     max_turns: int = 5,
+    api_key: str = "ollama",
 ) -> dict[str, Any]:
     """Run a task through the full AutoGen adapter pipeline.
 
@@ -327,7 +331,7 @@ def run_autogen_shim(
         "config_list": [{
             "model": model,
             "api_base": base_url,
-            "api_key": "ollama",
+            "api_key": api_key,
         }],
         "functions": LEGACY_FUNCTIONS,
         "temperature": 0.0,
@@ -426,11 +430,16 @@ def run_autogen_shim(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="AutoGen diagnostic: direct client vs shim")
-    parser.add_argument("--model", default="llama3.1")
-    parser.add_argument("--base-url", default="http://localhost:11434/v1")
+    add_llm_args(parser, default_model="llama3.1")
     parser.add_argument("--max-turns", type=int, default=5)
     parser.add_argument("--output-dir", default=None)
     args = parser.parse_args()
+    spec = spec_from_args(args)
+    if not spec.openai_compatible:
+        print(f"Provider {spec.provider!r} is not OpenAI-compatible; this diagnostic needs one.")
+        sys.exit(1)
+    base_url = spec.resolved_base_url
+    api_key = spec.resolve_api_key()
 
     if args.output_dir:
         out_dir = Path(args.output_dir)
@@ -439,7 +448,7 @@ def main() -> None:
         out_dir = Path(__file__).parent / "results_v2" / f"diagnostic_{ts}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"AutoGen diagnostic — model: {args.model}")
+    print(f"AutoGen diagnostic — provider: {spec.provider} · model: {spec.model} · {base_url}")
     print(f"Output: {out_dir}\n")
 
     # -----------------------------------------------------------------------
@@ -459,7 +468,7 @@ def main() -> None:
         label = task["prompt"]
         print(f"  {label}...", end=" ", flush=True)
         try:
-            direct = run_direct_client(args.model, args.base_url, task, args.max_turns)
+            direct = run_direct_client(spec.model, base_url, task, args.max_turns, api_key=api_key)
             print(f"answer_present={direct['answer_present']}, "
                   f"tool_calls={direct['total_tool_calls']}")
         except Exception as e:
@@ -482,7 +491,7 @@ def main() -> None:
         label = task["prompt"]
         print(f"  {label}...", end=" ", flush=True)
         try:
-            autogen_result = run_autogen_shim(args.model, args.base_url, task, args.max_turns)
+            autogen_result = run_autogen_shim(spec.model, base_url, task, args.max_turns, api_key=api_key)
             print(f"answer_present={autogen_result['answer_present']}, "
                   f"tool_calls={autogen_result['total_tool_calls']}")
         except Exception as e:
@@ -504,8 +513,9 @@ def main() -> None:
     # Save full diagnostic
     diagnostic = {
         "metadata": {
-            "model": args.model,
-            "base_url": args.base_url,
+            "model": spec.model,
+            "base_url": base_url,
+            "llm": spec.describe(),
             "max_turns": args.max_turns,
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
             "execution_order": "all_direct_first_then_all_autogen",
@@ -516,7 +526,7 @@ def main() -> None:
         "tasks": all_results,
     }
 
-    out_path = out_dir / f"diagnostic_{args.model.replace(':', '_').replace('/', '_')}.json"
+    out_path = out_dir / f"diagnostic_{spec.model.replace(':', '_').replace('/', '_')}.json"
     with open(out_path, "w") as f:
         json.dump(diagnostic, f, indent=2, default=str)
     print(f"Saved diagnostic to {out_path}")

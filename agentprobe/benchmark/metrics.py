@@ -49,6 +49,7 @@ class AgentMetrics:
     n_planned: int = 0
     n_executed: int = 0
     n_skipped: int = 0
+    n_backend_errors: int = 0  # LLM provider failures (excluded from all rates)
     condition_complete: bool = True
 
     # Failure metrics
@@ -81,6 +82,7 @@ class AgentMetrics:
             "n_planned": self.n_planned,
             "n_executed": self.n_executed,
             "n_skipped": self.n_skipped,
+            "n_backend_errors": self.n_backend_errors,
             "condition_complete": self.condition_complete,
             "failure_rate": round(self.failure_rate, 4),
             "n_failures": self.n_failures,
@@ -145,11 +147,13 @@ class MetricsCalculator:
                 return obj.get(key, default)
             return getattr(obj, key, default)
 
-        # Separate executed from skipped trials
+        # Separate executed trials from skipped ones and LLM backend errors.
+        # Neither of the latter is an observation about the agent.
         n_planned = len(runs)
         executed = [r for r in runs if _get(r, "status", "completed") == "completed"]
-        n_skipped = n_planned - len(executed)
-        condition_complete = n_skipped == 0
+        n_backend_errors = sum(1 for r in runs if _get(r, "status", "completed") == "backend_error")
+        n_skipped = n_planned - len(executed) - n_backend_errors
+        condition_complete = n_skipped == 0 and n_backend_errors == 0
 
         # Compute metrics only from executed trials
         successes = [r for r in executed if _get(r, "success", False)]
@@ -171,6 +175,7 @@ class MetricsCalculator:
             n_planned=n_planned,
             n_executed=n,
             n_skipped=n_skipped,
+            n_backend_errors=n_backend_errors,
             condition_complete=condition_complete,
             failure_rate=failure_rate,
             n_failures=len(failures),

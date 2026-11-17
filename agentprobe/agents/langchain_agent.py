@@ -29,6 +29,7 @@ from typing import Any
 from langchain.agents import create_agent
 from langchain_core.tools import tool
 
+from agentprobe.agents.base import message_text
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
 from agentprobe.observer.tracer import get_tracer
 
@@ -115,9 +116,11 @@ class LangChainToolAgent:
             messages = result.get("messages", [])
             output = ""
             for msg in reversed(messages):
-                if hasattr(msg, "content") and type(msg).__name__ == "AIMessage" and msg.content:
-                    output = msg.content
-                    break
+                if type(msg).__name__ == "AIMessage":
+                    text = message_text(msg)
+                    if text:
+                        output = text
+                        break
 
             return {
                 "output": output,
