@@ -57,29 +57,48 @@ _COMPAT_PATCHED = False
 # Providers such as Gemini 3 attach provider extras (a ``thought_signature``
 # under ``extra_content``) to each tool call and reject the next request unless
 # the echoed function call carries them. pyautogen 0.1.14 stores only the legacy
-# ``function_call`` {name, arguments}, so the shim remembers the full
-# ``tool_calls`` entry per (name, arguments) and restores it on the way out.
-# Entries without extras are never rewritten, so Ollama requests are unchanged.
-_TOOL_CALL_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
+# ``function_call`` {name, arguments}, so the shim remembers every full
+# ``tool_calls`` entry *in response order* and restores the k-th occurrence of a
+# (name, arguments) pair with the k-th remembered entry for that pair. The cache
+# is cleared by ``AutoGenToolAgent.reset()`` at the start of each conversation,
+# so identical calls in different trials never cross-contaminate. Entries without
+# extras are never rewritten, so Ollama requests are byte-identical.
+_TOOL_CALL_CACHE: dict[tuple[str, str], list[dict[str, Any]]] = {}
 _TOOL_CALL_CACHE_MAX = 256
+
+#: Optional client-side throttle applied around every ChatCompletion.create.
+_RATE_LIMITER: Any = None
+
+
+def _clear_tool_call_cache() -> None:
+    _TOOL_CALL_CACHE.clear()
 
 
 def _remember_tool_call(tool_call: dict[str, Any]) -> None:
     fn = tool_call.get("function", {})
     key = (fn.get("name", ""), fn.get("arguments", ""))
-    if len(_TOOL_CALL_CACHE) >= _TOOL_CALL_CACHE_MAX:
-        _TOOL_CALL_CACHE.pop(next(iter(_TOOL_CALL_CACHE)))
-    _TOOL_CALL_CACHE[key] = dict(tool_call)
+    total = sum(len(v) for v in _TOOL_CALL_CACHE.values())
+    if total >= _TOOL_CALL_CACHE_MAX:
+        _TOOL_CALL_CACHE.clear()
+    _TOOL_CALL_CACHE.setdefault(key, []).append(dict(tool_call))
 
 
 def _restore_tool_calls(messages: list[Any]) -> list[Any]:
     """Rewrite legacy assistant ``function_call`` messages whose original tool call
-    carried provider extras back into ``tool_calls`` form. Others pass through."""
+    carried provider extras back into ``tool_calls`` form. Others pass through.
+    The k-th legacy occurrence of a (name, arguments) pair maps to the k-th
+    remembered entry for that pair, so repeated identical calls keep their own
+    ids and signatures."""
     out: list[Any] = []
+    seen: dict[tuple[str, str], int] = {}
     for msg in messages:
         if isinstance(msg, dict) and msg.get("role") == "assistant" and msg.get("function_call"):
             fc = msg["function_call"]
-            cached = _TOOL_CALL_CACHE.get((fc.get("name", ""), fc.get("arguments", "")))
+            key = (fc.get("name", ""), fc.get("arguments", ""))
+            idx = seen.get(key, 0)
+            seen[key] = idx + 1
+            entries = _TOOL_CALL_CACHE.get(key, [])
+            cached = entries[idx] if idx < len(entries) else None
             if cached is not None and cached.get("extra_content"):
                 rewritten = {k: v for k, v in msg.items() if k != "function_call"}
                 rewritten["tool_calls"] = [cached]
@@ -89,6 +108,43 @@ def _restore_tool_calls(messages: list[Any]) -> list[Any]:
     return out
 
 
+def configure_compat(
+    requests_per_minute: float | None = None, max_retries: int | None = None
+) -> dict[str, Any]:
+    """Apply the process-wide knobs pyautogen 0.1.14 exposes only globally.
+
+    * ``requests_per_minute`` installs a token-bucket limiter that the shim
+      acquires before every ``ChatCompletion.create``.
+    * ``max_retries`` maps onto pyautogen's time-based retry window:
+      ``Completion.max_retry_period = max_retries * Completion.retry_wait_time``
+      (``0`` disables its internal retries so backend errors surface to the
+      harness, which has its own retry policy).
+
+    Returns the effective settings for metadata.
+    """
+    global _RATE_LIMITER
+    effective: dict[str, Any] = {}
+    if requests_per_minute is not None:
+        from langchain_core.rate_limiters import InMemoryRateLimiter
+
+        _RATE_LIMITER = InMemoryRateLimiter(
+            requests_per_second=requests_per_minute / 60.0,
+            check_every_n_seconds=0.1,
+            max_bucket_size=1,
+        )
+        effective["requests_per_minute"] = requests_per_minute
+    if max_retries is not None:
+        try:
+            from autogen import Completion
+
+            Completion.max_retry_period = max_retries * Completion.retry_wait_time
+            effective["max_retry_period_seconds"] = Completion.max_retry_period
+        except ImportError:
+            pass
+        effective["max_retries"] = max_retries
+    return effective
+
+
 def _patch_openai_compat() -> None:
     """Monkey-patch ``openai.ChatCompletion.create`` to bridge the
     ``functions`` ↔ ``tools`` protocol gap between pyautogen 0.1.14
@@ -96,7 +152,8 @@ def _patch_openai_compat() -> None:
 
     Request:  ``functions`` list → ``tools`` list (wrapped in type/function);
               assistant ``function_call`` → ``tool_calls`` when the original
-              call carried provider extras (thought signatures).
+              call carried provider extras (thought signatures);
+              optional requests-per-minute throttle (see :func:`configure_compat`).
     Response: ``tool_calls`` list → single ``function_call`` dict.
 
     The patch is idempotent and applied at most once per process.
@@ -119,6 +176,8 @@ def _patch_openai_compat() -> None:
         kwargs.pop("function_call", None)
         if isinstance(kwargs.get("messages"), list):
             kwargs["messages"] = _restore_tool_calls(kwargs["messages"])
+        if _RATE_LIMITER is not None:
+            _RATE_LIMITER.acquire(blocking=True)
 
         resp = _original_create(*args, **kwargs)
 
@@ -156,6 +215,10 @@ class AutoGenToolAgent:
             with empty messages until ``max_turns``. Required for providers
             that reject requests ending with a model turn (Gemini); see
             :func:`agentprobe.llm.autogen_agent_kwargs`.
+        requests_per_minute: Client-side throttle applied to every LLM call
+            (process-wide, since pyautogen 0.1.14 has no per-client hook).
+        max_retries: Mapped onto pyautogen's time-based retry window; see
+            :func:`configure_compat`.
     """
 
     framework = "autogen"
@@ -166,10 +229,20 @@ class AutoGenToolAgent:
         failure_config: ToolFailureConfig | None = None,
         max_turns: int = 5,
         stop_on_final_answer: bool = False,
+        requests_per_minute: float | None = None,
+        max_retries: int | None = None,
     ) -> None:
         self._llm_config = llm_config
         self._max_turns = max_turns
         self._stop_on_final_answer = stop_on_final_answer
+        self._effective = configure_compat(requests_per_minute, max_retries)
+        self._effective.update(
+            {
+                "temperature": llm_config.get("temperature"),
+                "request_timeout_seconds": llm_config.get("request_timeout"),
+                "stop_on_final_answer": stop_on_final_answer,
+            }
+        )
         self._injector = ToolFailureInjector(failure_config) if failure_config else None
         _patch_openai_compat()
         self._agents = self._build_agents()
@@ -232,6 +305,7 @@ class AutoGenToolAgent:
         completion cache. Called automatically at the start of every
         ``invoke()``. Injector state is intentionally preserved (condition-wide).
         """
+        _clear_tool_call_cache()  # per-conversation identity for restored tool calls
         user_proxy, assistant = self._agents
         if user_proxy is None or assistant is None:
             return  # pyautogen not installed; invoke() will raise a clear ImportError
@@ -247,6 +321,10 @@ class AutoGenToolAgent:
     @property
     def injector(self) -> ToolFailureInjector | None:
         return self._injector
+
+    def effective_settings(self) -> dict[str, Any]:
+        """The LLM settings this adapter actually applies (for experiment metadata)."""
+        return dict(self._effective)
 
     def get_injector_summary(self) -> dict[str, Any]:
         if self._injector:

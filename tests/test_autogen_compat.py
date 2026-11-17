@@ -77,7 +77,7 @@ def test_cache_is_bounded():
         ag._remember_tool_call(
             {"function": {"name": "f", "arguments": str(i)}, "extra_content": {}}
         )
-    assert len(ag._TOOL_CALL_CACHE) == ag._TOOL_CALL_CACHE_MAX
+    assert sum(len(v) for v in ag._TOOL_CALL_CACHE.values()) <= ag._TOOL_CALL_CACHE_MAX
 
 
 def test_stop_on_final_answer_sets_termination_predicate():

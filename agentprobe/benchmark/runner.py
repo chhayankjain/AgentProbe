@@ -98,6 +98,10 @@ class RunResult:
     recovered: bool = False
     recovery_latency_ms: float = 0.0
     recovery_output: str = ""
+    #: "recovered" | "failed" | "unassessed" (the recovery call hit an LLM backend
+    #: error even after retries, so nothing can be said about recovery) |
+    #: "not_attempted" (recovery_attempts == 0) | "n/a" (the run succeeded).
+    recovery_status: str = "n/a"
     output: str = ""
     backend_retries: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -117,6 +121,7 @@ class RunResult:
             "recovered": self.recovered,
             "recovery_latency_ms": round(self.recovery_latency_ms, 2),
             "recovery_output": self.recovery_output,
+            "recovery_status": self.recovery_status,
             "output": self.output,
             "backend_retries": self.backend_retries,
         }
@@ -256,10 +261,10 @@ class BenchmarkRunner:
         while True:
             result = self._run_single_once(run_id, failure_type)
             if result.status != "backend_error":
-                result.backend_retries = attempt
+                result.backend_retries += attempt
                 return result
             if attempt >= cfg.backend_error_retries or self._invocation_hung:
-                result.backend_retries = attempt
+                result.backend_retries += attempt
                 return result
             delay = cfg.backend_error_backoff_seconds * (2**attempt)
             _console.print(
@@ -319,7 +324,13 @@ class BenchmarkRunner:
                     category = event.category.value
 
                 # Attempt recovery
-                recovered, recovery_latency_ms, recovery_output = self._attempt_recovery(task_input)
+                (
+                    recovered,
+                    recovery_latency_ms,
+                    recovery_output,
+                    recovery_status,
+                    recovery_backend_retries,
+                ) = self._attempt_recovery(task_input)
 
                 return RunResult(
                     run_id=run_id,
@@ -334,6 +345,8 @@ class BenchmarkRunner:
                     recovered=recovered,
                     recovery_latency_ms=recovery_latency_ms,
                     recovery_output=str(recovery_output) if recovery_output else "",
+                    recovery_status=recovery_status,
+                    backend_retries=recovery_backend_retries,
                 )
 
     def _invoke_with_timeout(self, task_input: dict) -> Any:
@@ -381,29 +394,58 @@ class BenchmarkRunner:
             self._invocation_hung = True
             raise _HarnessTimeout(f"Agent invocation exceeded {timeout}s wall-clock timeout")
 
-    def _attempt_recovery(self, task_input: dict) -> tuple[bool, float, Any]:
+    def _attempt_recovery(self, task_input: dict) -> tuple[bool, float, Any, str, int]:
         """Try to invoke the agent again after a failure.
 
-        If the prior invocation is still running (hung thread after a
-        harness timeout), recovery is skipped entirely to prevent two
-        concurrent invocations on the same agent.
+        Returns ``(recovered, latency_ms, output, recovery_status, backend_retries)``.
 
-        Returns (recovered, latency_ms, output).
+        * An agent failure during the retry consumes one recovery attempt and,
+          once attempts are exhausted, yields ``"failed"``.
+        * An LLM *backend* error (429/5xx/connection) during the retry does not
+          consume a recovery attempt: it is retried with backoff up to
+          ``backend_error_retries`` and, if it persists, yields ``"unassessed"``
+          so the trial is excluded from the recovery-rate denominator rather
+          than counted as the agent failing to recover.
+        * If the prior invocation is still running (hung thread after a harness
+          timeout), recovery is skipped entirely (``"unassessed"``) to prevent
+          two concurrent invocations on the same agent.
         """
-        if self.config.recovery_attempts == 0:
-            return False, 0.0, None
+        cfg = self.config
+        if cfg.recovery_attempts == 0:
+            return False, 0.0, None, "not_attempted", 0
         if self._invocation_hung:
-            return False, 0.0, None
-        for _ in range(self.config.recovery_attempts):
+            return False, 0.0, None, "unassessed", 0
+
+        backend_retries = 0
+        attempts_left = cfg.recovery_attempts
+        while attempts_left > 0:
             start = time.perf_counter()
             try:
                 output = self._invoke_with_timeout(task_input)
-                return True, (time.perf_counter() - start) * 1000, output
-            except Exception:
+                return (
+                    True,
+                    (time.perf_counter() - start) * 1000,
+                    output,
+                    "recovered",
+                    backend_retries,
+                )
+            except Exception as exc:
                 if self._invocation_hung:
-                    break  # recovery attempt itself timed out; stop retrying
-                continue
-        return False, 0.0, None
+                    return False, 0.0, None, "unassessed", backend_retries
+                if not isinstance(exc, _HarnessTimeout) and is_llm_backend_error(exc):
+                    if backend_retries >= cfg.backend_error_retries:
+                        return False, 0.0, None, "unassessed", backend_retries
+                    delay = cfg.backend_error_backoff_seconds * (2**backend_retries)
+                    _console.print(
+                        f"  [yellow]LLM backend error during recovery "
+                        f"({type(exc).__name__}); retrying in {delay:.0f}s[/yellow]"
+                    )
+                    if delay > 0:
+                        time.sleep(delay)
+                    backend_retries += 1
+                    continue  # a backend error does not consume a recovery attempt
+                attempts_left -= 1
+        return False, 0.0, None, "failed", backend_retries
 
     def _summary_line(self, results: list[RunResult]) -> str:
         executed = [r for r in results if r.status == "completed"]

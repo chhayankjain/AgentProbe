@@ -361,7 +361,8 @@ def autogen_llm_config(spec: LLMSpec) -> dict[str, Any]:
         "api_base": spec.resolved_base_url,
         "api_key": spec.resolve_api_key(),
     }
-    cfg: dict[str, Any] = {"config_list": [entry]}
+    # pyautogen merges top-level keys into every ChatCompletion.create call.
+    cfg: dict[str, Any] = {"config_list": [entry], "temperature": spec.temperature}
     if spec.timeout_seconds is not None:
         cfg["request_timeout"] = spec.timeout_seconds
     return cfg
@@ -378,9 +379,32 @@ def autogen_agent_kwargs(spec: LLMSpec) -> dict[str, Any]:
     first text-only assistant reply. Every other provider keeps the paper's
     behaviour (loop until ``max_turns``).
     """
+    kwargs: dict[str, Any] = {
+        "requests_per_minute": spec.requests_per_minute,
+        "max_retries": spec.max_retries,
+    }
     if spec.provider == "gemini":
-        return {"stop_on_final_answer": True}
-    return {}
+        kwargs["stop_on_final_answer"] = True
+    return kwargs
+
+
+def autogen_effective_settings(spec: LLMSpec) -> dict[str, Any]:
+    """What the AutoGen adapter will actually apply for *spec*, for metadata.
+
+    pyautogen 0.1.14 has no per-request retry count; ``max_retries`` is mapped
+    onto its time-based retry window (``max_retry_period`` =
+    ``max_retries * retry_wait_time`` seconds). The ``--rpm`` throttle is
+    applied by the compatibility shim around every ``ChatCompletion.create``.
+    """
+    retry_wait = 10.0  # pyautogen Completion.retry_wait_time default
+    return {
+        "temperature": spec.temperature,
+        "request_timeout_seconds": spec.timeout_seconds,
+        "requests_per_minute": spec.requests_per_minute,
+        "max_retries": spec.max_retries,
+        "max_retry_period_seconds": spec.max_retries * retry_wait,
+        "stop_on_final_answer": spec.provider == "gemini",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -513,6 +537,7 @@ __all__ = [
     "build_chat_model",
     "autogen_llm_config",
     "autogen_agent_kwargs",
+    "autogen_effective_settings",
     "is_llm_backend_error",
     "add_llm_args",
     "spec_from_args",
