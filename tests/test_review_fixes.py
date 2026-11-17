@@ -288,3 +288,106 @@ def test_demo_grades_answers_against_matching_task():
     assert all(r.output and "127.05" in r.output for r in base["results"])
     faulty = run_demo(fault="api_error", probability=1.0, n_runs=3, quiet=True)
     assert faulty["n_correct"] == 0  # every call faults, no answer
+
+
+# --- Round 2: pyautogen retries 503/connection/APIError forever --------------
+
+
+@pytest.mark.parametrize("exc_name", ["ServiceUnavailableError", "APIConnectionError", "APIError"])
+@pytest.mark.parametrize("max_retries", [0, 2])
+def test_pyautogen_retry_loop_is_bounded(monkeypatch, exc_name, max_retries):
+    """Drive pyautogen's real _get_response loop with real openai<1 exceptions."""
+    autogen = pytest.importorskip("autogen")
+    from openai import error as oe
+
+    from agentprobe.agents import autogen_agent as ag
+    from agentprobe.llm import BackendRetriesExhausted, is_llm_backend_error
+
+    ag._patch_openai_compat()
+    old_max = ag._MAX_BACKEND_RETRIES
+    calls = {"n": 0}
+
+    def failing(*a, **k):
+        calls["n"] += 1
+        if calls["n"] > 50:
+            raise AssertionError("retry loop not bounded")
+        raise getattr(oe, exc_name)("simulated provider failure")
+
+    monkeypatch.setattr(ag, "_ORIGINAL_CREATE", failing)
+    try:
+        ag.configure_compat(max_retries=max_retries)
+        ag._reset_backend_failures()
+        with pytest.raises(BackendRetriesExhausted) as info:
+            autogen.ChatCompletion._get_response(
+                {
+                    "model": "gpt-4",
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "retry_wait_time": 0,
+                },
+                use_cache=False,
+            )
+        assert calls["n"] == max_retries + 1
+        assert isinstance(info.value.__cause__, getattr(oe, exc_name))
+        assert is_llm_backend_error(info.value)
+    finally:
+        ag._MAX_BACKEND_RETRIES = old_max
+        ag._reset_backend_failures()
+
+
+def test_transient_error_then_success_resets_counter(monkeypatch):
+    autogen = pytest.importorskip("autogen")
+    from openai import error as oe
+
+    from agentprobe.agents import autogen_agent as ag
+
+    ag._patch_openai_compat()
+    old_max = ag._MAX_BACKEND_RETRIES
+    seq = iter([oe.ServiceUnavailableError("503"), {"choices": [{"message": {"content": "ok"}}]}])
+
+    def flaky(*a, **k):
+        item = next(seq)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    monkeypatch.setattr(ag, "_ORIGINAL_CREATE", flaky)
+    try:
+        ag._MAX_BACKEND_RETRIES = 1
+        ag._reset_backend_failures()
+        resp = autogen.ChatCompletion._get_response(
+            {
+                "model": "gpt-4",
+                "messages": [{"role": "user", "content": "hi"}],
+                "retry_wait_time": 0,
+            },
+            use_cache=False,
+        )
+        assert resp["choices"][0]["message"]["content"] == "ok"
+        assert ag._RETRY_STATE.consecutive == 0
+    finally:
+        ag._MAX_BACKEND_RETRIES = old_max
+
+
+def test_content_filter_and_invalid_request_are_not_counted():
+    pytest.importorskip("autogen")
+    from openai import error as oe
+
+    from agentprobe.agents import autogen_agent as ag
+
+    assert not ag._is_transient_provider_error(oe.InvalidRequestError("bad", param=None))
+    cf = oe.APIError("filtered", json_body={"error": {"code": "content_filter"}})
+    assert not ag._is_transient_provider_error(cf)
+    assert ag._is_transient_provider_error(oe.ServiceUnavailableError("503"))
+
+
+def test_runner_treats_exhausted_retries_as_backend_error():
+    from agentprobe.llm import BackendRetriesExhausted
+
+    class Exhausted:
+        framework = "mock"
+
+        def invoke(self, input):
+            raise BackendRetriesExhausted("503 persisted")
+
+    r = BenchmarkRunner(agent=Exhausted(), config=_cfg(backend_error_retries=0)).run()[0]
+    assert r.status == "backend_error" and r.failure_category == "infrastructure"
