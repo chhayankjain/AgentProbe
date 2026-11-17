@@ -1,0 +1,141 @@
+"""Sixty-second AgentProbe demo that needs no model, no key, and no network.
+
+Run it with::
+
+    python -m agentprobe.demo
+    python -m agentprobe.demo --fault timeout --p 0.5 --runs 20
+
+It builds the LangGraph adapter around a scripted, deterministic chat model,
+wraps the calculator tool with a seeded fault injector, runs a short
+benchmark, and prints the reliability metrics plus the injection log, so you
+can see exactly which calls were faulted and how the agent and harness reacted.
+Swap :class:`~agentprobe.fake_llm.ScriptedToolCallingModel` for a real model
+(``agentprobe.llm.build_chat_model``) and nothing else changes.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from typing import Any
+
+from agentprobe.benchmark.metrics import MetricsCalculator
+from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner
+from agentprobe.fake_llm import ScriptedToolCallingModel
+from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
+from agentprobe.observer.tracer import AgentProbeTracer
+
+FAULTS = {
+    "timeout": ToolFailureType.TIMEOUT,
+    "malformed_output": ToolFailureType.MALFORMED_OUTPUT,
+    "rate_limit": ToolFailureType.RATE_LIMIT,
+    "api_error": ToolFailureType.API_ERROR,
+}
+
+
+def run_demo(
+    fault: str = "rate_limit",
+    probability: float = 0.3,
+    n_runs: int = 10,
+    seed: int = 42,
+    quiet: bool = False,
+) -> dict[str, Any]:
+    """Run the demo and return a dict with metrics, records, and the injection summary."""
+    from agentprobe.agents.langgraph_agent import LangGraphToolAgent
+
+    # 1. Tracing. Console export off so the demo output stays readable; point
+    #    otlp_endpoint at Jaeger (docker compose up) to see the spans.
+    tracer = AgentProbeTracer(service_name="agentprobe-demo", console=False)
+
+    # 2. A seeded fault injector: the same seed always faults the same calls.
+    failure_config = ToolFailureConfig(
+        failure_type=FAULTS[fault],
+        failure_probability=probability,
+        timeout_seconds=0.05,  # keep the demo fast; the paper used 5s
+        retry_after_seconds=1.0,
+        seed=seed,
+    )
+
+    # 3. The agent. The scripted model always calls the calculator once, then answers.
+    agent = LangGraphToolAgent(llm=ScriptedToolCallingModel(), failure_config=failure_config)
+
+    # 4. The benchmark: N runs over the paper's prompt set, one retry on failure.
+    config = BenchmarkConfig(
+        framework="langgraph",
+        task="tool_use",
+        n_runs=n_runs,
+        failure_config=failure_config,
+        recovery_attempts=1,
+        timeout_per_run_seconds=30.0,
+        seed=seed,
+    )
+    results = BenchmarkRunner(agent=agent, config=config).run()
+    metrics = MetricsCalculator().compute(results)
+    summary = agent.get_injector_summary()
+    tracer.shutdown()
+
+    if not quiet:
+        _print_report(fault, probability, results, metrics, summary, agent)
+    return {"metrics": metrics, "results": results, "injector": summary}
+
+
+def _print_report(
+    fault: str, probability: float, results: list[Any], metrics: Any, summary: dict, agent: Any
+) -> None:
+    print()
+    print(f"Fault: {fault}  p={probability}  runs={len(results)}  (seeded, reproducible)")
+    print("-" * 64)
+    print(f"tool calls made         {summary.get('total_calls', 0)}")
+    print(f"faults injected         {summary.get('injected_failures', 0)}")
+    print(f"failure rate            {metrics.failure_rate:.0%}  ({metrics.n_failures} runs raised)")
+    rr = metrics.recovery_rate
+    print(f"recovery rate           {'n/a' if rr is None else f'{rr:.0%}'}  (harness retried once)")
+    print(f"MTTR                    {metrics.mttr_ms:.0f} ms")
+    print(f"P50 / P99 latency       {metrics.p50_latency_ms:.0f} / {metrics.p99_latency_ms:.0f} ms")
+    print("-" * 64)
+    print("injection log (call_index, tool, injected, outcome):")
+    for rec in agent.injector.injection_log if agent.injector else []:
+        outcome = type(rec.exception).__name__ if rec.exception else repr(rec.return_value)[:40]
+        flag = "FAULT" if rec.injected else "ok   "
+        print(f"  #{rec.call_index:<3} {rec.tool_name:<11} {flag}  {outcome}   span={rec.span_id}")
+    print("-" * 64)
+    print("per-run outcome:")
+    for r in results:
+        status = "ok" if r.success else ("recovered" if r.recovered else "FAILED")
+        detail = r.exception_type if not r.success else _answer_text(r.output)
+        print(f"  run {r.run_id:<2} {status:<9} {detail}")
+    print()
+    print(
+        "Next: swap ScriptedToolCallingModel for a real model via agentprobe.llm.build_chat_model,"
+    )
+    print("or wrap your own tools with ToolFailureInjector. See README.md.")
+
+
+def _answer_text(output: str) -> str:
+    """The runner stores the adapter's whole return dict as a string; show just the answer."""
+    import ast
+
+    try:
+        parsed = ast.literal_eval(output)
+        if isinstance(parsed, dict):
+            return str(parsed.get("output", ""))[:60]
+    except (ValueError, SyntaxError):
+        pass
+    return (output or "")[:60]
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="AgentProbe 60-second demo (no model needed)")
+    parser.add_argument("--fault", choices=sorted(FAULTS), default="rate_limit")
+    parser.add_argument("--p", type=float, default=0.3, help="injection probability per tool call")
+    parser.add_argument("--runs", type=int, default=10)
+    parser.add_argument("--seed", type=int, default=42)
+    args = parser.parse_args(argv)
+    if not 0.0 <= args.p <= 1.0:
+        parser.error("--p must be between 0 and 1")
+    run_demo(args.fault, args.p, args.runs, args.seed)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

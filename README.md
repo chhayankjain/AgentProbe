@@ -48,10 +48,19 @@ pip install -e ".[dev,plotting,ollama]"
 
 The distribution is named `agentprobe-toolkit` because `agentprobe` was already taken on PyPI by an unrelated project. The import name is `agentprobe`.
 
+## Try it in 60 seconds (no model, no key)
+
+```bash
+pip install agentprobe-toolkit
+python -m agentprobe.demo                      # rate-limit faults, p=0.3, 10 runs
+python -m agentprobe.demo --fault timeout --p 0.5 --runs 20
+```
+
+The demo wraps the LangGraph adapter around a scripted, deterministic chat model, injects seeded faults into the calculator tool, runs a short benchmark, and prints the metrics, the per-call injection log with its OpenTelemetry span ids, and each run's outcome. [`examples/quickstart.py`](https://github.com/chhayankjain/AgentProbe/blob/main/examples/quickstart.py) is the same thing in 30 lines you can copy. Swap `ScriptedToolCallingModel` for a real model via `agentprobe.llm.build_chat_model` and nothing else changes.
+
 ## Quick Start
 
 ```bash
-
 # Start Ollama with Llama 3.1 (used in all paper experiments)
 ollama pull llama3.1
 
@@ -389,6 +398,25 @@ Phase 2 uses the corrected summaries under `experiments/results_v2/`. The origin
 > **Source map:** The authoritative mapping from each paper table cell to its batch directory is in [`experiments/results_v2/paper_source_map.json`](https://github.com/chhayankjain/AgentProbe/blob/main/experiments/results_v2/paper_source_map.json). The Qwen2.5 column combines two batches: LangGraph/LangChain from `20261112_040156` and AutoGen from `20261112_063451` (corrected output extractor). Llama and Mistral use their single original batches. The `analyze_cross_model.py` script does not automatically merge these; use the source map to select the correct batch per framework.
 
 > **Model digests:** All three models use Q4_K_M quantization. Ollama digest prefixes: Llama `46e0c10c039e`, Mistral `6577803aa9a0`, Qwen `845dbda0ea48`. The `experiment_metadata.json` files in historical batches record `model_digest: unknown` because digest capture was added after the experiments ran; the digests listed here were identified post-hoc from the same Ollama installation.
+
+## Related tools
+
+The space filled up in 2026. These are the closest projects; the last column is what AgentProbe does differently, not a claim to be better.
+
+| Project | What it is | Where AgentProbe differs |
+|---|---|---|
+| [AgentChaos](https://github.com/IntelligentDDS/AgentChaos) (ASE 2026) | Chaos engineering for agent systems by patching the LLM HTTP layer at runtime; 65 fault configurations; AutoGen, MAD, MapCoder and others on Google ADK | AgentProbe injects at the **tool boundary**, keeps a seeded per-call log linked to span ids, and targets small local models |
+| [llmmas-otel](https://github.com/vagabondboffin/llmmas-otel) (ICST 2026) | OpenTelemetry tracing plus fault injection at tool, LLM, and agent-to-agent boundaries for multi-agent systems; evaluated on ChatDev | Ships LangGraph, LangChain and AutoGen adapters, correctness grading, and recovery/MTTR metrics rather than latency amplification only |
+| [AgentChaosBench](https://github.com/kevinzck8k/agentic-fault-diagnosis) | Benchmark for *detecting and localising* injected faults from traces over CrewAI, LangGraph and AutoGen | AgentProbe measures the agent's resilience to faults; AgentChaosBench measures a detector's ability to find them |
+| [ReliabilityBench](https://arxiv.org/abs/2601.06112) | Consistency, perturbation robustness and fault tolerance of ReAct and Reflexion agents on GPT-4o and Gemini | Open-weight local models, framework adapters, OpenTelemetry traces, and published raw run data |
+| [MCP-Injector](https://neurips.cc/virtual/2026/poster/151564) (NeurIPS 2026) | Protocol-aware fault middleware for MCP tool calls with persistent, transient and intermittent schedules | AgentProbe is framework-level rather than MCP-specific; schedules beyond per-call probability are on the roadmap (#27) |
+| [AgentCheck](https://arxiv.org/abs/2607.11098) | Reproduce, intervene, mitigate workbench over MCP with record-and-replay and 12 fault types including stale data | AgentProbe is a batch benchmark harness, not an interactive debugger; corrupted-but-valid outputs are on the roadmap (#28) |
+| [agentic-chaos](https://github.com/DeepAgentLabs/agentic-chaos) | Fault-injection toolkit with provider SDK patches, streaming faults, and a 0 to 100 resilience score with CI contracts | No paper, no framework adapters, no OpenTelemetry; its resilience score is an idea AgentProbe plans to adopt |
+| [agent-chaos](https://github.com/deepankarm/agent-chaos) | Scenario-based chaos tests for Anthropic-SDK agents with DeepEval and Pydantic Evals judges | Anthropic only today; AgentProbe is backend-agnostic |
+| [AgentDebugX](https://github.com/AgentDebugX/AgentDebugX) (EMNLP 2026) | Failure observability, attribution and recovery over captured traces with a 19-mode taxonomy | Observes and diagnoses; does not inject faults |
+| [Towards a Science of AI Agent Reliability](https://arxiv.org/abs/2602.16666) (ICML 2026) | Twelve reliability metrics incl. fault robustness with a p=0.2 fault wrapper, on 15 frontier models | Nearly the same fault protocol as AgentProbe's Phase 2; reports fault robustness near saturation for frontier models, where AgentProbe's 7B to 8B local models still fail 23% of injected runs |
+
+Observability platforms such as Langfuse, Arize Phoenix, OpenLLMetry and AgentOps trace agents but do not inject faults; AgentProbe's spans can be exported to any of them over OTLP.
 
 ## Citation
 
