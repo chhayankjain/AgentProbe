@@ -48,6 +48,26 @@ pip install -e ".[dev,plotting,ollama]"
 
 The distribution is named `agentprobe-toolkit` because `agentprobe` was already taken on PyPI by an unrelated project. The import name is `agentprobe`.
 
+## Test your own agent
+
+Wrap the tools your agent already uses, break one on purpose, and check the outcome. No model or API key needed.
+
+```python
+from agentprobe.testing import probe
+
+def test_admits_failure_when_payment_service_is_down():
+    with probe() as p:
+        tools = p.wrap(TOOLS)                                  # probed copies; your tools are untouched
+        p.on("payment_status").always_fail(with_="timeout")
+        result = p.run(lambda q: answer(q, tools), "Did order 42 go through?")
+        result.assert_no_crash()
+        result.assert_answer_not_contains("is confirmed")      # never claim unverified success
+```
+
+When the block ends, AgentProbe also checks that every declared fault **actually fired**. An agent that skips the tool or answers from a cache can't pass. Scenarios: `fail_first(n)`, `fail_times(n).then_succeed()`, `always_fail()`, `returns(value)`, `slow(ms=...)`, `with_probability(p, seed=...)`. Works with plain functions and LangChain tools.
+
+The [10-minute tutorial](https://github.com/chhayankjain/AgentProbe/blob/main/examples/your_agent/README.md) walks through an example agent, shows the same test catching a deliberately broken version, and ships a CI workflow you can copy. [docs/instrumentation.md](https://github.com/chhayankjain/AgentProbe/blob/main/docs/instrumentation.md) explains what AgentProbe guarantees about your tools.
+
 ## Try it in 60 seconds (no model, no key)
 
 ```bash

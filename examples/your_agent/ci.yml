@@ -1,0 +1,25 @@
+# Copy to .github/workflows/agent-fault-tests.yml in your repository.
+# Runs your AgentProbe fault tests on every push and pull request. No model or
+# API key is needed when your tests use scripted or plain-Python agents.
+name: Agent fault tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  fault-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install agentprobe-toolkit pytest
+      # Point this at the folder with your fault tests.
+      - run: pytest tests/ --junitxml=agentprobe-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agentprobe-results
+          path: agentprobe-results.xml

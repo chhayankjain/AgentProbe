@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Test your own agent** with `agentprobe.testing.probe()`: wrap the tools your agent already uses (plain sync/async functions and LangChain tools; originals are never modified), declare deterministic fault scenarios, run the agent, and assert on the outcome (#63, #96)
+- Scenarios: `fail_first(n)`, `fail_times(n).then_succeed()`, `always_fail()`, `returns(value)`, `slow(ms=...)`, `with_probability(p, seed=...)`, with any named fault or exception. Rules for one tool form a sequence (#65)
+- **Scenario evidence**: each scenario records whether its tool was reached and its fault injected. A required scenario that never fired is `not_exercised` and fails the test, so an agent that bypasses a tool can't pass (#94)
+- `ProbeResult` separates observed events (call log, answer, exception, timing, evidence), assertion results (`pass`/`fail`/`unassessed`/`error`) and inferred labels (retries, fallbacks); `summary()` and a versioned `to_dict()` (#66)
+- Gate on probe exit: passes only when every required scenario was exercised and every required assertion passed
+- Instrumentation contract (`docs/instrumentation.md`): no in-place patching, per-probe state, cleanup on exception and cancellation, and late tool calls from a still-running agent recorded as `after_probe_end` and never counted (#95)
+- Tutorial and example (`examples/your_agent/`): an order-status agent, a deliberately broken version the tests catch, a cache-skipping agent the gate rejects, and a copyable CI workflow (#67)
+
+
 ## [1.3.0] - 2026-11-17
 
 Hosted LLM backends, a no-model demo, and fixes from four rounds of code review that
