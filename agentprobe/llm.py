@@ -411,6 +411,16 @@ def autogen_effective_settings(spec: LLMSpec) -> dict[str, Any]:
 # Backend-error detection
 # ---------------------------------------------------------------------------
 
+
+class BackendRetriesExhausted(Exception):
+    """Raised when an LLM provider keeps failing after the configured retries.
+
+    Used by the AutoGen compatibility shim, because pyautogen 0.1.14 retries
+    ``ServiceUnavailableError``, ``APIConnectionError`` and ``APIError``
+    forever. The original provider exception is attached as ``__cause__``.
+    """
+
+
 #: Module prefixes of exceptions raised by LLM clients / transports.
 _BACKEND_MODULE_PREFIXES: tuple[str, ...] = (
     "openai",
@@ -455,6 +465,8 @@ def is_llm_backend_error(exc: BaseException) -> bool:
     walks ``__cause__``/``__context__`` so a framework that wraps the provider
     exception is still recognised.
     """
+    if isinstance(exc, BackendRetriesExhausted):
+        return True
     seen: set[int] = set()
     cur: BaseException | None = exc
     while cur is not None and id(cur) not in seen:
@@ -539,6 +551,7 @@ __all__ = [
     "autogen_agent_kwargs",
     "autogen_effective_settings",
     "is_llm_backend_error",
+    "BackendRetriesExhausted",
     "add_llm_args",
     "spec_from_args",
 ]

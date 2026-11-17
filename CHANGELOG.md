@@ -7,6 +7,7 @@
 - LLM backend errors during the *recovery* call are retried with backoff and, if persistent, recorded as `recovery_status="unassessed"`; `MetricsCalculator` drops those from the recovery-rate denominator and reports `n_recovery_unassessed`. `RunResult` gains `recovery_status` (`recovered`/`failed`/`unassessed`/`not_attempted`/`n/a`)
 - `run_experiment_v2.py --resume` with a subset of conditions rebuilds `combined_summary.json` and `manifest.json` from every checkpointed condition on disk instead of shrinking them; the manifest lists `completed_conditions` and `n_records_this_invocation`
 - AutoGen honours `temperature`, `--rpm` (shim-level throttle) and `--max-retries` (mapped onto pyautogen's retry window); `experiment_metadata.json` records `llm_autogen_effective`
+- AutoGen retries are bounded for every transient provider error. pyautogen 0.1.14 retries `ServiceUnavailableError`, `APIConnectionError` and `APIError` with no limit; the shim now counts consecutive failures and raises `BackendRetriesExhausted` (an infrastructure error) after `--max-retries`
 - AutoGen thought-signature cache keeps every repeated identical call in order and is cleared per conversation, so restored history can no longer swap ids/signatures
 - `AgentProbeTracer` reuses one process-wide provider (or an SDK provider the application already registered); later instances attach exporters to it instead of creating a provider library spans bypass, and `shutdown()` only flushes
 - `--resume` also rejects changed timeout, retry, throttle and temperature settings

@@ -44,6 +44,7 @@ Usage::
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any
 
@@ -68,6 +69,40 @@ _TOOL_CALL_CACHE_MAX = 256
 
 #: Optional client-side throttle applied around every ChatCompletion.create.
 _RATE_LIMITER: Any = None
+
+#: Retries allowed for consecutive transient provider errors before the shim
+#: raises BackendRetriesExhausted. pyautogen 0.1.14 retries ServiceUnavailable,
+#: APIConnectionError and APIError without any limit, so the bound must live here.
+_MAX_BACKEND_RETRIES = 6
+_RETRY_STATE = threading.local()
+
+#: The unpatched ``openai.ChatCompletion.create``; set by ``_patch_openai_compat``.
+_ORIGINAL_CREATE: Any = None
+
+
+def _reset_backend_failures() -> None:
+    _RETRY_STATE.consecutive = 0
+
+
+def _is_transient_provider_error(exc: BaseException) -> bool:
+    try:
+        from openai import error as oe
+    except ImportError:  # pragma: no cover
+        return False
+    transient = (
+        oe.ServiceUnavailableError,
+        oe.APIConnectionError,
+        oe.RateLimitError,
+        oe.Timeout,
+        oe.APIError,
+    )
+    if not isinstance(exc, transient) or isinstance(exc, oe.InvalidRequestError):
+        return False
+    if isinstance(exc, oe.APIError) and isinstance(getattr(exc, "json_body", None), dict):
+        code = (exc.json_body.get("error") or {}).get("code")
+        if code == "content_filter":
+            return False
+    return True
 
 
 def _clear_tool_call_cache() -> None:
@@ -122,7 +157,7 @@ def configure_compat(
 
     Returns the effective settings for metadata.
     """
-    global _RATE_LIMITER
+    global _RATE_LIMITER, _MAX_BACKEND_RETRIES
     effective: dict[str, Any] = {}
     if requests_per_minute is not None:
         from langchain_core.rate_limiters import InMemoryRateLimiter
@@ -134,6 +169,7 @@ def configure_compat(
         )
         effective["requests_per_minute"] = requests_per_minute
     if max_retries is not None:
+        _MAX_BACKEND_RETRIES = max_retries
         try:
             from autogen import Completion
 
@@ -158,13 +194,13 @@ def _patch_openai_compat() -> None:
 
     The patch is idempotent and applied at most once per process.
     """
-    global _COMPAT_PATCHED
+    global _COMPAT_PATCHED, _ORIGINAL_CREATE
     if _COMPAT_PATCHED:
         return
 
     import openai
 
-    _original_create = openai.ChatCompletion.create
+    _ORIGINAL_CREATE = openai.ChatCompletion.create
 
     @staticmethod  # type: ignore[misc]
     def _patched_create(*args: Any, **kwargs: Any) -> Any:
@@ -179,7 +215,22 @@ def _patch_openai_compat() -> None:
         if _RATE_LIMITER is not None:
             _RATE_LIMITER.acquire(blocking=True)
 
-        resp = _original_create(*args, **kwargs)
+        try:
+            resp = _ORIGINAL_CREATE(*args, **kwargs)
+        except Exception as exc:
+            if not _is_transient_provider_error(exc):
+                raise
+            count = getattr(_RETRY_STATE, "consecutive", 0) + 1
+            _RETRY_STATE.consecutive = count
+            if count > _MAX_BACKEND_RETRIES:
+                _RETRY_STATE.consecutive = 0
+                from agentprobe.llm import BackendRetriesExhausted
+
+                raise BackendRetriesExhausted(
+                    f"{type(exc).__name__} persisted after {_MAX_BACKEND_RETRIES} retries"
+                ) from exc
+            raise  # pyautogen sleeps retry_wait_time and calls again
+        _RETRY_STATE.consecutive = 0
 
         # --- response: tool_calls → function_call ---
         for choice in resp.get("choices", []):
@@ -306,6 +357,7 @@ class AutoGenToolAgent:
         ``invoke()``. Injector state is intentionally preserved (condition-wide).
         """
         _clear_tool_call_cache()  # per-conversation identity for restored tool calls
+        _reset_backend_failures()
         user_proxy, assistant = self._agents
         if user_proxy is None or assistant is None:
             return  # pyautogen not installed; invoke() will raise a clear ImportError
