@@ -14,21 +14,28 @@ check the outcome::
         # Leaving the block enforces the gate: every required scenario must have
         # been exercised and every required assertion must have passed.
 
+Async agents and async tests use ``await p.arun(...)``.
+
 Design contract (see ``docs/instrumentation.md``):
 
 * **Your tools are never modified.** :meth:`Probe.wrap` returns new objects (a new
-  function, or a shallow copy of a LangChain tool). Originals stay byte-for-byte
-  as they were, so two probes on the same tool cannot interfere.
+  function, or a shallow copy of a LangChain tool). Originals stay as they were,
+  so two probes on the same tool cannot interfere.
 * **Evidence, not hope.** Each scenario records whether its tool was reached and
   whether its fault was injected. A required scenario that never fired is
   ``not_exercised`` and fails the gate.
+* **Calls are recorded when they start.** Every tool call appears in the log the
+  moment it begins (``status="pending"``) and is completed when it returns or
+  raises, so a call still in flight at a deadline is never invisible.
 * **Observed, asserted and inferred are separate.** :class:`ProbeResult` keeps the
   call log, your assertion results (``pass``/``fail``/``unassessed``/``error``)
-  and heuristic labels (retry, fallback) apart.
-* **Still-running agents are reported, not hidden.** With ``timeout=`` the agent
-  runs in a worker thread that Python cannot kill. If it outlives the deadline the
-  result says so, the probe closes, and any later tool call passes through
-  without a fault and is recorded as ``after_probe_end``.
+  and heuristic labels (retry, fallback) apart. Answer assertions need an actual
+  answer: a crash or ``None`` never satisfies them.
+* **Still-running agents are reported, not hidden.** A result is a frozen snapshot
+  taken at the end of the run. If a sync agent outlives its deadline the result
+  says so, the probe closes, calls that complete later are marked
+  ``completed_after_close``, and calls that *start* later pass through without a
+  fault as ``after_probe_end``. Neither changes an earlier verdict.
 """
 
 from __future__ import annotations
@@ -37,13 +44,20 @@ import asyncio
 import concurrent.futures
 import contextvars
 import copy
+import dataclasses
+import datetime as _dt
+import decimal
+import enum
 import functools
 import inspect
+import math
+import pathlib
 import random
 import threading
 import time
+import uuid
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any
 
 from agentprobe.agents.base import message_text
@@ -56,14 +70,16 @@ from agentprobe.injector.tool_failure import (
 )
 from agentprobe.observer.tracer import get_tracer
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 _tracer = get_tracer(__name__)
 
-#: Guards against counting one logical tool call twice when a wrapped async
-#: method delegates to a wrapped sync method on the same tool.
-_IN_WRAPPER: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "agentprobe_in_wrapper", default=False
+#: Wrapper keys currently executing in this context. A wrapped LangChain tool's
+#: async method may delegate to its own wrapped sync method; that delegation must
+#: not count twice. Keyed by wrapper identity, so a *different* wrapped tool
+#: called from inside a tool is still recorded and still gets its faults.
+_ACTIVE_WRAPPERS: contextvars.ContextVar[frozenset[int]] = contextvars.ContextVar(
+    "agentprobe_active_wrappers", default=frozenset()
 )
 
 
@@ -73,6 +89,32 @@ class ProbeError(Exception):
 
 class ProbeGateError(AssertionError):
     """A required scenario was not exercised or a required assertion did not pass."""
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+
+def _count(name: str, value: Any, *, allow_none: bool) -> int | None:
+    """A positive whole number of calls, or ``None`` (every call) where allowed.
+    Zero, negatives, fractions, booleans and non-finite values are rejected: a
+    rule that can never inject must not be able to count as exercised."""
+    if value is None and allow_none:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        allowed = "a positive whole number or None" if allow_none else "a positive whole number"
+        raise ProbeError(f"{name} must be {allowed}, got {value!r}")
+    return value
+
+
+def _finite_number(name: str, value: Any, *, low: float, high: float | None = None) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ProbeError(f"{name} must be a finite number, got {value!r}")
+    if value < low or (high is not None and value > high):
+        bound = f"between {low:g} and {high:g}" if high is not None else f">= {low:g}"
+        raise ProbeError(f"{name} must be {bound}, got {value!r}")
+    return float(value)
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +131,9 @@ _FAULTS: dict[str, Callable[[], ToolCallError]] = {
 }
 
 
-def _fault_factory(with_: str | type[BaseException] | BaseException) -> Callable[[], BaseException]:
+def _fault_factory(
+    with_: str | type[BaseException] | BaseException,
+) -> Callable[[], BaseException]:
     if isinstance(with_, str):
         try:
             return _FAULTS[with_]
@@ -110,6 +154,10 @@ def _fault_label(with_: Any) -> str:
     if isinstance(with_, BaseException):
         return type(with_).__name__
     return getattr(with_, "__name__", repr(with_))
+
+
+def _first_calls(n: int) -> str:
+    return f"the first {n} call{'s' if n > 1 else ''}"
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +181,7 @@ class _Rule:
     required: bool
     planned: int | None  # faults the rule intends to apply; None = open-ended
     decide: Callable[[int], _Action | None]  # nth call offered to this rule -> action
+    consumes_every_call: bool  # True if no later rule for this tool can ever be reached
     injected: int = 0
     offered: int = 0  # calls that reached this rule (not consumed by earlier rules)
 
@@ -144,7 +193,9 @@ class ToolScenarios:
     same tool form a sequence: each call is offered to the rules in declaration
     order, and each rule counts only the calls that reach it. So
     ``fail_first(1).returns("stale", times=2)`` fails call 1, returns stale data
-    for calls 2 and 3, and lets call 4 through.
+    for calls 2 and 3, and lets call 4 through. A rule that applies to every call
+    (``always_fail()``, or ``returns``/``slow`` with ``times=None``) must be the
+    last rule for its tool; adding one after it raises :class:`ProbeError`.
     """
 
     def __init__(self, probe: Probe, tool: str) -> None:
@@ -155,15 +206,16 @@ class ToolScenarios:
         self, n: int = 1, *, with_: Any = "timeout", required: bool = True
     ) -> ToolScenarios:
         """Fail the first *n* calls to this tool, then let calls through."""
-        if n < 1:
-            raise ProbeError("fail_first(n) needs n >= 1")
+        count = _count("fail_first(n)", n, allow_none=False)
+        assert count is not None
         make = _fault_factory(with_)
         self._probe._add_rule(
             self._tool,
-            f"{self._tool}: fail {_first_calls(n)} with {_fault_label(with_)}",
+            f"{self._tool}: fail {_first_calls(count)} with {_fault_label(with_)}",
             required,
-            n,
-            lambda i: _Action("raise", exc=make()) if i <= n else None,
+            count,
+            lambda i: _Action("raise", exc=make()) if i <= count else None,
+            consumes_every_call=False,
         )
         return self
 
@@ -181,39 +233,42 @@ class ToolScenarios:
             required,
             None,
             lambda i: _Action("raise", exc=make()),
+            consumes_every_call=True,
         )
         return self
 
     def slow(self, *, ms: float, times: int | None = 1, required: bool = True) -> ToolScenarios:
         """Delay the first *times* calls by *ms* milliseconds, then run them normally.
         ``times=None`` delays every call."""
-        if ms < 0:
-            raise ProbeError("slow(ms) needs ms >= 0")
-        seconds = ms / 1000.0
-        label = "every call" if times is None else _first_calls(times)
+        seconds = _finite_number("slow(ms)", ms, low=0.0) / 1000.0
+        count = _count("slow(times)", times, allow_none=True)
+        label = "every call" if count is None else _first_calls(count)
         self._probe._add_rule(
             self._tool,
             f"{self._tool}: delay {label} by {ms:g} ms",
             required,
-            times,
-            lambda i: _Action("delay", seconds=seconds) if times is None or i <= times else None,
+            count,
+            lambda i: _Action("delay", seconds=seconds) if count is None or i <= count else None,
+            consumes_every_call=count is None,
         )
         return self
 
     def returns(self, value: Any, *, times: int | None = 1, required: bool = True) -> ToolScenarios:
         """Return *value* instead of calling the tool for the first *times* calls
         (``None`` = every call). Use it for wrong, stale or incomplete data."""
-        label = "every call" if times is None else _first_calls(times)
+        count = _count("returns(times)", times, allow_none=True)
+        label = "every call" if count is None else _first_calls(count)
         self._probe._add_rule(
             self._tool,
-            f"{self._tool}: return {value!r} for {label}",
+            f"{self._tool}: return {_short(value, 60)} for {label}",
             required,
-            times,
+            count,
             lambda i: (
                 _Action("return", value=copy.deepcopy(value))
-                if times is None or i <= times
+                if count is None or i <= count
                 else None
             ),
+            consumes_every_call=count is None,
         )
         return self
 
@@ -223,23 +278,19 @@ class ToolScenarios:
         """Fail each call with probability *p* (seeded). For experiments; regression
         tests should prefer the deterministic rules. Exercised once at least one
         fault fired."""
-        if not 0.0 <= p <= 1.0:
-            raise ProbeError("probability must be in [0, 1]")
+        prob = _finite_number("probability", p, low=0.0, high=1.0)
         rng = random.Random(seed)
         make = _fault_factory(with_)
         self._probe._add_rule(
             self._tool,
-            f"{self._tool}: fail with {_fault_label(with_)} at p={p:g}"
+            f"{self._tool}: fail with {_fault_label(with_)} at p={prob:g}"
             + (f" (seed {seed})" if seed is not None else ""),
             required,
             None,
-            lambda i: _Action("raise", exc=make()) if rng.random() < p else None,
+            lambda i: _Action("raise", exc=make()) if rng.random() < prob else None,
+            consumes_every_call=False,
         )
         return self
-
-
-def _first_calls(n: int) -> str:
-    return f"the first {n} call{'s' if n > 1 else ''}"
 
 
 class _Then:
@@ -257,23 +308,38 @@ class _Then:
 
 @dataclass
 class CallRecord:
-    """One tool call seen through a wrapper. Observed, never inferred."""
+    """One tool call seen through a wrapper. Observed, never inferred.
 
-    index: int  # order across all tools in this probe (1-based)
+    Created when the call **starts** (``status="pending"``), completed when it
+    returns or raises. ``started_seq`` / ``completed_seq`` order start and
+    completion events across all tools in the probe.
+    """
+
+    index: int  # invocation order across all tools in this probe (1-based)
     tool: str
-    tool_call_index: int  # nth call to this tool (1-based); 0 for after_probe_end
+    tool_call_index: int  # nth call to this tool while the probe was active; 0 if after end
     args: list[Any]
     kwargs: dict[str, Any]
-    outcome: str  # "returned" | "raised"
+    status: str = "pending"  # "pending" | "completed"
+    outcome: str | None = None  # "returned" | "raised" once completed
     value: str | None = None
     exception_type: str | None = None
     exception_message: str | None = None
     injected: bool = False
     fault: str | None = None  # scenario description when injected
     rule_id: int | None = None
-    duration_ms: float = 0.0
+    duration_ms: float | None = None
     span_id: str | None = None
-    after_probe_end: bool = False
+    started_seq: int = 0
+    completed_seq: int | None = None
+    after_probe_end: bool = False  # started after the probe closed (never evidence)
+    completed_after_close: bool = False  # started while active, finished after close
+
+    def to_dict(self) -> dict[str, Any]:
+        out = {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
+        out["args"] = _jsonable(self.args)
+        out["kwargs"] = _jsonable(self.kwargs)
+        return out
 
 
 @dataclass
@@ -342,8 +408,40 @@ def _evidence(rule: _Rule, calls_to_tool: int) -> ScenarioEvidence:
 
 
 def _short(value: Any, limit: int = 200) -> str:
-    text = repr(value)
+    try:
+        text = repr(value)
+    except Exception as exc:  # noqa: BLE001 - repr of arbitrary user objects
+        text = f"<unrepresentable {type(value).__name__}: {type(exc).__name__}>"
     return text if len(text) <= limit else text[: limit - 3] + "..."
+
+
+def _jsonable(value: Any, _depth: int = 0) -> Any:
+    """Convert to JSON-safe data without touching the caller's objects.
+
+    JSON-native values pass through. Datetimes, dates, times, decimals, UUIDs,
+    paths and enums become strings. Bytes become ``{"type": "bytes", "length",
+    "preview"}``. Anything else becomes ``{"type": <qualified name>, "repr": ...}``.
+    """
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else repr(value)
+    if _depth > 20:
+        return {"type": type(value).__name__, "repr": _short(value)}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_jsonable(v, _depth + 1) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v, _depth + 1) for k, v in value.items()}
+    if isinstance(value, (_dt.datetime, _dt.date, _dt.time)):
+        return value.isoformat()
+    if isinstance(value, enum.Enum):
+        return _jsonable(value.value, _depth + 1)
+    if isinstance(value, (decimal.Decimal, uuid.UUID, pathlib.PurePath)):
+        return str(value)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        raw = bytes(value)
+        return {"type": "bytes", "length": len(raw), "preview": raw[:32].hex()}
+    return {"type": f"{type(value).__module__}.{type(value).__qualname__}", "repr": _short(value)}
 
 
 # ---------------------------------------------------------------------------
@@ -353,13 +451,17 @@ def _short(value: Any, limit: int = 200) -> str:
 
 @dataclass
 class ProbeResult:
-    """Outcome of :meth:`Probe.run`, in three separate parts.
+    """Outcome of :meth:`Probe.run` / :meth:`Probe.arun`, in three separate parts.
 
-    * **Observed:** ``calls``, ``answer``, ``exception``, ``elapsed_ms``,
-      ``deadline_exceeded``, ``still_running`` and ``scenarios`` (evidence).
+    * **Observed:** ``calls`` (a snapshot at the end of the run, pending calls
+      included), ``answer``, ``exception``, ``elapsed_ms``, ``deadline_exceeded``,
+      ``still_running``, ``cancelled`` and ``scenarios`` (evidence).
     * **Asserted:** ``assertions``, filled by the ``assert_*`` methods.
     * **Inferred:** :attr:`retries` and :attr:`fallbacks`, heuristics over the
       call log, labelled as such.
+
+    The snapshot never changes after the run returns, even if a still-running
+    agent completes more calls later.
     """
 
     input: Any
@@ -373,28 +475,37 @@ class ProbeResult:
     calls: list[CallRecord]
     scenarios: list[ScenarioEvidence]
     known_tools: list[str]
+    cancelled: bool = False
     assertions: list[AssertionRecord] = field(default_factory=list)
 
     # ---- inferred (heuristics) ------------------------------------------------
 
+    def _ordered_pairs(self) -> list[tuple[CallRecord, CallRecord]]:
+        """Consecutive calls in invocation order where the first had already
+        failed before the second started (concurrent calls are never paired)."""
+        ordered = sorted(self.calls, key=lambda c: c.index)
+        return [
+            (prev, cur)
+            for prev, cur in zip(ordered, ordered[1:])
+            if prev.outcome == "raised"
+            and prev.completed_seq is not None
+            and prev.completed_seq < cur.started_seq
+        ]
+
     @property
     def retries(self) -> dict[str, int]:
-        """Heuristic: a call to the same tool directly after that tool raised."""
+        """Heuristic: the same tool called next, after that tool had raised."""
         out: dict[str, int] = {}
-        for prev, cur in zip(self.calls, self.calls[1:]):
-            if prev.outcome == "raised" and cur.tool == prev.tool:
+        for prev, cur in self._ordered_pairs():
+            if cur.tool == prev.tool:
                 out[cur.tool] = out.get(cur.tool, 0) + 1
         return out
 
     @property
     def fallbacks(self) -> list[tuple[str, str]]:
         """Heuristic: ``(failed_tool, next_tool)`` when a different tool was called
-        directly after a tool raised."""
-        return [
-            (prev.tool, cur.tool)
-            for prev, cur in zip(self.calls, self.calls[1:])
-            if prev.outcome == "raised" and cur.tool != prev.tool
-        ]
+        next, after a tool had raised."""
+        return [(p.tool, c.tool) for p, c in self._ordered_pairs() if c.tool != p.tool]
 
     # ---- assertions -------------------------------------------------------------
 
@@ -403,27 +514,33 @@ class ProbeResult:
         if status != "pass" and required:
             raise AssertionError(f"{name}: {message}\n\n{self.summary()}")
 
-    def _unassessable(self) -> str | None:
+    def _no_answer_reason(self) -> tuple[str, str] | None:
+        """Why an answer assertion cannot pass: (status, message), or None."""
         if self.still_running:
-            return "the agent was still running at the deadline, so there is no final answer"
+            return (
+                "unassessed",
+                "the agent was still running at the deadline, so there is no final answer",
+            )
+        if self.cancelled:
+            return ("unassessed", "the agent was cancelled at the deadline; no final answer")
+        if self.exception is not None:
+            return (
+                "fail",
+                f"no answer: the agent raised {type(self.exception).__name__}: {self.exception}",
+            )
+        if self.answer is None:
+            return ("fail", "no answer: the agent returned None")
         return None
 
     def assert_answer_contains(
         self, text: str, *, case_sensitive: bool = False, required: bool = True
     ) -> ProbeResult:
-        """The final answer contains *text*."""
+        """The agent produced a final answer, and it contains *text*."""
         name = f"answer contains {text!r}"
-        if (why := self._unassessable()) is not None:
-            self._record(name, "unassessed", why, required)
+        if (reason := self._no_answer_reason()) is not None:
+            self._record(name, *reason, required)
             return self
-        if self.answer is None:
-            reason = (
-                f"no answer: the agent raised {type(self.exception).__name__}: {self.exception}"
-                if self.exception is not None
-                else "no answer was produced"
-            )
-            self._record(name, "fail", reason, required)
-            return self
+        assert self.answer is not None
         hay, needle = (self.answer, text) if case_sensitive else (self.answer.lower(), text.lower())
         if needle in hay:
             self._record(name, "pass", "found", required)
@@ -434,14 +551,18 @@ class ProbeResult:
     def assert_answer_not_contains(
         self, text: str, *, case_sensitive: bool = False, required: bool = True
     ) -> ProbeResult:
-        """The final answer does not contain *text* (e.g. a success claim the agent
-        could not have verified)."""
+        """The agent produced a final answer, and it does not contain *text*.
+
+        A crash or a ``None`` answer does **not** pass: "no answer" is not the
+        same as "an answer without the claim". Check crashes with
+        :meth:`assert_no_crash`.
+        """
         name = f"answer does not contain {text!r}"
-        if (why := self._unassessable()) is not None:
-            self._record(name, "unassessed", why, required)
+        if (reason := self._no_answer_reason()) is not None:
+            self._record(name, *reason, required)
             return self
-        answer = self.answer or ""
-        hay, needle = (answer, text) if case_sensitive else (answer.lower(), text.lower())
+        assert self.answer is not None
+        hay, needle = (self.answer, text) if case_sensitive else (self.answer.lower(), text.lower())
         if needle in hay:
             self._record(name, "fail", f"answer was {self.answer!r}", required)
         else:
@@ -451,8 +572,8 @@ class ProbeResult:
     def assert_no_crash(self, *, required: bool = True) -> ProbeResult:
         """No exception escaped the agent."""
         name = "no unhandled exception"
-        if (why := self._unassessable()) is not None:
-            self._record(name, "unassessed", why, required)
+        if self.still_running or self.cancelled:
+            self._record(name, "unassessed", "the agent did not finish", required)
         elif self.exception is not None:
             self._record(
                 name, "fail", f"{type(self.exception).__name__}: {self.exception}", required
@@ -462,31 +583,52 @@ class ProbeResult:
         return self
 
     def assert_within(self, seconds: float, *, required: bool = True) -> ProbeResult:
-        """The run finished within *seconds*. A run that is still going fails here,
-        because the deadline was exceeded, which is an observed fact."""
+        """The run finished within *seconds*. A run that is still going or was
+        cancelled fails here: exceeding the deadline is an observed fact."""
         name = f"finished within {seconds:g}s"
-        if self.still_running or self.elapsed_ms > seconds * 1000:
-            self._record(
-                name,
-                "fail",
-                f"took {self.elapsed_ms / 1000:.2f}s"
-                + (" and is still running" if self.still_running else ""),
-                required,
-            )
+        took = f"took {self.elapsed_ms / 1000:.2f}s"
+        if self.still_running:
+            self._record(name, "fail", took + " and is still running", required)
+        elif self.cancelled:
+            self._record(name, "fail", took + " and was cancelled", required)
+        elif self.elapsed_ms > seconds * 1000:
+            self._record(name, "fail", took, required)
         else:
-            self._record(name, "pass", f"took {self.elapsed_ms / 1000:.2f}s", required)
+            self._record(name, "pass", took, required)
         return self
 
+    def _calls_to(self, tool: str) -> list[CallRecord]:
+        return [c for c in self.calls if c.tool == tool and not c.after_probe_end]
+
     def assert_called(self, tool: str, *, required: bool = True) -> ProbeResult:
+        """*tool* was called (a call in flight counts: the boundary was reached)."""
         name = f"tool {tool!r} was called"
-        n = sum(1 for c in self.calls if c.tool == tool)
-        self._record(name, "pass" if n else "fail", f"{n} call(s)", required)
+        n = len(self._calls_to(tool))
+        if n:
+            self._record(name, "pass", f"{n} call(s)", required)
+        elif self.still_running:
+            self._record(
+                name, "unassessed", "not yet called, and the agent is still running", required
+            )
+        else:
+            self._record(name, "fail", "0 calls", required)
         return self
 
     def assert_not_called(self, tool: str, *, required: bool = True) -> ProbeResult:
+        """*tool* was never called. A call in flight is a call. While the agent is
+        still running, "not called yet" cannot establish "never called"."""
         name = f"tool {tool!r} was not called"
-        n = sum(1 for c in self.calls if c.tool == tool)
-        self._record(name, "fail" if n else "pass", f"{n} call(s)", required)
+        calls = self._calls_to(tool)
+        if calls:
+            pending = sum(1 for c in calls if c.status == "pending")
+            detail = f"{len(calls)} call(s)" + (f", {pending} still in flight" if pending else "")
+            self._record(name, "fail", detail, required)
+        elif self.still_running:
+            self._record(
+                name, "unassessed", "not called yet, but the agent is still running", required
+            )
+        else:
+            self._record(name, "pass", "0 calls", required)
         return self
 
     def assert_scenarios_exercised(self) -> ProbeResult:
@@ -508,23 +650,7 @@ class ProbeResult:
     def gate(self) -> GateReport:
         """Pass only if every required scenario was exercised and every required
         assertion passed. Unassessed, error and missing evidence never pass."""
-        failures: list[str] = []
-        req_s = [s for s in self.scenarios if s.required]
-        for s in req_s:
-            if s.status != "exercised":
-                failures.append(_scenario_problem(s, self.known_tools, self.calls))
-        req_a = [a for a in self.assertions if a.required]
-        for a in req_a:
-            if a.status != "pass":
-                failures.append(f"assertion {a.name!r} is {a.status}: {a.message}")
-        return GateReport(
-            passed=not failures,
-            failures=failures,
-            scenarios_exercised=sum(1 for s in req_s if s.status == "exercised"),
-            scenarios_required=len(req_s),
-            assertions_passed=sum(1 for a in req_a if a.status == "pass"),
-            assertions_required=len(req_a),
-        )
+        return _gate(self.scenarios, self.assertions, self.known_tools, self.calls)
 
     # ---- presentation ----------------------------------------------------------
 
@@ -536,16 +662,21 @@ class ProbeResult:
         timing = f"  elapsed: {self.elapsed_ms / 1000:.2f}s"
         if self.deadline_exceeded:
             timing += f" (deadline {self.deadline_seconds:g}s exceeded"
-            timing += ", agent still running)" if self.still_running else ")"
+            if self.still_running:
+                timing += ", agent still running"
+            elif self.cancelled:
+                timing += ", agent cancelled"
+            timing += ")"
         lines.append(timing)
         if not self.calls:
             lines.append("  tool calls: none")
-        for c in self.calls:
-            what = (
-                f"returned {c.value}"
-                if c.outcome == "returned"
-                else f"raised {c.exception_type}: {c.exception_message}"
-            )
+        for c in sorted(self.calls, key=lambda c: c.index):
+            if c.status == "pending":
+                what = "IN FLIGHT (no result yet)"
+            elif c.outcome == "returned":
+                what = f"returned {c.value}"
+            else:
+                what = f"raised {c.exception_type}: {c.exception_message}"
             fault = f"  [injected: {c.fault}]" if c.injected else ""
             lines.append(f"  {c.index}. {c.tool}({_call_args(c)}) {what}{fault}")
         lines.append("  scenarios:")
@@ -570,9 +701,12 @@ class ProbeResult:
         return self.summary()
 
     def to_dict(self) -> dict[str, Any]:
+        """JSON-safe representation (``json.dumps`` always works). Non-JSON values
+        are converted as described in :func:`_jsonable`; caller objects are not
+        modified."""
         return {
             "schema_version": SCHEMA_VERSION,
-            "input": _short(self.input),
+            "input": _jsonable(self.input),
             "observed": {
                 "answer": self.answer,
                 "exception": None
@@ -582,18 +716,45 @@ class ProbeResult:
                 "deadline_seconds": self.deadline_seconds,
                 "deadline_exceeded": self.deadline_exceeded,
                 "still_running": self.still_running,
-                "calls": [asdict(c) for c in self.calls],
-                "scenarios": [asdict(s) for s in self.scenarios],
+                "cancelled": self.cancelled,
+                "calls": [c.to_dict() for c in sorted(self.calls, key=lambda c: c.index)],
+                "scenarios": [dataclasses.asdict(s) for s in self.scenarios],
             },
-            "asserted": [asdict(a) for a in self.assertions],
+            "asserted": [dataclasses.asdict(a) for a in self.assertions],
             "inferred": {
-                "rule": "retry = same tool called right after it raised; "
-                "fallback = different tool called right after a tool raised",
+                "rule": "retry = same tool called next after it had raised; "
+                "fallback = different tool called next after a tool had raised; "
+                "calls that overlapped in time are never paired",
                 "retries": self.retries,
                 "fallbacks": [list(f) for f in self.fallbacks],
             },
-            "gate": asdict(self.gate()),
+            "gate": dataclasses.asdict(self.gate()),
         }
+
+
+def _gate(
+    scenarios: list[ScenarioEvidence],
+    assertions: list[AssertionRecord],
+    known_tools: list[str],
+    calls: list[CallRecord],
+) -> GateReport:
+    failures: list[str] = []
+    req_s = [s for s in scenarios if s.required]
+    for s in req_s:
+        if s.status != "exercised":
+            failures.append(_scenario_problem(s, known_tools, calls))
+    req_a = [a for a in assertions if a.required]
+    for a in req_a:
+        if a.status != "pass":
+            failures.append(f"assertion {a.name!r} is {a.status}: {a.message}")
+    return GateReport(
+        passed=not failures,
+        failures=failures,
+        scenarios_exercised=sum(1 for s in req_s if s.status == "exercised"),
+        scenarios_required=len(req_s),
+        assertions_passed=sum(1 for a in req_a if a.status == "pass"),
+        assertions_required=len(req_a),
+    )
 
 
 def _call_args(c: CallRecord) -> str:
@@ -608,7 +769,7 @@ def _scenario_problem(s: ScenarioEvidence, known_tools: list[str], calls: list[C
             f"(wrapped: {', '.join(known_tools) or 'none'})"
         )
     if not s.boundary_reached:
-        called = sorted({c.tool for c in calls})
+        called = sorted({c.tool for c in calls if not c.after_probe_end})
         return (
             f"scenario {s.description!r} not exercised: the agent never called {s.tool!r} "
             f"(tools called: {', '.join(called) or 'none'}). It may have bypassed the tool "
@@ -639,6 +800,8 @@ class Probe:
         self._late_calls: list[CallRecord] = []
         self._per_tool: dict[str, int] = {}
         self._known_tools: list[str] = []
+        self._next_index = 0
+        self._seq = 0
         self._active = False
         self._closed = False
         self._enforce = enforce
@@ -666,8 +829,8 @@ class Probe:
         self.__exit__(exc_type, exc, tb)
 
     def close(self) -> None:
-        """Stop injecting. Later calls through the wrappers pass straight through
-        and are recorded in :attr:`late_calls`, never as evidence."""
+        """Stop injecting. Calls that start later pass straight through and are
+        recorded in :attr:`late_calls`, never as evidence."""
         with self._lock:
             self._active = False
             self._closed = True
@@ -678,13 +841,15 @@ class Probe:
 
     @property
     def calls(self) -> list[CallRecord]:
+        """Snapshot of calls that started while the probe was active, in
+        invocation order. Pending calls are included."""
         with self._lock:
-            return list(self._calls)
+            return [dataclasses.replace(c) for c in self._calls]
 
     @property
     def late_calls(self) -> list[CallRecord]:
         with self._lock:
-            return list(self._late_calls)
+            return [dataclasses.replace(c) for c in self._late_calls]
 
     # ---- scenarios ---------------------------------------------------------------
 
@@ -699,12 +864,31 @@ class Probe:
         required: bool,
         planned: int | None,
         decide: Callable[[int], _Action | None],
+        *,
+        consumes_every_call: bool,
     ) -> None:
         with self._lock:
             if self._closed:
                 raise ProbeError("cannot add scenarios to a closed probe")
+            blocker = next(
+                (r for r in self._rules if r.tool == tool and r.consumes_every_call), None
+            )
+            if blocker is not None:
+                raise ProbeError(
+                    f"scenario {description!r} can never run: the earlier scenario "
+                    f"{blocker.description!r} applies to every call to {tool!r}. "
+                    "Declare it after the other scenarios for this tool."
+                )
             self._rules.append(
-                _Rule(len(self._rules) + 1, tool, description, required, planned, decide)
+                _Rule(
+                    len(self._rules) + 1,
+                    tool,
+                    description,
+                    required,
+                    planned,
+                    decide,
+                    consumes_every_call,
+                )
             )
 
     def scenarios(self) -> list[ScenarioEvidence]:
@@ -754,13 +938,13 @@ class Probe:
 
             @functools.wraps(fn)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                return await self._acall(name, fn, args, kwargs)
+                return await self._acall(name, fn, args, kwargs, key=None)
 
             return async_wrapper
 
         @functools.wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            return self._call(name, fn, args, kwargs)
+            return self._call(name, fn, args, kwargs, key=None)
 
         return wrapper
 
@@ -770,13 +954,14 @@ class Probe:
         name = tool.name
         self._register(name)
         clone = tool.model_copy()
+        key = id(clone)  # identity of this wrapped tool, for delegation detection
         inner_run = clone._run
 
         @functools.wraps(inner_run)
         def run(*args: Any, **kwargs: Any) -> Any:
-            if _IN_WRAPPER.get():
-                return inner_run(*args, **kwargs)
-            return self._call(name, inner_run, args, kwargs)
+            if key in _ACTIVE_WRAPPERS.get():
+                return inner_run(*args, **kwargs)  # same tool delegating to itself
+            return self._call(name, inner_run, args, kwargs, key=key)
 
         object.__setattr__(clone, "_run", run)
 
@@ -790,19 +975,19 @@ class Probe:
 
             @functools.wraps(inner_arun)
             async def arun(*args: Any, **kwargs: Any) -> Any:
-                if _IN_WRAPPER.get():
+                if key in _ACTIVE_WRAPPERS.get():
                     return await inner_arun(*args, **kwargs)
-                return await self._acall(name, inner_arun, args, kwargs)
+                return await self._acall(name, inner_arun, args, kwargs, key=key)
 
             object.__setattr__(clone, "_arun", arun)
         return clone
 
     # ---- the call path -------------------------------------------------------------
 
-    def _begin(
-        self, name: str, args: tuple, kwargs: dict
-    ) -> tuple[CallRecord, _Action | None, bool]:
+    def _begin(self, name: str, args: tuple, kwargs: dict) -> tuple[CallRecord, _Action | None]:
+        """Record the call at entry (pending) and decide its fault, atomically."""
         with self._lock:
+            self._seq += 1
             if not self._active:
                 rec = CallRecord(
                     index=len(self._late_calls) + 1,
@@ -810,10 +995,12 @@ class Probe:
                     tool_call_index=0,
                     args=list(args),
                     kwargs=_public_kwargs(kwargs),
-                    outcome="returned",
+                    started_seq=self._seq,
                     after_probe_end=True,
                 )
-                return rec, None, True
+                self._late_calls.append(rec)
+                return rec, None
+            self._next_index += 1
             n = self._per_tool.get(name, 0) + 1
             self._per_tool[name] = n
             action: _Action | None = None
@@ -827,26 +1014,48 @@ class Probe:
                     rule.injected += 1
                     break
             rec = CallRecord(
-                index=len(self._calls) + 1,
+                index=self._next_index,
                 tool=name,
                 tool_call_index=n,
                 args=list(args),
                 kwargs=_public_kwargs(kwargs),
-                outcome="returned",
                 injected=action is not None,
                 fault=rule_hit.description if rule_hit else None,
                 rule_id=rule_hit.rule_id if rule_hit else None,
+                started_seq=self._seq,
             )
-            return rec, action, False
+            self._calls.append(rec)
+            return rec, action
 
-    def _finish(self, rec: CallRecord, late: bool) -> None:
+    def _complete(
+        self,
+        rec: CallRecord,
+        *,
+        value: Any = None,
+        exc: BaseException | None = None,
+        started: float,
+    ) -> None:
         with self._lock:
-            (self._late_calls if late else self._calls).append(rec)
+            self._seq += 1
+            rec.status = "completed"
+            rec.completed_seq = self._seq
+            rec.duration_ms = (time.perf_counter() - started) * 1000
+            if exc is None:
+                rec.outcome = "returned"
+                rec.value = _short(value)
+            else:
+                rec.outcome = "raised"
+                rec.exception_type = type(exc).__name__
+                rec.exception_message = str(exc)[:300]
+            if not rec.after_probe_end and not self._active:
+                rec.completed_after_close = True
 
-    def _call(self, name: str, fn: Callable[..., Any], args: tuple, kwargs: dict) -> Any:
-        rec, action, late = self._begin(name, args, kwargs)
-        start = time.perf_counter()
-        token = _IN_WRAPPER.set(True)
+    def _call(
+        self, name: str, fn: Callable[..., Any], args: tuple, kwargs: dict, *, key: int | None
+    ) -> Any:
+        rec, action = self._begin(name, args, kwargs)
+        started = time.perf_counter()
+        token = _ACTIVE_WRAPPERS.set(_ACTIVE_WRAPPERS.get() | {key}) if key is not None else None
         try:
             with _tracer.start_as_current_span(
                 f"probe.tool.{name}",
@@ -862,22 +1071,22 @@ class Probe:
                     if action is not None and action.kind == "delay":
                         time.sleep(action.seconds)
                     result = fn(*args, **kwargs)
-                rec.value = _short(result)
-                return result
         except BaseException as exc:
-            rec.outcome = "raised"
-            rec.exception_type = type(exc).__name__
-            rec.exception_message = str(exc)[:300]
+            self._complete(rec, exc=exc, started=started)
             raise
+        else:
+            self._complete(rec, value=result, started=started)
+            return result
         finally:
-            _IN_WRAPPER.reset(token)
-            rec.duration_ms = (time.perf_counter() - start) * 1000
-            self._finish(rec, late)
+            if token is not None:
+                _ACTIVE_WRAPPERS.reset(token)
 
-    async def _acall(self, name: str, fn: Callable[..., Any], args: tuple, kwargs: dict) -> Any:
-        rec, action, late = self._begin(name, args, kwargs)
-        start = time.perf_counter()
-        token = _IN_WRAPPER.set(True)
+    async def _acall(
+        self, name: str, fn: Callable[..., Any], args: tuple, kwargs: dict, *, key: int | None
+    ) -> Any:
+        rec, action = self._begin(name, args, kwargs)
+        started = time.perf_counter()
+        token = _ACTIVE_WRAPPERS.set(_ACTIVE_WRAPPERS.get() | {key}) if key is not None else None
         try:
             with _tracer.start_as_current_span(
                 f"probe.tool.{name}",
@@ -893,63 +1102,94 @@ class Probe:
                     if action is not None and action.kind == "delay":
                         await asyncio.sleep(action.seconds)
                     result = await fn(*args, **kwargs)
-                rec.value = _short(result)
-                return result
         except BaseException as exc:
-            rec.outcome = "raised"
-            rec.exception_type = type(exc).__name__
-            rec.exception_message = str(exc)[:300]
+            self._complete(rec, exc=exc, started=started)
             raise
+        else:
+            self._complete(rec, value=result, started=started)
+            return result
         finally:
-            _IN_WRAPPER.reset(token)
-            rec.duration_ms = (time.perf_counter() - start) * 1000
-            self._finish(rec, late)
+            if token is not None:
+                _ACTIVE_WRAPPERS.reset(token)
 
     # ---- running the agent ---------------------------------------------------------
 
-    def run(
-        self, agent: Any, input: Any = None, *args: Any, timeout: float | None = None, **kwargs: Any
-    ) -> ProbeResult:
-        """Run *agent* on *input* and return a :class:`ProbeResult`.
-
-        *agent* may be a function (sync or async) or an object with ``invoke`` /
-        ``ainvoke`` (LangChain runnables, compiled LangGraph graphs, AgentProbe
-        adapters). Exceptions from the agent are captured in the result, not raised,
-        so you can assert on them.
-
-        With ``timeout`` the agent runs in a worker thread. If it is still running at
-        the deadline, the result is marked ``deadline_exceeded`` and ``still_running``,
-        and the probe closes so late tool calls cannot count as evidence.
-        """
+    def _check_runnable(self) -> None:
         if self._closed:
             raise ProbeError("this probe is closed; use a new probe for a new test")
-        call = _agent_callable(agent)
+
+    def run(
+        self,
+        agent: Any,
+        input: Any = None,
+        *args: Any,
+        timeout: float | None = None,
+        **kwargs: Any,
+    ) -> ProbeResult:
+        """Run a **synchronous** agent on *input* and return a :class:`ProbeResult`.
+
+        *agent* may be a function or an object with ``invoke`` (LangChain
+        runnables, compiled LangGraph graphs, AgentProbe adapters). An async agent
+        is also accepted when no event loop is running in this thread; inside a
+        running loop (an async test) use ``await p.arun(...)`` instead, which this
+        method tells you before doing anything.
+
+        Exceptions from the agent are captured in the result, not raised. With
+        ``timeout`` the agent runs in a worker thread. Python cannot stop a
+        thread, so if the agent is still running at the deadline the result is
+        marked ``deadline_exceeded`` and ``still_running`` and the probe closes.
+        """
+        self._check_runnable()
+        call = _agent_callable(agent, prefer_async=False)
+        if _loop_running() and _is_async_callable(call):
+            raise ProbeError(
+                "this agent is async and an event loop is already running here; "
+                "use `await p.arun(agent, input)` instead of `p.run(...)`"
+            )
         call_args = ((input,) if input is not None else ()) + args
-        start = time.perf_counter()
-        output: Any = None
-        error: BaseException | None = None
-        still_running = False
-        deadline_exceeded = False
 
         def target() -> Any:
             res = call(*call_args, **kwargs)
             if inspect.isawaitable(res):
+                if _loop_running():
+                    if inspect.iscoroutine(res):
+                        res.close()  # never leave an un-awaited coroutine behind
+                    raise ProbeError(
+                        "the agent returned an awaitable inside a running event loop; "
+                        "use `await p.arun(agent, input)`"
+                    )
                 return asyncio.run(_await(res))
             return res
+
+        start = time.perf_counter()
+        output: Any = None
+        error: BaseException | None = None
+        still_running = deadline_exceeded = False
 
         if timeout is None:
             try:
                 output = target()
+            except ProbeError:
+                raise
             except Exception as exc:  # noqa: BLE001 - captured for assertions
                 error = exc
         else:
+            budget = _finite_number("timeout", timeout, low=0.0)
             ctx = contextvars.copy_context()
             pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             future = pool.submit(ctx.run, target)
             pool.shutdown(wait=False)
-            try:
-                output = future.result(timeout=timeout)
-            except concurrent.futures.TimeoutError:
+            done, _ = concurrent.futures.wait([future], timeout=budget)
+            if done:
+                # The agent finished in time. Whatever it raised (including its own
+                # TimeoutError) is the agent's exception, not our deadline.
+                try:
+                    output = future.result()
+                except ProbeError:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    error = exc
+            else:
                 deadline_exceeded = True
                 still_running = not future.done()
                 if still_running:
@@ -959,13 +1199,90 @@ class Probe:
                         output = future.result()
                     except Exception as exc:  # noqa: BLE001
                         error = exc
-            except Exception as exc:  # noqa: BLE001
-                error = exc
+        return self._result(
+            input, output, error, start, timeout, deadline_exceeded, still_running, cancelled=False
+        )
 
-        elapsed_ms = (time.perf_counter() - start) * 1000
-        if timeout is not None and not deadline_exceeded and elapsed_ms > timeout * 1000:
+    async def arun(
+        self,
+        agent: Any,
+        input: Any = None,
+        *args: Any,
+        timeout: float | None = None,
+        **kwargs: Any,
+    ) -> ProbeResult:
+        """Run an agent from async code and return a :class:`ProbeResult`.
+
+        Async agents (``async def`` functions, objects with ``ainvoke``) run in the
+        current event loop. With ``timeout`` they are **cancelled** at the deadline,
+        so they do not keep running; the result has ``deadline_exceeded`` and
+        ``cancelled`` set. Sync agents run in a worker thread via
+        :func:`asyncio.to_thread`; like :meth:`run`, a sync agent that outlives the
+        deadline cannot be stopped and is reported as ``still_running``.
+        """
+        self._check_runnable()
+        call = _agent_callable(agent, prefer_async=True)
+        call_args = ((input,) if input is not None else ()) + args
+        is_async = _is_async_callable(call)
+        start = time.perf_counter()
+        output: Any = None
+        error: BaseException | None = None
+        deadline_exceeded = still_running = cancelled = False
+
+        if is_async:
+            task = asyncio.ensure_future(call(*call_args, **kwargs))
+        else:
+            task = asyncio.ensure_future(asyncio.to_thread(call, *call_args, **kwargs))
+
+        budget = None if timeout is None else _finite_number("timeout", timeout, low=0.0)
+        done, _ = await asyncio.wait({task}, timeout=budget)
+        if done:
+            try:
+                output = task.result()
+                if inspect.isawaitable(output):  # a sync callable that returned a coroutine
+                    output = await output
+            except Exception as exc:  # noqa: BLE001 - captured for assertions
+                error = exc
+        else:
             deadline_exceeded = True
-        answer = None if (error is not None or still_running) else _answer_text(output)
+            if is_async:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    cancelled = True
+                except Exception as exc:  # noqa: BLE001 - raised while being cancelled
+                    error = exc
+                    cancelled = True
+            else:
+                still_running = True
+            self.close()
+        return self._result(
+            input,
+            output,
+            error,
+            start,
+            timeout,
+            deadline_exceeded,
+            still_running,
+            cancelled=cancelled,
+        )
+
+    def _result(
+        self,
+        input: Any,
+        output: Any,
+        error: BaseException | None,
+        start: float,
+        timeout: float | None,
+        deadline_exceeded: bool,
+        still_running: bool,
+        *,
+        cancelled: bool,
+    ) -> ProbeResult:
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        finished = not (still_running or cancelled)
+        answer = _answer_text(output) if (finished and error is None) else None
         result = ProbeResult(
             input=input,
             answer=answer,
@@ -975,7 +1292,8 @@ class Probe:
             deadline_seconds=timeout,
             deadline_exceeded=deadline_exceeded,
             still_running=still_running,
-            calls=self.calls,
+            cancelled=cancelled,
+            calls=self.calls,  # frozen snapshot, pending calls included
             scenarios=self.scenarios(),
             known_tools=list(self._known_tools),
         )
@@ -986,39 +1304,42 @@ class Probe:
     # ---- gate ------------------------------------------------------------------------
 
     def gate(self) -> GateReport:
-        """The gate over the whole probe: every required scenario exercised (from all
-        calls made while the probe was active) and every required assertion passed
-        in every result."""
+        """The gate over the whole probe: every required scenario exercised (from
+        all calls that started while the probe was active) and every required
+        assertion passed in every result."""
         with self._lock:
-            results = list(self._results)
-        merged = ProbeResult(
-            input=None,
-            answer=None,
-            raw_output=None,
-            exception=None,
-            elapsed_ms=0.0,
-            deadline_seconds=None,
-            deadline_exceeded=False,
-            still_running=False,
-            calls=self.calls,
-            scenarios=self.scenarios(),
-            known_tools=list(self._known_tools),
-            assertions=[a for r in results for a in r.assertions],
-        )
-        return merged.gate()
+            assertions = [a for r in self._results for a in r.assertions]
+        return _gate(self.scenarios(), assertions, list(self._known_tools), self.calls)
 
 
 async def _await(aw: Any) -> Any:
     return await aw
 
 
-def _agent_callable(agent: Any) -> Callable[..., Any]:
-    if callable(agent) and not hasattr(agent, "invoke"):
-        return agent  # type: ignore[no-any-return]
+def _loop_running() -> bool:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return False
+    return True
+
+
+def _is_async_callable(fn: Any) -> bool:
+    if inspect.iscoroutinefunction(fn):
+        return True
+    dunder_call = getattr(fn, "__call__", None)  # noqa: B004 - objects with async __call__
+    return dunder_call is not None and inspect.iscoroutinefunction(dunder_call)
+
+
+def _agent_callable(agent: Any, *, prefer_async: bool) -> Callable[..., Any]:
+    if prefer_async and hasattr(agent, "ainvoke"):
+        return agent.ainvoke  # type: ignore[no-any-return]
     if hasattr(agent, "invoke"):
         return agent.invoke  # type: ignore[no-any-return]
     if hasattr(agent, "ainvoke"):
         return agent.ainvoke  # type: ignore[no-any-return]
+    if callable(agent):
+        return agent  # type: ignore[no-any-return]
     raise ProbeError(f"{type(agent).__name__} is not callable and has no invoke()")
 
 

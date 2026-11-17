@@ -9,6 +9,11 @@
 - `ProbeResult` separates observed events (call log, answer, exception, timing, evidence), assertion results (`pass`/`fail`/`unassessed`/`error`) and inferred labels (retries, fallbacks); `summary()` and a versioned `to_dict()` (#66)
 - Gate on probe exit: passes only when every required scenario was exercised and every required assertion passed
 - Instrumentation contract (`docs/instrumentation.md`): no in-place patching, per-probe state, cleanup on exception and cancellation, and late tool calls from a still-running agent recorded as `after_probe_end` and never counted (#95)
+- `await p.arun(...)` for async agents and async tests: async agents run in the current loop and are cancelled at the deadline (`cancelled=True`); `p.run()` rejects async agents inside a running loop before creating a coroutine
+- Calls are recorded when they start (`status="pending"`/`"completed"`, entry-allocated `index`, `started_seq`/`completed_seq`); results are frozen snapshots; calls finishing after the probe closed are marked `completed_after_close`
+- Answer assertions require an actual answer: a crash, `None`, a still-running or cancelled agent never passes `assert_answer_not_contains`
+- Scenario validation at declaration: positive whole-number counts, finite delays and probabilities, and no rules after one that applies to every call
+- `to_dict()` is always JSON-safe (schema 1.1)
 - Tutorial and example (`examples/your_agent/`): an order-status agent, a deliberately broken version the tests catch, a cache-skipping agent the gate rejects, and a copyable CI workflow (#67)
 
 

@@ -52,6 +52,15 @@ The distribution is named `agentprobe-toolkit` because `agentprobe` was already 
 
 Wrap the tools your agent already uses, break one on purpose, and check the outcome. No model or API key needed.
 
+> **Pre-release:** this API ships in AgentProbe 1.4, which is not on PyPI yet. Until it is, install from GitHub:
+>
+> ```bash
+> pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/AgentProbe@main" pytest
+> python -c "import agentprobe; print(agentprobe.__version__)"   # 1.4.0.dev0 or later
+> ```
+>
+> Once 1.4 is released, `pip install "agentprobe-toolkit>=1.4" pytest` is enough.
+
 ```python
 from agentprobe.testing import probe
 

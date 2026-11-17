@@ -15,7 +15,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install agentprobe-toolkit pytest
+      # Until AgentProbe 1.4 is on PyPI, install it from GitHub. After the release,
+      # replace this line with: pip install "agentprobe-toolkit>=1.4" pytest
+      - run: pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/AgentProbe@main" pytest
       # Point this at the folder with your fault tests.
       - run: pytest tests/ --junitxml=agentprobe-results.xml
       - uses: actions/upload-artifact@v4
