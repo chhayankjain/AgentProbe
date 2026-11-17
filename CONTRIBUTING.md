@@ -20,6 +20,13 @@ ruff check agentprobe/ tests/
 ruff format --check agentprobe/ tests/
 ```
 
+## Where to start
+
+- [ROADMAP.md](ROADMAP.md) explains what we're building and why, milestone by milestone.
+- [Good first issues](https://github.com/chhayankjain/AgentProbe/labels/good%20first%20issue) are small and need no model or API key.
+- Every roadmap issue has **Why / Scope / Acceptance criteria / Where to start / Size**. Comment to claim one; we reply within two working days.
+- Have a real agent? Trying AgentProbe on it and reporting friction (#68) is the most valuable contribution right now.
+
 ## Workflow
 
 1. Fork the repo and create a branch from `main`
