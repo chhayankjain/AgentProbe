@@ -862,6 +862,51 @@ def load_completed_records(batch_dir: Path, state: ExperimentState) -> list[Enha
     return records
 
 
+#: Settings a resume must not change. Compared by key presence, so an explicit
+#: ``None`` (e.g. unlimited RPM) is a real value, not "unknown".
+RESUME_COMPAT_KEYS: tuple[str, ...] = (
+    "model",
+    "seed",
+    "n_runs_per_condition",
+    "injection_probability",
+    "llm_provider",
+    "llm_base_url",
+    "llm_timeout_seconds",
+    "llm_max_retries",
+    "llm_requests_per_minute",
+    "llm_temperature",
+)
+
+#: What batches recorded before provider support (no ``llm_*`` keys) actually
+#: ran with: local Ollama via langchain-ollama at temperature 0, no throttle.
+#: Resuming such a batch is allowed only if these still hold. Their timeout and
+#: client-retry behaviour was not recorded, so those keys cannot be checked.
+LEGACY_LLM_DEFAULTS: dict[str, Any] = {
+    "llm_provider": "ollama",
+    "llm_base_url": "http://localhost:11434/v1",
+    "llm_requests_per_minute": None,
+    "llm_temperature": 0.0,
+}
+
+
+def resume_mismatches(original: dict[str, Any], current: dict[str, Any]) -> list[str]:
+    """Differences that make *current* unsafe to append to a batch run with *original*."""
+    problems: list[str] = []
+    for key in RESUME_COMPAT_KEYS:
+        new_val = current.get(key)
+        if key in original:
+            if original[key] != new_val:
+                problems.append(f"  {key}: original={original[key]!r}, current={new_val!r}")
+        elif key in LEGACY_LLM_DEFAULTS:
+            legacy = LEGACY_LLM_DEFAULTS[key]
+            if new_val != legacy:
+                problems.append(
+                    f"  {key}: not recorded in this pre-provider batch, which ran with "
+                    f"{legacy!r}; current={new_val!r}"
+                )
+    return problems
+
+
 def compute_summary(batch_dir: Path, all_records: list[EnhancedRunRecord]) -> None:
     """Compute and save aggregate metrics from raw records."""
     calc = MetricsCalculator()
@@ -1037,28 +1082,7 @@ def main() -> None:
     if meta_path.exists():
         with open(meta_path) as f:
             original_meta = json.load(f)
-        # Reject changes to critical configuration fields
-        _compat_fields = [
-            ("model", "model"),
-            ("seed", "seed"),
-            ("n_runs_per_condition", "n_runs_per_condition"),
-            ("injection_probability", "injection_probability"),
-            # Absent in pre-provider batches (orig None => check skipped).
-            ("llm_provider", "llm_provider"),
-            ("llm_base_url", "llm_base_url"),
-            ("llm_timeout_seconds", "llm_timeout_seconds"),
-            ("llm_max_retries", "llm_max_retries"),
-            ("llm_requests_per_minute", "llm_requests_per_minute"),
-            ("llm_temperature", "llm_temperature"),
-        ]
-        mismatches = []
-        for field_name, meta_key in _compat_fields:
-            orig_val = original_meta.get(meta_key)
-            new_val = meta.get(meta_key)
-            if orig_val is not None and orig_val != new_val:
-                mismatches.append(
-                    f"  {field_name}: original={orig_val}, current={new_val}"
-                )
+        mismatches = resume_mismatches(original_meta, meta)
         if mismatches:
             _console.print(
                 "[red bold]Resume rejected — configuration mismatch "
