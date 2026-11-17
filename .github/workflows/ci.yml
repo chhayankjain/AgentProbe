@@ -41,6 +41,9 @@ jobs:
       - name: Run tests
         run: pytest tests/ -v --tb=short -m "not slow and not integration"
 
+      - name: Run the own-agent example and tutorial tests
+        run: pytest examples/your_agent -v --tb=short --junitxml=agentprobe-example.xml
+
   lint:
     runs-on: ubuntu-latest
     steps:

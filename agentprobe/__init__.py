@@ -19,11 +19,16 @@ from agentprobe.injector.tool_failure import (
 )
 from agentprobe.observer.classifier import FailureCategory, FailureClassifier
 from agentprobe.observer.tracer import AgentProbeTracer, get_tracer
+from agentprobe.probe import Probe, ProbeGateError, ProbeResult
 
-__version__ = "1.3.0"
+__version__ = "1.4.0.dev0"
 
 __all__ = [
     "__version__",
+    # Test your own agent (the probe() helper lives in agentprobe.testing)
+    "Probe",
+    "ProbeResult",
+    "ProbeGateError",
     # Injection
     "ToolFailureConfig",
     "ToolFailureInjector",
