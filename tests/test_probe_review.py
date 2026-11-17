@@ -429,8 +429,8 @@ class TestJsonSafety:
         assert args[1] == {"type": "bytes", "length": 9, "preview": blob.hex()}
         assert args[2]["type"].endswith("Custom") and args[2]["repr"] == "Custom()"
         assert args[3] == "1.50"
-        # caller objects untouched
-        assert isinstance(r.calls[0].args[0], dt.datetime) and r.calls[0].args[2] is obj
+        # caller objects untouched; the live references are kept separately
+        assert isinstance(r.calls[0].raw_args[0], dt.datetime) and r.calls[0].raw_args[2] is obj
 
     def test_unrepresentable_object_does_not_break_reporting(self):
         class Bad:
@@ -443,3 +443,171 @@ class TestJsonSafety:
         d = json.loads(json.dumps(r.to_dict()))
         assert "unrepresentable Bad" in d["observed"]["calls"][0]["args"][0]["repr"]
         assert "unrepresentable Bad" in r.summary()
+
+
+# ---------------------------------------------------------------------------
+# Re-review: async lifetime under one deadline, bounded cancellation, caller
+# cancellation, frozen argument evidence
+# ---------------------------------------------------------------------------
+
+
+class TestAsyncLifetime:
+    async def test_sync_callable_returning_coroutine_is_under_the_deadline(self):
+        """Reported case: a 40 ms coroutine returned by a sync lambda, timeout 5 ms,
+        came back after ~41 ms with deadline_exceeded=False."""
+
+        async def slow():
+            await asyncio.sleep(0.04)
+            return "late answer"
+
+        async with probe(enforce=False) as p:
+            r = await p.arun(lambda q: slow(), "q", timeout=0.005)
+        assert r.deadline_exceeded and r.cancel_requested and r.cancelled
+        assert r.answer is None and r.elapsed_ms < 1000
+
+    async def test_returned_awaitable_object_is_awaited(self):
+        loop = asyncio.get_running_loop()
+
+        def agent(q):
+            fut = loop.create_future()
+            loop.call_later(0.01, fut.set_result, f"future {q}")
+            return fut
+
+        async with probe(enforce=False) as p:
+            r = await p.arun(agent, "q", timeout=2)
+        assert r.answer == "future q" and not r.deadline_exceeded
+
+    async def test_agent_suppressing_cancellation_is_bounded_and_isolated(self):
+        """Reported case: an agent caught CancelledError, arun waited forever, and a
+        tool call after the deadline was injected and counted as evidence."""
+        release = asyncio.Event()
+
+        async def tool(x: str) -> str:
+            return "ok"
+
+        async with probe(enforce=False) as p:
+            t = p.wrap({"tool": tool})["tool"]
+            p.on("tool").always_fail()
+
+            async def stubborn(q):
+                try:
+                    await asyncio.sleep(10)
+                except asyncio.CancelledError:
+                    await release.wait()  # ignores cancellation, keeps going
+                    return await t("after deadline")
+
+            started = time.perf_counter()
+            r = await p.arun(stubborn, "q", timeout=0.02, cancel_grace=0.05)
+            assert time.perf_counter() - started < 2  # bounded
+            assert not p.active  # closed before cleanup
+        assert r.deadline_exceeded and r.cancel_requested
+        assert r.still_running and not r.cancelled
+        release.set()
+        for _ in range(100):
+            if p.late_calls:
+                break
+            await asyncio.sleep(0.01)
+        late = p.late_calls
+        assert late and late[0].after_probe_end and not late[0].injected
+        assert p.scenarios()[0].injected == 0  # never counted as evidence
+        assert p.calls == []
+
+    async def test_agent_that_finishes_during_grace_is_reported_honestly(self):
+        async def ignores_then_finishes(q):
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                return "finished anyway"
+
+        async with probe(enforce=False) as p:
+            r = await p.arun(ignores_then_finishes, "q", timeout=0.02, cancel_grace=1)
+        assert r.deadline_exceeded and r.cancel_requested
+        assert not r.cancelled and not r.still_running and r.answer == "finished anyway"
+        with pytest.raises(AssertionError, match="finished within"):
+            r.assert_within(0.02)
+
+    async def test_caller_cancellation_cancels_async_agent(self):
+        """Reported case: cancelling the caller left the agent task running."""
+        agent_cancelled = asyncio.Event()
+        agent_started = asyncio.Event()
+
+        async def agent(q):
+            agent_started.set()
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                agent_cancelled.set()
+                raise
+
+        p = probe(enforce=False)
+        async with p:
+            caller = asyncio.ensure_future(p.arun(agent, "q", cancel_grace=1))
+            await agent_started.wait()
+            caller.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await caller
+            assert agent_cancelled.is_set()
+            assert not p.active
+
+    async def test_caller_cancellation_with_sync_agent_in_thread(self):
+        release = threading.Event()
+        entered = threading.Event()
+
+        def sync_agent(q):
+            entered.set()
+            release.wait(2)
+            return "done"
+
+        p = probe(enforce=False)
+        async with p:
+            caller = asyncio.ensure_future(p.arun(sync_agent, "q", cancel_grace=0.05))
+            while not entered.is_set():
+                await asyncio.sleep(0.005)
+            caller.cancel()
+            started = time.perf_counter()
+            with pytest.raises(asyncio.CancelledError):
+                await caller
+            assert time.perf_counter() - started < 2  # bounded, the thread can't be stopped
+            assert not p.active
+        release.set()
+
+    async def test_sync_agent_past_deadline_is_still_running(self):
+        release = threading.Event()
+        async with probe(enforce=False) as p:
+            r = await p.arun(lambda q: release.wait(2) or "x", "q", timeout=0.02, cancel_grace=0.02)
+        release.set()
+        assert r.deadline_exceeded and r.still_running and not r.cancelled
+
+    async def test_invalid_cancel_grace_rejected(self):
+        async with probe(enforce=False) as p:
+            with pytest.raises(ProbeError):
+                await p.arun(lambda q: "x", "q", cancel_grace=-1)
+
+
+class TestFrozenArguments:
+    def test_mutating_arguments_after_the_run_does_not_change_evidence(self):
+        """Reported case: mutating an input dict after the run changed the earlier
+        result's serialized evidence."""
+        payload = {"status": "initial", "items": [1, 2]}
+        with probe(enforce=False) as p:
+            w = p.wrap({"tool": lambda d: "ok"})["tool"]
+            r = p.run(lambda q: w(payload), "q")
+        before = json.dumps(r.to_dict(), sort_keys=True)
+        summary_before = r.summary()
+        payload["status"] = "changed later"
+        payload["items"].append(3)
+        assert json.dumps(r.to_dict(), sort_keys=True) == before
+        assert r.summary() == summary_before
+        assert r.calls[0].args == [{"status": "initial", "items": [1, 2]}]
+        assert p.calls[0].args == [{"status": "initial", "items": [1, 2]}]
+        # the live reference is still available, separately, and does change
+        assert r.calls[0].raw_args[0]["status"] == "changed later"
+
+    def test_uncopyable_arguments_are_fine(self):
+        lock = threading.Lock()
+        with probe(enforce=False) as p:
+            w = p.wrap({"tool": lambda resource: "ok"})["tool"]
+            r = p.run(lambda q: w(lock), "q")
+        assert r.calls[0].raw_args[0] is lock
+        assert "lock" in r.calls[0].args[0]["repr"].lower()
+        json.dumps(r.to_dict())

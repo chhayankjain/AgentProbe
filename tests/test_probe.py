@@ -370,7 +370,7 @@ class TestProbeResult:
         s = r.summary()
         assert s.index("Observed") < s.index("Asserted") < s.index("Inferred")
         d = json.loads(json.dumps(r.to_dict(), default=str))
-        assert d["schema_version"] == "1.1"
+        assert d["schema_version"] == "1.2"
         assert set(d) >= {"observed", "asserted", "inferred", "gate"}
         assert d["gate"]["passed"] is True
 

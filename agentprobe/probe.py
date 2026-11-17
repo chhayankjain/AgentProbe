@@ -70,7 +70,7 @@ from agentprobe.injector.tool_failure import (
 )
 from agentprobe.observer.tracer import get_tracer
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
 
 _tracer = get_tracer(__name__)
 
@@ -318,8 +318,8 @@ class CallRecord:
     index: int  # invocation order across all tools in this probe (1-based)
     tool: str
     tool_call_index: int  # nth call to this tool while the probe was active; 0 if after end
-    args: list[Any]
-    kwargs: dict[str, Any]
+    args: list[Any]  # JSON-safe snapshot taken when the call started; never changes
+    kwargs: dict[str, Any]  # JSON-safe snapshot taken when the call started
     status: str = "pending"  # "pending" | "completed"
     outcome: str | None = None  # "returned" | "raised" once completed
     value: str | None = None
@@ -334,12 +334,18 @@ class CallRecord:
     completed_seq: int | None = None
     after_probe_end: bool = False  # started after the probe closed (never evidence)
     completed_after_close: bool = False  # started while active, finished after close
+    #: The live objects your agent passed, kept for debugging only. They are the
+    #: caller's objects and may change after the call; evidence and reports use
+    #: the snapshots in ``args``/``kwargs``. Never serialized.
+    raw_args: tuple[Any, ...] = field(default=(), repr=False, compare=False)
+    raw_kwargs: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
-        out = {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
-        out["args"] = _jsonable(self.args)
-        out["kwargs"] = _jsonable(self.kwargs)
-        return out
+        return {
+            f.name: getattr(self, f.name)
+            for f in dataclasses.fields(self)
+            if f.name not in {"raw_args", "raw_kwargs"}
+        }
 
 
 @dataclass
@@ -475,7 +481,8 @@ class ProbeResult:
     calls: list[CallRecord]
     scenarios: list[ScenarioEvidence]
     known_tools: list[str]
-    cancelled: bool = False
+    cancelled: bool = False  # cancellation confirmed (async agents only)
+    cancel_requested: bool = False  # cancellation was requested at the deadline
     assertions: list[AssertionRecord] = field(default_factory=list)
 
     # ---- inferred (heuristics) ------------------------------------------------
@@ -664,6 +671,8 @@ class ProbeResult:
             timing += f" (deadline {self.deadline_seconds:g}s exceeded"
             if self.still_running:
                 timing += ", agent still running"
+                if self.cancel_requested:
+                    timing += " after cancellation was requested"
             elif self.cancelled:
                 timing += ", agent cancelled"
             timing += ")"
@@ -716,6 +725,7 @@ class ProbeResult:
                 "deadline_seconds": self.deadline_seconds,
                 "deadline_exceeded": self.deadline_exceeded,
                 "still_running": self.still_running,
+                "cancel_requested": self.cancel_requested,
                 "cancelled": self.cancelled,
                 "calls": [c.to_dict() for c in sorted(self.calls, key=lambda c: c.index)],
                 "scenarios": [dataclasses.asdict(s) for s in self.scenarios],
@@ -758,7 +768,14 @@ def _gate(
 
 
 def _call_args(c: CallRecord) -> str:
-    parts = [_short(a, 40) for a in c.args] + [f"{k}={_short(v, 40)}" for k, v in c.kwargs.items()]
+    """Render the frozen argument snapshot (never the live objects)."""
+
+    def show(v: Any) -> str:
+        if isinstance(v, dict) and set(v) == {"type", "repr"}:
+            return str(v["repr"])[:40]
+        return _short(v, 40)
+
+    parts = [show(a) for a in c.args] + [f"{k}={show(v)}" for k, v in c.kwargs.items()]
     return ", ".join(parts)
 
 
@@ -993,8 +1010,10 @@ class Probe:
                     index=len(self._late_calls) + 1,
                     tool=name,
                     tool_call_index=0,
-                    args=list(args),
-                    kwargs=_public_kwargs(kwargs),
+                    args=_jsonable(list(args)),
+                    kwargs=_jsonable(_public_kwargs(kwargs)),
+                    raw_args=tuple(args),
+                    raw_kwargs=_public_kwargs(kwargs),
                     started_seq=self._seq,
                     after_probe_end=True,
                 )
@@ -1017,8 +1036,10 @@ class Probe:
                 index=self._next_index,
                 tool=name,
                 tool_call_index=n,
-                args=list(args),
-                kwargs=_public_kwargs(kwargs),
+                args=_jsonable(list(args)),
+                kwargs=_jsonable(_public_kwargs(kwargs)),
+                raw_args=tuple(args),
+                raw_kwargs=_public_kwargs(kwargs),
                 injected=action is not None,
                 fault=rule_hit.description if rule_hit else None,
                 rule_id=rule_hit.rule_id if rule_hit else None,
@@ -1209,54 +1230,97 @@ class Probe:
         input: Any = None,
         *args: Any,
         timeout: float | None = None,
+        cancel_grace: float = 1.0,
         **kwargs: Any,
     ) -> ProbeResult:
         """Run an agent from async code and return a :class:`ProbeResult`.
 
-        Async agents (``async def`` functions, objects with ``ainvoke``) run in the
-        current event loop. With ``timeout`` they are **cancelled** at the deadline,
-        so they do not keep running; the result has ``deadline_exceeded`` and
-        ``cancelled`` set. Sync agents run in a worker thread via
-        :func:`asyncio.to_thread`; like :meth:`run`, a sync agent that outlives the
-        deadline cannot be stopped and is reported as ``still_running``.
+        Invoking the agent and awaiting whatever it returns (an ``async def``
+        agent, ``ainvoke``, or a sync callable that returns a coroutine) happen in
+        **one task under one deadline**. Sync agents run in a worker thread.
+
+        At the deadline the probe closes **first** (so no later tool call can be
+        injected or counted), then cancellation is requested and given at most
+        ``cancel_grace`` seconds. The result reports ``cancel_requested`` and
+        ``cancelled`` (confirmed) separately. An agent that suppresses
+        cancellation, or a sync agent's thread, is reported as ``still_running``.
+
+        If the caller awaiting ``arun()`` is itself cancelled, the probe closes,
+        the agent task is cancelled with the same bounded cleanup, and the
+        caller's cancellation is re-raised.
         """
         self._check_runnable()
         call = _agent_callable(agent, prefer_async=True)
         call_args = ((input,) if input is not None else ()) + args
+        budget = None if timeout is None else _finite_number("timeout", timeout, low=0.0)
+        grace = _finite_number("cancel_grace", cancel_grace, low=0.0)
+        thread_done = threading.Event()  # set when a sync agent's thread really finishes
         is_async = _is_async_callable(call)
+
+        def run_sync() -> Any:
+            try:
+                return call(*call_args, **kwargs)
+            finally:
+                thread_done.set()
+
+        async def invoke() -> Any:
+            if is_async:
+                result = call(*call_args, **kwargs)
+                thread_done.set()  # no thread involved
+            else:
+                result = await asyncio.to_thread(run_sync)
+            while inspect.isawaitable(result):  # returned coroutines stay under the deadline
+                result = await result
+            return result
+
         start = time.perf_counter()
+        task = asyncio.ensure_future(invoke())
         output: Any = None
         error: BaseException | None = None
-        deadline_exceeded = still_running = cancelled = False
+        deadline_exceeded = still_running = cancelled = cancel_requested = False
 
-        if is_async:
-            task = asyncio.ensure_future(call(*call_args, **kwargs))
-        else:
-            task = asyncio.ensure_future(asyncio.to_thread(call, *call_args, **kwargs))
+        try:
+            done, _ = await asyncio.wait({task}, timeout=budget)
+        except asyncio.CancelledError:
+            # The caller was cancelled: stop injecting, stop the agent, propagate.
+            self.close()
+            task.cancel()
+            await asyncio.wait({task}, timeout=grace)
+            if task.done():
+                _retrieve_quietly(task)
+            else:
+                task.add_done_callback(_retrieve_quietly)
+            raise
 
-        budget = None if timeout is None else _finite_number("timeout", timeout, low=0.0)
-        done, _ = await asyncio.wait({task}, timeout=budget)
         if done:
             try:
                 output = task.result()
-                if inspect.isawaitable(output):  # a sync callable that returned a coroutine
-                    output = await output
+            except asyncio.CancelledError:
+                cancelled = True
             except Exception as exc:  # noqa: BLE001 - captured for assertions
                 error = exc
         else:
             deadline_exceeded = True
-            if is_async:
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    cancelled = True
-                except Exception as exc:  # noqa: BLE001 - raised while being cancelled
-                    error = exc
-                    cancelled = True
+            self.close()  # before anything else: late tool calls can't be injected or counted
+            task.cancel()
+            cancel_requested = True
+            finished, _ = await asyncio.wait({task}, timeout=grace)
+            if finished:
+                if task.cancelled():
+                    cancelled = True  # confirmed
+                else:
+                    # It ignored cancellation but completed within the grace period.
+                    try:
+                        output = task.result()
+                    except Exception as exc:  # noqa: BLE001
+                        error = exc
             else:
+                still_running = True  # suppressed cancellation and is still going
+                task.add_done_callback(_retrieve_quietly)
+            if not is_async and not thread_done.is_set():
+                # Cancelling the task cannot stop a sync agent's thread.
                 still_running = True
-            self.close()
+                cancelled = False
         return self._result(
             input,
             output,
@@ -1266,6 +1330,7 @@ class Probe:
             deadline_exceeded,
             still_running,
             cancelled=cancelled,
+            cancel_requested=cancel_requested,
         )
 
     def _result(
@@ -1279,6 +1344,7 @@ class Probe:
         still_running: bool,
         *,
         cancelled: bool,
+        cancel_requested: bool = False,
     ) -> ProbeResult:
         elapsed_ms = (time.perf_counter() - start) * 1000
         finished = not (still_running or cancelled)
@@ -1293,6 +1359,7 @@ class Probe:
             deadline_exceeded=deadline_exceeded,
             still_running=still_running,
             cancelled=cancelled,
+            cancel_requested=cancel_requested,
             calls=self.calls,  # frozen snapshot, pending calls included
             scenarios=self.scenarios(),
             known_tools=list(self._known_tools),
@@ -1314,6 +1381,12 @@ class Probe:
 
 async def _await(aw: Any) -> Any:
     return await aw
+
+
+def _retrieve_quietly(task: asyncio.Future[Any]) -> None:
+    """Consume a straggling task's outcome so asyncio doesn't log it as unhandled."""
+    if not task.cancelled():
+        task.exception()
 
 
 def _loop_running() -> bool:

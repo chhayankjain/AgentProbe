@@ -60,13 +60,25 @@ Without `timeout`, the agent runs in the calling thread, and `elapsed_ms` is sti
 
 ## Async agents and async tests
 
-Use `await p.arun(agent, input, timeout=...)` from async code. An async agent runs in the current event loop and, unlike a thread, **can be stopped**: at the deadline it is cancelled, the result has `deadline_exceeded=True` and `cancelled=True`, and answer assertions are `unassessed`. A sync agent passed to `arun` runs in a worker thread and behaves like `run`.
+Use `await p.arun(agent, input, timeout=..., cancel_grace=1.0)` from async code. Invoking the agent and awaiting whatever it returns (an `async def` agent, `ainvoke`, or a sync callable that returns a coroutine) happen in **one task under one deadline**.
+
+At the deadline:
+
+1. The probe **closes first**, so no tool call from then on can be injected or counted as evidence.
+2. Cancellation is requested (`cancel_requested=True`) and given at most `cancel_grace` seconds.
+3. If the agent stops, `cancelled=True` (cancellation confirmed). If it ignores cancellation and finishes within the grace period, its answer is reported but `deadline_exceeded` stays `True`. If it ignores cancellation and keeps going, the result says `still_running=True`, and anything it does later is recorded as late activity only.
+
+A sync agent passed to `arun` runs in a worker thread. Cancelling cannot stop the thread, so a sync agent that outlives the deadline is reported as `still_running`.
+
+If the code awaiting `arun()` is itself cancelled (for example, a test timeout), the probe closes, the agent task is cancelled with the same bounded grace period, and the cancellation is re-raised.
 
 `p.run()` refuses an async agent when an event loop is already running in the thread (as in an async test) and tells you to use `arun`, before creating any coroutine.
 
 ## Reports
 
-`result.summary()` prints what was observed, asserted and inferred. `result.to_dict()` is always JSON-safe (schema version `1.1`): JSON values pass through; datetimes, decimals, UUIDs, paths and enums become strings; bytes become `{"type": "bytes", "length", "preview"}`; anything else becomes `{"type", "repr"}`. Your objects are never modified.
+**Arguments are frozen when the call starts.** `CallRecord.args` and `kwargs` hold a JSON-safe snapshot taken at the call boundary, so changing your objects later can't alter recorded evidence. The live objects are kept separately in `raw_args` and `raw_kwargs` for debugging; they are never serialized and may change. Nothing is deep-copied, so locks, clients and callbacks are safe to pass.
+
+`result.summary()` prints what was observed, asserted and inferred. `result.to_dict()` is always JSON-safe (schema version `1.2`): JSON values pass through; datetimes, decimals, UUIDs, paths and enums become strings; bytes become `{"type": "bytes", "length", "preview"}`; anything else becomes `{"type", "repr"}`. Your objects are never modified.
 
 ## Evidence
 

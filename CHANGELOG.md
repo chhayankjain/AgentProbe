@@ -9,11 +9,12 @@
 - `ProbeResult` separates observed events (call log, answer, exception, timing, evidence), assertion results (`pass`/`fail`/`unassessed`/`error`) and inferred labels (retries, fallbacks); `summary()` and a versioned `to_dict()` (#66)
 - Gate on probe exit: passes only when every required scenario was exercised and every required assertion passed
 - Instrumentation contract (`docs/instrumentation.md`): no in-place patching, per-probe state, cleanup on exception and cancellation, and late tool calls from a still-running agent recorded as `after_probe_end` and never counted (#95)
-- `await p.arun(...)` for async agents and async tests: async agents run in the current loop and are cancelled at the deadline (`cancelled=True`); `p.run()` rejects async agents inside a running loop before creating a coroutine
+- `await p.arun(...)` for async agents and async tests: invocation and any returned awaitable run in one task under one deadline; at the deadline the probe closes first, cancellation is requested with a bounded `cancel_grace`, and `cancel_requested` / `cancelled` (confirmed) / `still_running` are reported separately; cancelling the caller cancels the agent task and re-raises. `p.run()` rejects async agents inside a running loop before creating a coroutine
+- Tool arguments are frozen as JSON-safe snapshots at the call boundary (`args`/`kwargs`); live references are kept separately in `raw_args`/`raw_kwargs` and never serialized
 - Calls are recorded when they start (`status="pending"`/`"completed"`, entry-allocated `index`, `started_seq`/`completed_seq`); results are frozen snapshots; calls finishing after the probe closed are marked `completed_after_close`
 - Answer assertions require an actual answer: a crash, `None`, a still-running or cancelled agent never passes `assert_answer_not_contains`
 - Scenario validation at declaration: positive whole-number counts, finite delays and probabilities, and no rules after one that applies to every call
-- `to_dict()` is always JSON-safe (schema 1.1)
+- `to_dict()` is always JSON-safe (schema 1.2)
 - Tutorial and example (`examples/your_agent/`): an order-status agent, a deliberately broken version the tests catch, a cache-skipping agent the gate rejects, and a copyable CI workflow (#67)
 
 
