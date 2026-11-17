@@ -24,7 +24,7 @@ ruff format --check agentprobe/ tests/
 
 - [ROADMAP.md](ROADMAP.md) explains what we're building and why, milestone by milestone.
 - [Good first issues](https://github.com/chhayankjain/AgentProbe/labels/good%20first%20issue) are small and need no model or API key.
-- Every roadmap issue has **Why / Scope / Acceptance criteria / Where to start / Size**. Comment to claim one; we reply within two working days.
+- Every roadmap issue has **Why / Scope / Acceptance criteria / Where to start / Size**. Comment to claim one. We aim to reply within two working days; see the [maintainer service targets](ROADMAP.md#maintainer-service-targets), including what happens when maintainers are away.
 - Have a real agent? Trying AgentProbe on it and reporting friction (#68) is the most valuable contribution right now.
 
 ## Workflow

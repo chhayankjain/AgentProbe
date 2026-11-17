@@ -16,8 +16,8 @@ Live tracking: [milestones](https://github.com/chhayankjain/AgentProbe/milestone
 2. **Prove the fault happened.** A fault test that never reached its tool is reported as *not exercised* and fails, never silently passes. An agent that bypasses a tool must not look resilient.
 3. **Deterministic by default.** Regression tests get the same failure every run. Probability-based injection remains for experiments.
 4. **Separate what we saw from what we infer.** Results keep observed events (tool calls, injected faults, exceptions, elapsed time), your assertions (pass, fail or unassessed) and inferred labels (retry, fallback) apart. A deadline being exceeded is reported separately from execution actually stopping.
-5. **Leave no trace.** Instrumentation is restored after every test, including after exceptions and cancellation, so one test can't change another.
-6. **Gate on requirements, not scores.** CI fails on explicit required assertions and scenario coverage. A weighted score can hide a correctness regression.
+5. **Leave no trace.** Instrumentation is restored after every test, including after exceptions and cancellation. If an agent is still running when its test ends, its late tool calls are recorded against that test only, and overlapping probes on the same tool are rejected rather than interleaved.
+6. **Gate on requirements that demonstrably passed.** CI succeeds only when every required scenario was exercised and every required assertion passed. Unassessed results, evaluation errors and missing evidence never satisfy a required gate. A weighted score can hide a correctness regression, so there isn't one yet.
 7. **Honest support levels.** Every integration is labelled experimental, offline-tested, live-qualified or legacy, and a level is only raised with evidence.
 8. **Stable and easy to contribute to.** Semantic versioning with a time-bound deprecation window, fast tests with no model, and small well-scoped issues.
 
@@ -29,7 +29,8 @@ Live tracking: [milestones](https://github.com/chhayankjain/AgentProbe/milestone
 | Design partners who add a fault test to their own agent | 5 |
 | **Retention:** design partners still running meaningful fault tests in CI four weeks later | at least 3 of 5 |
 | Repositories outside the maintainers with AgentProbe tests in CI | 25 within six months of v1.5 |
-| Issues and PRs opened by people outside the maintainers | at least 5 per month by the end of v1.5 |
+
+We also watch issues and PRs from people outside the maintainers as an **engagement indicator**, not a success requirement: a stable tool can keep users without generating many issues. CI retention is the measure that counts.
 
 ---
 
@@ -60,7 +61,9 @@ The smallest end-to-end workflow.
 
 ### v1.5 — Friction fixes, pytest plugin and supported integrations
 
-*Exit criterion: the friction design partners reported is fixed, fault tests use a first-class pytest plugin, and every advertised integration has an honest support level.*
+*Exit criterion: the blocking onboarding and CI issues agreed with the first design-partner cohort are resolved, remaining limitations are documented and prioritised, fault tests use a first-class pytest plugin, and every advertised integration has an honest support level.*
+
+The rest of this list is the v1.5 backlog, worked in priority order. Not every item is required to ship v1.5.
 
 | | Issue |
 |---|---|
@@ -69,7 +72,7 @@ The smallest end-to-end workflow.
 | Outcome assertions: no crash, answer contains, within deadline, retry budget, admits failure | #70 |
 | Scripted mode for CI, live mode for real models, cost guards, pass-rate thresholds | #71 |
 | Failure reports: terminal diagnostics and versioned JSON (pytest's JUnit for CI viewers) | #72 |
-| `agentprobe check`: gate on required assertions and scenario coverage | #74 |
+| `agentprobe check`: pass only if every required scenario was exercised and every required assertion passed | #74 |
 | Graph support for documented LangGraph shapes with explicit tool selection | #64 |
 | Adapter contract and conformance test suite | #78 |
 | Integration support levels: experimental, offline-tested, live-qualified, legacy | #97 |
