@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import runpy
 
@@ -83,6 +84,15 @@ class TestDemo:
         assert main(["--fault", "timeout", "--p", "0.5", "--runs", "4"]) == 0
         captured = capsys.readouterr().out
         assert "Fault: timeout" in captured and "injection log" in captured
+
+    def test_cli_json_output(self, capsys: pytest.CaptureFixture[str]):
+        assert main(["--json", "--p", "0", "--runs", "2"]) == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report.keys() == {"metrics", "injector", "results"}
+        assert report["metrics"]["n_executed"] == 2
+        assert report["injector"]["injected_failures"] == 0
+        assert [result["run_id"] for result in report["results"]] == [0, 1]
+        assert all(result["success"] for result in report["results"])
 
     def test_examples_quickstart_runs(self, capsys: pytest.CaptureFixture[str]):
         path = os.path.join(os.path.dirname(__file__), "..", "examples", "quickstart.py")

@@ -4,11 +4,13 @@ Run it with::
 
     python -m agentprobe.demo
     python -m agentprobe.demo --fault timeout --p 0.5 --runs 20
+    python -m agentprobe.demo --json
 
 It builds the LangGraph adapter around a scripted, deterministic chat model,
 wraps the calculator tool with a seeded fault injector, runs a short
 benchmark, and prints the reliability metrics plus the injection log, so you
 can see exactly which calls were faulted and how the agent and harness reacted.
+With ``--json``, the JSON report goes to stdout and progress goes to stderr.
 Swap :class:`~agentprobe.fake_llm.ScriptedToolCallingModel` for a real model
 (``agentprobe.llm.build_chat_model``) and nothing else changes.
 """
@@ -16,7 +18,9 @@ Swap :class:`~agentprobe.fake_llm.ScriptedToolCallingModel` for a real model
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from contextlib import redirect_stdout
 from typing import Any
 
 from agentprobe.benchmark.metrics import MetricsCalculator
@@ -175,10 +179,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--p", type=float, default=0.3, help="injection probability per tool call")
     parser.add_argument("--runs", type=int, default=10)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--json", action="store_true", help="write the report as JSON to stdout")
     args = parser.parse_args(argv)
     if not 0.0 <= args.p <= 1.0:
         parser.error("--p must be between 0 and 1")
-    run_demo(args.fault, args.p, args.runs, args.seed)
+    if args.json:
+        # The benchmark prints progress even when the demo's text report is disabled.
+        with redirect_stdout(sys.stderr):
+            report = run_demo(args.fault, args.p, args.runs, args.seed, quiet=True)
+        payload = {
+            "metrics": report["metrics"].to_dict(),
+            "injector": report["injector"],
+            "results": [result.to_dict() for result in report["results"]],
+        }
+        print(json.dumps(payload, allow_nan=False))
+    else:
+        run_demo(args.fault, args.p, args.runs, args.seed)
     return 0
 
 
