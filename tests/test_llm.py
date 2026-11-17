@@ -105,12 +105,15 @@ class TestBuilders:
         with pytest.raises(ValueError, match="not OpenAI-compatible"):
             autogen_llm_config(LLMSpec.from_provider("anthropic", model="claude"))
 
-    def test_autogen_agent_kwargs_only_for_gemini(self):
-        assert autogen_agent_kwargs(LLMSpec.from_provider("gemini", model="m")) == {
-            "stop_on_final_answer": True
+    def test_autogen_agent_kwargs(self):
+        gem = autogen_agent_kwargs(
+            LLMSpec.from_provider("gemini", model="m", requests_per_minute=10)
+        )
+        assert gem == {"requests_per_minute": 10, "max_retries": 6, "stop_on_final_answer": True}
+        assert autogen_agent_kwargs(LLMSpec.from_provider("ollama", model="m")) == {
+            "requests_per_minute": None,
+            "max_retries": 6,
         }
-        assert autogen_agent_kwargs(LLMSpec.from_provider("ollama", model="m")) == {}
-        assert autogen_agent_kwargs(LLMSpec.from_provider("groq", model="m")) == {}
 
     def test_openai_compatible_chat_model(self, monkeypatch: pytest.MonkeyPatch):
         pytest.importorskip("langchain_openai")

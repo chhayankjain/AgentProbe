@@ -35,7 +35,7 @@ import platform
 import subprocess
 import sys
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import fields, asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -50,6 +50,7 @@ from agentprobe.llm import (
     LLMSpec,
     add_llm_args,
     autogen_agent_kwargs,
+    autogen_effective_settings,
     autogen_llm_config,
     build_chat_model,
     spec_from_args,
@@ -209,6 +210,7 @@ class EnhancedRunRecord:
     recovered: bool = False
     recovery_latency_ms: float = 0.0
     recovery_output: str = ""
+    recovery_status: str = "n/a"  # recovered | failed | unassessed | not_attempted | n/a
 
     # Tool evidence (reviewer concern #3, #4)
     tool_call_count: int = 0
@@ -476,7 +478,10 @@ def run_single_condition(
     """
     configs = failure_configs or build_failure_configs(seed)
     failure_config = configs[failure_type]
-    llm = build_llm(model)
+    # Only the LangChain-based adapters need a LangChain model; building one for
+    # AutoGen would require langchain-openai for hosted providers, which cannot
+    # coexist with pyautogen's openai<1 in the same environment.
+    llm = build_llm(model) if framework in ("langgraph", "langchain") else None
     agent = build_agent(framework, llm, failure_config, model=model)
 
     config = BenchmarkConfig(
@@ -539,6 +544,7 @@ def run_single_condition(
             recovered=r.recovered,
             recovery_latency_ms=r.recovery_latency_ms,
             recovery_output=r.recovery_output,
+            recovery_status=getattr(r, "recovery_status", "n/a"),
             tool_call_count=tool_calls,
             injector_calls=injector_summary.get("total_calls", 0),
             injector_injections=injector_summary.get("injected_failures", 0),
@@ -627,9 +633,7 @@ def run_experiment(
                     if json_path.exists():
                         with open(json_path) as f:
                             existing = json.load(f)
-                        all_records.extend(
-                            EnhancedRunRecord(**r) for r in existing
-                        )
+                        all_records.extend(record_from_dict(r) for r in existing)
                     continue
 
                 _console.print(f"  [{condition_num}/{total_conditions}] {label} — running...")
@@ -832,6 +836,32 @@ def run_pilot(model: str, batch_dir: Path, seed: int = 42) -> bool:
 # Post-experiment analysis
 # ---------------------------------------------------------------------------
 
+_RECORD_FIELDS = {f.name for f in fields(EnhancedRunRecord)}
+
+
+def record_from_dict(d: dict[str, Any]) -> EnhancedRunRecord:
+    """Build a record from a saved dict, ignoring keys this version does not know
+    and letting new fields take their defaults for older batches."""
+    return EnhancedRunRecord(**{k: v for k, v in d.items() if k in _RECORD_FIELDS})
+
+
+def load_completed_records(batch_dir: Path, state: ExperimentState) -> list[EnhancedRunRecord]:
+    """Every record of every condition the checkpoint marks complete, from disk.
+
+    Batch-wide outputs (combined_summary.json, manifest.json) must be built
+    from this, not from the conditions selected on the command line, or a
+    ``--resume`` of a subset would silently shrink the batch summary.
+    """
+    records: list[EnhancedRunRecord] = []
+    for key in state.completed_conditions:
+        json_path = batch_dir / f"{key}.json"
+        if not json_path.exists():
+            continue
+        with open(json_path) as f:
+            records.extend(record_from_dict(r) for r in json.load(f))
+    return records
+
+
 def compute_summary(batch_dir: Path, all_records: list[EnhancedRunRecord]) -> None:
     """Compute and save aggregate metrics from raw records."""
     calc = MetricsCalculator()
@@ -1002,6 +1032,8 @@ def main() -> None:
     )
     # Exact backend description (provider, model id, endpoint, key *variable*).
     meta.update(llm_spec.describe())
+    if "autogen" in args.frameworks:
+        meta["llm_autogen_effective"] = autogen_effective_settings(llm_spec)
     if meta_path.exists():
         with open(meta_path) as f:
             original_meta = json.load(f)
@@ -1014,6 +1046,10 @@ def main() -> None:
             # Absent in pre-provider batches (orig None => check skipped).
             ("llm_provider", "llm_provider"),
             ("llm_base_url", "llm_base_url"),
+            ("llm_timeout_seconds", "llm_timeout_seconds"),
+            ("llm_max_retries", "llm_max_retries"),
+            ("llm_requests_per_minute", "llm_requests_per_minute"),
+            ("llm_temperature", "llm_temperature"),
         ]
         mismatches = []
         for field_name, meta_key in _compat_fields:
@@ -1051,19 +1087,25 @@ def main() -> None:
     )
 
     # Compute summary
-    if all_records:
-        compute_summary(batch_dir, all_records)
+    # Batch-wide outputs cover every completed condition on disk, not only the
+    # conditions selected for this invocation (a subset --resume must not shrink them).
+    batch_records = load_completed_records(batch_dir, ExperimentState.load(batch_dir / "checkpoint.json"))
+    if not batch_records:
+        batch_records = all_records
+    if batch_records:
+        compute_summary(batch_dir, batch_records)
 
     # Save manifest
+    completed_keys = sorted(set(f"{r.framework}_{r.task}_{r.failure_type}" for r in batch_records))
     manifest = {
         "batch_id": batch_dir.name,
         "result_files": sorted(str(p.name) for p in batch_dir.glob("*.csv")),
-        "n_records": len(all_records),
-        "n_conditions": len(set(
-            f"{r.framework}_{r.task}_{r.failure_type}" for r in all_records
-        )),
+        "completed_conditions": completed_keys,
+        "n_records": len(batch_records),
+        "n_conditions": len(completed_keys),
+        "n_records_this_invocation": len(all_records),
         "checksum": hashlib.sha256(
-            json.dumps([r.to_dict() for r in all_records], sort_keys=True).encode()
+            json.dumps([r.to_dict() for r in batch_records], sort_keys=True).encode()
         ).hexdigest(),
     }
     with open(batch_dir / "manifest.json", "w") as f:

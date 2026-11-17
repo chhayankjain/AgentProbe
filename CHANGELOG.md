@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed (from code review)
+- AutoGen conditions no longer construct an unused LangChain model, so hosted AutoGen runs work in the `openai<1` environment
+- LLM backend errors during the *recovery* call are retried with backoff and, if persistent, recorded as `recovery_status="unassessed"`; `MetricsCalculator` drops those from the recovery-rate denominator and reports `n_recovery_unassessed`. `RunResult` gains `recovery_status` (`recovered`/`failed`/`unassessed`/`not_attempted`/`n/a`)
+- `run_experiment_v2.py --resume` with a subset of conditions rebuilds `combined_summary.json` and `manifest.json` from every checkpointed condition on disk instead of shrinking them; the manifest lists `completed_conditions` and `n_records_this_invocation`
+- AutoGen honours `temperature`, `--rpm` (shim-level throttle) and `--max-retries` (mapped onto pyautogen's retry window); `experiment_metadata.json` records `llm_autogen_effective`
+- AutoGen thought-signature cache keeps every repeated identical call in order and is cleared per conversation, so restored history can no longer swap ids/signatures
+- `AgentProbeTracer` reuses one process-wide provider (or an SDK provider the application already registered); later instances attach exporters to it instead of creating a provider library spans bypass, and `shutdown()` only flushes
+- `--resume` also rejects changed timeout, retry, throttle and temperature settings
+- Demo uses a calculator prompt matching its scripted model and reports correct final answers separately from execution success
+
 ### Added
 - `python -m agentprobe.demo`: a 60-second, network-free demo built on `agentprobe.fake_llm.ScriptedToolCallingModel`, a deterministic tool-calling chat model usable in CI and in users' own tests; `examples/quickstart.py` is the copyable version
 - `assets/social-preview.png` for the GitHub repository card

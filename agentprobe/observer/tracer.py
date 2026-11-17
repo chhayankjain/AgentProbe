@@ -49,6 +49,7 @@ except ImportError:
 
 _DEFAULT_SERVICE = "agentprobe"
 _GLOBAL_PROVIDER: TracerProvider | None = None
+_ATTACHED: dict[str, Any] = {"console": False, "otlp": set()}
 
 
 def _build_provider(
@@ -81,11 +82,18 @@ def _build_provider(
 class AgentProbeTracer:
     """Configured OpenTelemetry tracer for AgentProbe experiments.
 
-    Registers as the global OTel tracer provider so that all
-    ``get_tracer(__name__)`` calls within the library resolve to this provider.
+    The first instance in a process creates the SDK ``TracerProvider`` and
+    registers it globally, so every ``get_tracer(__name__)`` in the library
+    resolves to it. OpenTelemetry allows the global provider to be set only
+    once, so later instances **reuse** that provider instead of creating a
+    second one that library spans would never reach; they only attach an OTLP
+    exporter for an endpoint that is not attached yet. This makes repeated
+    construction (notebooks, ``python -m agentprobe.demo`` in a loop, tests)
+    safe.
 
     Args:
-        service_name: Service name shown in trace UIs (Jaeger, Tempo, etc.)
+        service_name: Service name shown in trace UIs (Jaeger, Tempo, etc.).
+            Only the first instance's name is used for the shared resource.
         otlp_endpoint: gRPC endpoint for OTLP export (e.g. "http://localhost:4317").
             If None, only console export is active.
         console: Whether to print spans to stdout (useful for local dev).
@@ -97,12 +105,34 @@ class AgentProbeTracer:
         otlp_endpoint: str | None = None,
         console: bool = True,
     ) -> None:
-        # Allow env-var override
+        global _GLOBAL_PROVIDER
         endpoint = otlp_endpoint or os.getenv("AGENTPROBE_OTLP_ENDPOINT")
         console_on = console and os.getenv("AGENTPROBE_NO_CONSOLE_TRACE") != "1"
 
-        self._provider = _build_provider(service_name, endpoint, console_on)
-        trace.set_tracer_provider(self._provider)
+        existing = trace.get_tracer_provider()
+        if _GLOBAL_PROVIDER is None and isinstance(existing, TracerProvider):
+            # The application already configured OpenTelemetry: join it
+            # rather than create a provider that library spans would bypass.
+            _GLOBAL_PROVIDER = existing
+        if _GLOBAL_PROVIDER is None:
+            _GLOBAL_PROVIDER = _build_provider(service_name, endpoint, console_on)
+            trace.set_tracer_provider(_GLOBAL_PROVIDER)
+            _ATTACHED["console"] = console_on
+            if endpoint and _OTLP_AVAILABLE:
+                _ATTACHED["otlp"].add(endpoint)
+            self.owns_provider = True
+        else:
+            self.owns_provider = False
+            if console_on and not _ATTACHED["console"]:
+                _GLOBAL_PROVIDER.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+                _ATTACHED["console"] = True
+            if endpoint and _OTLP_AVAILABLE and endpoint not in _ATTACHED["otlp"]:
+                _GLOBAL_PROVIDER.add_span_processor(
+                    BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True))
+                )
+                _ATTACHED["otlp"].add(endpoint)
+
+        self._provider = _GLOBAL_PROVIDER
         self._tracer: Tracer = self._provider.get_tracer(service_name)
         self.service_name = service_name
 
@@ -122,9 +152,19 @@ class AgentProbeTracer:
     def get_tracer(self, name: str) -> Tracer:
         return self._provider.get_tracer(name)
 
+    def add_span_processor(self, processor: Any) -> None:
+        """Attach an extra span processor (e.g. an in-memory exporter in tests)."""
+        self._provider.add_span_processor(processor)
+
+    def flush(self) -> None:
+        """Flush pending spans from every attached exporter."""
+        self._provider.force_flush()
+
     def shutdown(self) -> None:
-        """Flush and shut down the span processor (call at end of experiments)."""
-        self._provider.shutdown()
+        """Flush pending spans. The shared provider itself is shut down at
+        interpreter exit by the OpenTelemetry SDK, so a tracer going out of
+        scope in one experiment never silences spans for the next one."""
+        self.flush()
 
 
 def get_tracer(name: str) -> Tracer:

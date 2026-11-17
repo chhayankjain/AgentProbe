@@ -58,7 +58,8 @@ class AgentMetrics:
     n_successes: int = 0
 
     # Recovery metrics
-    recovery_rate: float | None = None  # None when no failures; fraction otherwise
+    recovery_rate: float | None = None  # None when no assessable failures; fraction otherwise
+    n_recovery_unassessed: int = 0  # failures whose recovery call hit an LLM backend error
     mttr_ms: float = 0.0  # mean time to recovery (ms)
     mttr_ms_std: float = 0.0
 
@@ -90,6 +91,7 @@ class AgentMetrics:
             "recovery_rate": round(self.recovery_rate, 4)
             if self.recovery_rate is not None
             else None,
+            "n_recovery_unassessed": self.n_recovery_unassessed,
             "mttr_ms": round(self.mttr_ms, 2),
             "mean_latency_ms": round(self.mean_latency_ms, 2),
             "p50_latency_ms": round(self.p50_latency_ms, 2),
@@ -159,13 +161,18 @@ class MetricsCalculator:
         successes = [r for r in executed if _get(r, "success", False)]
         failures = [r for r in executed if not _get(r, "success", False)]
         recovered = [r for r in failures if _get(r, "recovered", False)]
+        # Recovery could not be assessed when the retry itself hit an LLM backend
+        # error; those failures stay in the failure rate but leave the recovery
+        # denominator (records without the field, e.g. older batches, count as assessed).
+        unassessed = [r for r in failures if _get(r, "recovery_status", "") == "unassessed"]
+        n_assessable = len(failures) - len(unassessed)
 
         latencies = [_get(r, "latency_ms", 0.0) for r in executed]
         recovery_latencies = [_get(r, "recovery_latency_ms", 0.0) for r in recovered]
 
         n = len(executed)
         failure_rate = len(failures) / n if n > 0 else 0.0
-        recovery_rate = len(recovered) / len(failures) if failures else None
+        recovery_rate = len(recovered) / n_assessable if n_assessable else None
 
         return AgentMetrics(
             framework=fw,
@@ -181,6 +188,7 @@ class MetricsCalculator:
             n_failures=len(failures),
             n_successes=len(successes),
             recovery_rate=recovery_rate,
+            n_recovery_unassessed=len(unassessed),
             mttr_ms=statistics.mean(recovery_latencies) if recovery_latencies else 0.0,
             mttr_ms_std=statistics.stdev(recovery_latencies)
             if len(recovery_latencies) > 1
