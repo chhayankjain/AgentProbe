@@ -236,6 +236,7 @@ class EnhancedRunRecord:
 
     # Classification
     failure_category: str = "none"
+    backend_retries: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items()}
@@ -565,6 +566,7 @@ def run_single_condition(
             input_text=input_text,
             prompt_index=prompt_idx,
             failure_category=r.failure_category,
+            backend_retries=r.backend_retries,
         )
         records.append(record)
 

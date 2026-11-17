@@ -188,13 +188,18 @@ def run_matrix(
                 runner = BenchmarkRunner(agent=agent, config=config, task_fn=task_fn)
                 runs = runner.run()
                 metrics = calc.compute(runs, framework=framework, task=task, failure_type=ft_name)
+                # A timeout on the last trial still produces every planned record,
+                # but a lingering worker makes the condition unsafe to accept.
+                if runner._invocation_hung:
+                    metrics.condition_complete = False
                 all_metrics.append(metrics.to_dict())
 
-                if runner._invocation_hung:
+                if runner._invocation_hung or not metrics.condition_complete:
                     _console.print(
                         f"[bold red]Aborting experiment batch: "
-                        f"{framework}/{task}/{ft_name} has a lingering "
-                        f"thread that may compete for backend resources.[/bold red]"
+                        f"{framework}/{task}/{ft_name} is incomplete "
+                        f"({metrics.n_skipped} skipped, {metrics.n_backend_errors} backend errors, "
+                        f"{metrics.n_harness_errors} harness errors).[/bold red]"
                     )
                     tracer.shutdown()
                     return all_metrics
@@ -208,6 +213,8 @@ def print_results_table(all_metrics: list[dict[str, Any]]) -> None:
     table.add_column("Framework", style="cyan")
     table.add_column("Task", style="green")
     table.add_column("Failure Type", style="yellow")
+    table.add_column("Executed / Planned", justify="right")
+    table.add_column("Excluded", justify="right")
     table.add_column("Failure Rate", justify="right")
     table.add_column("Recovery Rate", justify="right")
     table.add_column("MTTR (ms)", justify="right")
@@ -218,7 +225,9 @@ def print_results_table(all_metrics: list[dict[str, Any]]) -> None:
             m["framework"],
             m["task"],
             m["failure_type"],
-            f"{m['failure_rate']:.1%}",
+            f"{m['n_executed']}/{m['n_planned']}",
+            str(m['n_backend_errors'] + m['n_harness_errors'] + m['n_skipped']),
+            f"{m['failure_rate']:.1%}" if m['n_executed'] else "N/A",
             "N/A" if m['recovery_rate'] is None else f"{m['recovery_rate']:.1%}",
             f"{m['mttr_ms']:.0f}",
             f"{m['p99_latency_ms']:.0f}",
@@ -302,6 +311,13 @@ def main() -> None:
         with open(meta_path, "w") as f:
             json.dump(meta_dict, f, indent=2)
         _console.print(f"[green]Metadata saved to {meta_path}[/green]")
+
+    expected_conditions = len(args.frameworks) * len(args.tasks) * len(failure_types)
+    if len(all_metrics) != expected_conditions or any(
+        not m["condition_complete"] for m in all_metrics
+    ):
+        _console.print("[red]Experiment incomplete; any saved results are partial.[/red]")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
