@@ -529,14 +529,18 @@ class BenchmarkRunner:
         skipped = len(results) - len(executed) - backend_errors - harness_errors
         total = len(executed)
         failures = sum(1 for r in executed if not r.success)
+        unassessed = sum(1 for r in executed if not r.success and r.recovery_status == "unassessed")
         rate = failures / total if total > 0 else 0.0
         recovered = sum(1 for r in executed if r.recovered)
         latencies = [r.latency_ms for r in executed]
         p99 = _percentile(latencies, 99)
+        rate_text = f"{rate:.1%}" if total else "N/A"
+        assessable = failures - unassessed
+        recovery_text = f"{recovered}/{assessable} assessable" if assessable else "N/A"
         line = (
             f"[green]Done[/green] — {total} executed | "
-            f"failure_rate={rate:.1%} | "
-            f"recovered={recovered}/{failures} | "
+            f"failure_rate={rate_text} | "
+            f"recovered={recovery_text} | "
             f"P99={p99:.0f}ms"
         )
         if skipped:
@@ -545,6 +549,8 @@ class BenchmarkRunner:
             line += f" | [red]{backend_errors} LLM backend errors (excluded)[/red]"
         if harness_errors:
             line += f" | [red]{harness_errors} harness limitations (excluded)[/red]"
+        if unassessed:
+            line += f" | [yellow]{unassessed} recoveries unassessed[/yellow]"
         return line
 
     def _save(self, results: list[RunResult], path: str) -> None:

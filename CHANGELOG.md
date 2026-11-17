@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed (from code review)
+- The legacy benchmark CLI stops on incomplete conditions and exits nonzero after saving partial results. Its table shows executed/planned and excluded counts; empty samples display N/A. Recovery summaries use the assessable denominator, and v2 records preserve backend retry counts.
 - LLM backend errors are identified at the **LLM-call boundary**, not by exception class: adapters wrap every model call in `agentprobe.llm.llm_call_boundary()` (LangGraph node, LangChain middleware, AutoGen shim). A real tool failing with `httpx.ReadTimeout` is now measured as an agent failure instead of being excluded. Custom agents should wrap their model calls the same way
 - AutoGen no longer silently executes only the first of several parallel tool calls: such a turn raises `ParallelToolCallsUnsupported` and the trial is recorded as `status="harness_error"` (excluded, `n_harness_errors`). OpenAI, Groq and OpenRouter are asked for `parallel_tool_calls=false`
 - Per-trial tool evidence: `trial_tool_calls`, `trial_injections`, `recovery_tool_calls`, `recovery_injections` on every record, from injector snapshots around each invocation; `tool_call_count` is now per trial. `injector_calls`/`injector_injections` keep their condition-total meaning. Adapters always install a pass-through injector, so baseline conditions also record tool calls (previously 0)
@@ -14,7 +15,7 @@
 - AutoGen conditions no longer construct an unused LangChain model, so hosted AutoGen runs work in the `openai<1` environment
 - LLM backend errors during the *recovery* call are retried with backoff and, if persistent, recorded as `recovery_status="unassessed"`; `MetricsCalculator` drops those from the recovery-rate denominator and reports `n_recovery_unassessed`. `RunResult` gains `recovery_status` (`recovered`/`failed`/`unassessed`/`not_attempted`/`n/a`)
 - `run_experiment_v2.py --resume` with a subset of conditions rebuilds `combined_summary.json` and `manifest.json` from every checkpointed condition on disk instead of shrinking them; the manifest lists `completed_conditions` and `n_records_this_invocation`
-- AutoGen honours `temperature`, `--rpm` (shim-level throttle) and `--max-retries` (mapped onto pyautogen's retry window); `experiment_metadata.json` records `llm_autogen_effective`
+- AutoGen honours `temperature`, `--rpm` (shim-level throttle) and `--max-retries` (bounded by the compatibility shim); `experiment_metadata.json` records `llm_autogen_effective`
 - AutoGen retries are bounded for every transient provider error. pyautogen 0.1.14 retries `ServiceUnavailableError`, `APIConnectionError` and `APIError` with no limit; the shim now counts consecutive failures and raises `BackendRetriesExhausted` (an infrastructure error) after `--max-retries`
 - AutoGen thought-signature cache keeps every repeated identical call in order and is cleared per conversation, so restored history can no longer swap ids/signatures
 - `AgentProbeTracer` reuses one process-wide provider (or an SDK provider the application already registered); later instances attach exporters to it instead of creating a provider library spans bypass, and `shutdown()` only flushes
