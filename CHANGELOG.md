@@ -1,8 +1,28 @@
 # Changelog
 
-## [Unreleased]
+## [1.3.0] - 2026-11-17
 
-### Fixed (from code review)
+Hosted LLM backends, a no-model demo, and fixes from four rounds of code review that
+make new benchmark results safer to trust. The published paper batches are unchanged
+and still load and resume.
+
+### Added
+- `python -m agentprobe.demo`: a 60-second, network-free demo built on `agentprobe.fake_llm.ScriptedToolCallingModel`, a deterministic tool-calling chat model usable in CI and in users' own tests; `examples/quickstart.py` is the copyable version
+- `assets/social-preview.png` for the GitHub repository card
+- `agentprobe.llm`: provider-agnostic LLM construction (`LLMSpec`, `build_chat_model`, `autogen_llm_config`) with presets for Ollama, OpenAI, Groq, OpenRouter, Cerebras, Mistral, GitHub Models, Google AI Studio (`gemini` = OpenAI-compatible endpoint for AutoGen; `google` = native `langchain-google-genai` for LangGraph/LangChain, new `[google]` extra), Anthropic, and any OpenAI-compatible server.
+- `agentprobe.agents.base.message_text()`: adapters return plain text even when a provider (Gemini, Anthropic) returns content blocks
+- AutoGen compatibility shim restores provider extras (Gemini 3 thought signatures) on echoed function calls, which Gemini otherwise rejects with HTTP 400; Ollama requests are unchanged
+- `AutoGenToolAgent(stop_on_final_answer=True)` (set automatically for `--provider gemini` via `autogen_agent_kwargs`) ends the two-agent chat at the first text-only reply, because Gemini rejects requests that end with a model turn; the paper's loop-until-`max_turns` behaviour remains the default
+- All five experiment scripts take `--provider/--model/--base-url/--api-key-env/--rpm/--max-retries/--llm-timeout`; the default is byte-for-byte the paper's Ollama setup
+- LLM backend errors (429/5xx/connection) are distinguished from injected tool faults: the runner re-dispatches the trial (`BenchmarkConfig.backend_error_retries`, backoff), then records `status="backend_error"` / category `infrastructure`; `MetricsCalculator` excludes them and reports `n_backend_errors`. `FailureClassifier` gains `FailureCategory.INFRASTRUCTURE`
+- `experiment_metadata.json` records the exact backend (`llm_provider`, `model_id`, `llm_base_url`, key variable name, throttle); `--resume` rejects a changed provider or endpoint
+
+### Changed
+- `run_benchmarks.py --llm {ollama,openai,anthropic}` replaced by `--provider` (same defaults)
+- Provider exceptions (`RateLimitError`, `APITimeoutError`, `APIConnectionError`, …) now classify as `infrastructure` instead of `tool_call`
+- Behaviour changes to check when upgrading: `run_benchmarks.py` now exits nonzero when any condition is incomplete; `tool_call_count` in Phase 2 records is per trial (condition totals stay in `injector_calls`/`injector_injections`); adapters always install a pass-through injector, so baseline conditions report tool calls; Phase 2 metadata gains `protocol`, and `--resume` rejects a changed protocol
+
+### Fixed
 - The legacy benchmark CLI stops on incomplete conditions and exits nonzero after saving partial results. Its table shows executed/planned and excluded counts; empty samples display N/A. Recovery summaries use the assessable denominator, and v2 records preserve backend retry counts.
 - LLM backend errors are identified at the **LLM-call boundary**, not by exception class: adapters wrap every model call in `agentprobe.llm.llm_call_boundary()` (LangGraph node, LangChain middleware, AutoGen shim). A real tool failing with `httpx.ReadTimeout` is now measured as an agent failure instead of being excluded. Custom agents should wrap their model calls the same way
 - AutoGen no longer silently executes only the first of several parallel tool calls: such a turn raises `ParallelToolCallsUnsupported` and the trial is recorded as `status="harness_error"` (excluded, `n_harness_errors`). OpenAI, Groq and OpenRouter are asked for `parallel_tool_calls=false`
@@ -22,20 +42,6 @@
 - `--resume` also rejects changed timeout, retry, throttle and temperature settings, comparing by key presence so an explicit `None` (unlimited RPM) counts as a value. Batches recorded before provider support are checked against the documented defaults they ran with (Ollama, temperature 0, no throttle)
 - AutoGen throttle, retry limit and tool-call cache are per agent and per thread: each agent activates its own settings at the start of every conversation, `None` clears a previous throttle, the pyautogen retry window is set in each agent's own `llm_config` instead of on the global class, and concurrent conversations in different threads no longer share state
 - Demo uses a calculator prompt matching its scripted model and reports correct final answers separately from execution success
-
-### Added
-- `python -m agentprobe.demo`: a 60-second, network-free demo built on `agentprobe.fake_llm.ScriptedToolCallingModel`, a deterministic tool-calling chat model usable in CI and in users' own tests; `examples/quickstart.py` is the copyable version
-- `assets/social-preview.png` for the GitHub repository card
-- `agentprobe.llm`: provider-agnostic LLM construction (`LLMSpec`, `build_chat_model`, `autogen_llm_config`) with presets for Ollama, OpenAI, Groq, OpenRouter, Cerebras, Mistral, GitHub Models, Google AI Studio (`gemini` = OpenAI-compatible endpoint for AutoGen; `google` = native `langchain-google-genai` for LangGraph/LangChain, new `[google]` extra), Anthropic, and any OpenAI-compatible server.
-- `agentprobe.agents.base.message_text()`: adapters return plain text even when a provider (Gemini, Anthropic) returns content blocks
-- AutoGen compatibility shim restores provider extras (Gemini 3 thought signatures) on echoed function calls, which Gemini otherwise rejects with HTTP 400; Ollama requests are unchanged
-- `AutoGenToolAgent(stop_on_final_answer=True)` (set automatically for `--provider gemini` via `autogen_agent_kwargs`) ends the two-agent chat at the first text-only reply, because Gemini rejects requests that end with a model turn; the paper's loop-until-`max_turns` behaviour remains the default All five experiment scripts take `--provider/--model/--base-url/--api-key-env/--rpm/--max-retries/--llm-timeout`; the default is byte-for-byte the paper's Ollama setup
-- LLM backend errors (429/5xx/connection) are distinguished from injected tool faults: the runner re-dispatches the trial (`BenchmarkConfig.backend_error_retries`, backoff), then records `status="backend_error"` / category `infrastructure`; `MetricsCalculator` excludes them and reports `n_backend_errors`. `FailureClassifier` gains `FailureCategory.INFRASTRUCTURE`
-- `experiment_metadata.json` records the exact backend (`llm_provider`, `model_id`, `llm_base_url`, key variable name, throttle); `--resume` rejects a changed provider or endpoint
-
-### Changed
-- `run_benchmarks.py --llm {ollama,openai,anthropic}` replaced by `--provider` (same defaults)
-- Provider exceptions (`RateLimitError`, `APITimeoutError`, `APIConnectionError`, …) now classify as `infrastructure` instead of `tool_call`
 
 ## [1.2.0] - 2026-11-14
 
