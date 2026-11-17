@@ -16,6 +16,9 @@ from agentprobe.llm import (
     autogen_llm_config,
     build_chat_model,
     is_llm_backend_error,
+    llm_call_boundary,
+    looks_like_provider_error,
+    mark_llm_call_error,
     spec_from_args,
 )
 
@@ -154,8 +157,8 @@ class TestIsLLMBackendError:
     @pytest.mark.parametrize(
         "name,module",
         [
-            ("RateLimitError", "openai"),  # openai>=1
-            ("RateLimitError", "openai.error"),  # openai 0.28 (pyautogen)
+            ("RateLimitError", "openai"),
+            ("RateLimitError", "openai.error"),
             ("APIConnectionError", "openai"),
             ("InternalServerError", "openai"),
             ("ConnectError", "httpx"),
@@ -165,27 +168,39 @@ class TestIsLLMBackendError:
             ("Weird", "google.api_core.exceptions"),
         ],
     )
-    def test_provider_and_transport_errors_detected(self, name: str, module: str):
-        assert is_llm_backend_error(_exc_from_module(name, module))
+    def test_provider_errors_from_a_model_call_are_backend_errors(self, name, module):
+        exc = _exc_from_module(name, module)
+        assert looks_like_provider_error(exc)
+        assert not is_llm_backend_error(exc)  # unmarked: origin unknown
+        assert is_llm_backend_error(mark_llm_call_error(exc))
+
+    def test_boundary_context_manager_marks(self):
+        exc = _exc_from_module("RateLimitError", "openai")
+        with pytest.raises(Exception) as info:
+            with llm_call_boundary():
+                raise exc
+        assert is_llm_backend_error(info.value)
+
+    def test_tool_transport_error_is_not_a_backend_error(self):
+        """A real tool failing with httpx.ReadTimeout must stay an agent-visible failure."""
+        assert not is_llm_backend_error(_exc_from_module("ReadTimeout", "httpx"))
+
+    def test_marked_non_provider_error_is_not_backend(self):
+        assert not is_llm_backend_error(mark_llm_call_error(ValueError("bad output parse")))
 
     def test_injected_tool_faults_are_never_backend_errors(self):
-        assert not is_llm_backend_error(ToolCallRateLimited())
+        assert not is_llm_backend_error(mark_llm_call_error(ToolCallRateLimited()))
         assert not is_llm_backend_error(ToolCallTimeout("t"))
 
-    def test_plain_exceptions_are_not_backend_errors(self):
-        assert not is_llm_backend_error(ValueError("x"))
-        assert not is_llm_backend_error(RuntimeError("Mock agent failure"))
-
-    def test_wrapped_cause_is_followed(self):
-        inner = _exc_from_module("RateLimitError", "openai")
+    def test_wrapped_marked_cause_is_followed(self):
+        inner = mark_llm_call_error(_exc_from_module("RateLimitError", "openai"))
         outer = RuntimeError("framework wrapper")
         outer.__cause__ = inner
         assert is_llm_backend_error(outer)
 
     def test_injected_fault_wrapping_backend_error_stays_injected(self):
-        # An injected ToolCallError sits on top: the agent-facing event is the injection.
         outer = ToolCallTimeout("injected")
-        outer.__cause__ = _exc_from_module("ReadTimeout", "httpx")
+        outer.__cause__ = mark_llm_call_error(_exc_from_module("ReadTimeout", "httpx"))
         assert not is_llm_backend_error(outer)
 
 

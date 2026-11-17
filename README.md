@@ -280,6 +280,8 @@ Three things the harness does for hosted runs:
 
 - **Backend errors are not agent failures.** A provider-side 429, 5xx, or connection error that survives client retries is re-dispatched by the runner (`backend_error_retries`, default 2, with backoff), and if it still fails the trial is recorded as `status="backend_error"` with category `infrastructure` and **excluded from every metric**. It is never confused with an *injected* `ToolCallRateLimited`. Conditions with backend errors are marked incomplete.
 - **Exact backend is recorded.** `experiment_metadata.json` gains `llm_provider`, `model_id`, `llm_base_url`, `llm_api_key_env` (the variable *name*, never the key), `llm_requests_per_minute`, so a batch says which hosted model produced it. `--resume` refuses a batch whose provider or endpoint changed.
+- **Backend errors are recognised at the model call, not by exception type.** A tool that fails with the same transport error (`httpx.ReadTimeout`, a 503 from a real service) is a measured agent failure. If you write your own agent, wrap each model call in `agentprobe.llm.llm_call_boundary()` to get the same separation.
+- **AutoGen runs one tool call per turn.** A turn that requests several parallel calls is recorded as a `harness_error` and excluded, rather than silently running only the first.
 - **AutoGen works with any OpenAI-compatible provider** through `api_base`, so hosted AutoGen runs need no extra packages. LangGraph/LangChain hosted runs need `langchain-openai` (`openai>=1`), which conflicts with the `[autogen]` extra (`openai<1`): use a separate environment for those.
 
 Hosted models change silently and are not seed-reproducible; treat hosted batches as a snapshot, not a replication of the paper.

@@ -95,9 +95,13 @@ Roadmap = "https://github.com/chhayankjain/AgentProbe/issues/38"
 packages = ["agentprobe"]
 
 [tool.hatch.build.targets.sdist]
-only-include = [
+# Self-contained: the bundled tests import the experiment scripts and the
+# quickstart example, so those ship too (scripts only, not the result data).
+include = [
     "agentprobe",
     "tests",
+    "examples",
+    "experiments/*.py",
     "README.md",
     "LICENSE",
     "CHANGELOG.md",

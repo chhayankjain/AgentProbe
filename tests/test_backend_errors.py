@@ -11,6 +11,7 @@ import pytest
 from agentprobe.benchmark.metrics import MetricsCalculator
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, RunResult
 from agentprobe.injector.tool_failure import ToolCallRateLimited
+from agentprobe.llm import mark_llm_call_error
 from agentprobe.observer.classifier import FailureCategory, FailureClassifier
 
 # A stand-in for openai.RateLimitError without importing the SDK.
@@ -29,7 +30,7 @@ class FlakyBackendAgent:
     def invoke(self, input: dict) -> dict:
         self.invocations += 1
         if self.invocations <= self.n_failures:
-            raise FakeRateLimitError("429 from provider")
+            raise mark_llm_call_error(FakeRateLimitError("429 from provider"))
         return {"output": "ok", "latency_ms": 1.0}
 
 
@@ -167,7 +168,7 @@ class TestClassifierInfrastructure:
     )
     def test_provider_errors_are_infrastructure_not_tool_call(self, name: str):
         exc = type(name, (Exception,), {"__module__": "openai"})("x")
-        event = FailureClassifier().classify_exception(exc)
+        event = FailureClassifier().classify_exception(exc)  # name-based label only
         assert event.category == FailureCategory.INFRASTRUCTURE
 
     def test_injected_rate_limit_is_still_tool_call(self):

@@ -44,6 +44,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 
 from agentprobe.benchmark.metrics import _percentile
+from agentprobe.errors import HarnessLimitation
 from agentprobe.llm import is_llm_backend_error
 from agentprobe.observer.classifier import FailureClassifier
 from agentprobe.observer.tracer import get_tracer
@@ -53,6 +54,17 @@ if TYPE_CHECKING:
 
 _tracer = get_tracer(__name__)
 _console = Console()
+
+
+def _is_harness_limitation(exc: BaseException) -> bool:
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if isinstance(cur, HarnessLimitation):
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
 
 
 class _HarnessTimeout(Exception):
@@ -76,10 +88,19 @@ class RunResult:
     produced no valid observation:
       - ``"completed"``     — trial was dispatched and finished (success or failure).
       - ``"skipped"``       — trial was never dispatched (prior timeout lingering).
-      - ``"backend_error"`` — the LLM provider/transport failed (429, 5xx,
-        connection error) even after in-place retries. This is an
-        infrastructure event, not an agent failure, and is kept separate from
-        *injected* tool faults.
+      - ``"backend_error"`` — an LLM model call failed at the provider or its
+        transport (429, 5xx, connection error) even after in-place retries.
+        This is an infrastructure event, not an agent failure, and is kept
+        separate from *injected* tool faults. Identified at the LLM-call
+        boundary, so a tool that fails with the same transport error is an
+        ordinary failure.
+      - ``"harness_error"`` — the adapter could not run the trial faithfully
+        (e.g. parallel tool calls the AutoGen adapter cannot execute).
+
+    Tool evidence is per trial: ``trial_tool_calls``/``trial_injections`` count
+    tool calls and injected faults during the initial invocation (summed over
+    any backend re-dispatches), ``recovery_tool_calls``/``recovery_injections``
+    during the recovery attempt.
 
     Only ``"completed"`` trials should be included in error-rate, recovery,
     and latency calculations.
@@ -104,6 +125,10 @@ class RunResult:
     recovery_status: str = "n/a"
     output: str = ""
     backend_retries: int = 0
+    trial_tool_calls: int = 0
+    trial_injections: int = 0
+    recovery_tool_calls: int = 0
+    recovery_injections: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -124,6 +149,10 @@ class RunResult:
             "recovery_status": self.recovery_status,
             "output": self.output,
             "backend_retries": self.backend_retries,
+            "trial_tool_calls": self.trial_tool_calls,
+            "trial_injections": self.trial_injections,
+            "recovery_tool_calls": self.recovery_tool_calls,
+            "recovery_injections": self.recovery_injections,
         }
 
 
@@ -258,14 +287,18 @@ class BenchmarkRunner:
         """
         cfg = self.config
         attempt = 0
+        prior_calls = prior_injections = 0  # tool activity in abandoned dispatches
         while True:
             result = self._run_single_once(run_id, failure_type)
+            result.trial_tool_calls += prior_calls
+            result.trial_injections += prior_injections
             if result.status != "backend_error":
                 result.backend_retries += attempt
                 return result
             if attempt >= cfg.backend_error_retries or self._invocation_hung:
                 result.backend_retries += attempt
                 return result
+            prior_calls, prior_injections = result.trial_tool_calls, result.trial_injections
             delay = cfg.backend_error_backoff_seconds * (2**attempt)
             _console.print(
                 f"  [yellow]LLM backend error on run {run_id} "
@@ -290,9 +323,11 @@ class BenchmarkRunner:
             },
         ):
             start = time.perf_counter()
+            c0 = self._tool_counts()
             try:
                 output = self._invoke_with_timeout(task_input)
                 latency_ms = (time.perf_counter() - start) * 1000
+                calls, injections = self._delta(c0)
                 return RunResult(
                     run_id=run_id,
                     framework=cfg.framework,
@@ -301,9 +336,27 @@ class BenchmarkRunner:
                     success=True,
                     latency_ms=latency_ms,
                     output=str(output),
+                    trial_tool_calls=calls,
+                    trial_injections=injections,
                 )
             except Exception as exc:
                 latency_ms = (time.perf_counter() - start) * 1000
+                calls, injections = self._delta(c0)
+                if _is_harness_limitation(exc):
+                    return RunResult(
+                        run_id=run_id,
+                        framework=cfg.framework,
+                        task=cfg.task,
+                        failure_type=failure_type,
+                        success=False,
+                        latency_ms=latency_ms,
+                        status="harness_error",
+                        failure_category="harness",
+                        exception_type=type(exc).__name__,
+                        exception_msg=str(exc)[:200],
+                        trial_tool_calls=calls,
+                        trial_injections=injections,
+                    )
                 if not isinstance(exc, _HarnessTimeout) and is_llm_backend_error(exc):
                     # Infrastructure failure: no recovery attempt, not an agent failure.
                     return RunResult(
@@ -317,13 +370,20 @@ class BenchmarkRunner:
                         failure_category="infrastructure",
                         exception_type=type(exc).__name__,
                         exception_msg=str(exc)[:200],
+                        trial_tool_calls=calls,
+                        trial_injections=injections,
                     )
                 category = "unknown"
                 if self._classifier is not None:
                     event = self._classifier.classify_exception(exc, framework=cfg.framework)
                     category = event.category.value
+                    if category == "infrastructure":
+                        # Provider-like class, but not raised by a model call (e.g. a
+                        # real tool's httpx timeout): the origin is not established.
+                        category = "unknown"
 
                 # Attempt recovery
+                rc0 = self._tool_counts()
                 (
                     recovered,
                     recovery_latency_ms,
@@ -331,6 +391,7 @@ class BenchmarkRunner:
                     recovery_status,
                     recovery_backend_retries,
                 ) = self._attempt_recovery(task_input)
+                rec_calls, rec_injections = self._delta(rc0)
 
                 return RunResult(
                     run_id=run_id,
@@ -347,6 +408,10 @@ class BenchmarkRunner:
                     recovery_output=str(recovery_output) if recovery_output else "",
                     recovery_status=recovery_status,
                     backend_retries=recovery_backend_retries,
+                    trial_tool_calls=calls,
+                    trial_injections=injections,
+                    recovery_tool_calls=rec_calls,
+                    recovery_injections=rec_injections,
                 )
 
     def _invoke_with_timeout(self, task_input: dict) -> Any:
@@ -430,7 +495,7 @@ class BenchmarkRunner:
                     backend_retries,
                 )
             except Exception as exc:
-                if self._invocation_hung:
+                if self._invocation_hung or _is_harness_limitation(exc):
                     return False, 0.0, None, "unassessed", backend_retries
                 if not isinstance(exc, _HarnessTimeout) and is_llm_backend_error(exc):
                     if backend_retries >= cfg.backend_error_retries:
@@ -447,10 +512,21 @@ class BenchmarkRunner:
                 attempts_left -= 1
         return False, 0.0, None, "failed", backend_retries
 
+    def _tool_counts(self) -> tuple[int, int]:
+        injector = getattr(self.agent, "injector", None)
+        if injector is None or not hasattr(injector, "counts"):
+            return (0, 0)
+        return injector.counts()  # type: ignore[no-any-return]
+
+    def _delta(self, before: tuple[int, int]) -> tuple[int, int]:
+        after = self._tool_counts()
+        return after[0] - before[0], after[1] - before[1]
+
     def _summary_line(self, results: list[RunResult]) -> str:
         executed = [r for r in results if r.status == "completed"]
         backend_errors = sum(1 for r in results if r.status == "backend_error")
-        skipped = len(results) - len(executed) - backend_errors
+        harness_errors = sum(1 for r in results if r.status == "harness_error")
+        skipped = len(results) - len(executed) - backend_errors - harness_errors
         total = len(executed)
         failures = sum(1 for r in executed if not r.success)
         rate = failures / total if total > 0 else 0.0
@@ -467,6 +543,8 @@ class BenchmarkRunner:
             line += f" | [yellow]{skipped} skipped (condition incomplete)[/yellow]"
         if backend_errors:
             line += f" | [red]{backend_errors} LLM backend errors (excluded)[/red]"
+        if harness_errors:
+            line += f" | [red]{harness_errors} harness limitations (excluded)[/red]"
         return line
 
     def _save(self, results: list[RunResult], path: str) -> None:

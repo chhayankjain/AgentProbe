@@ -103,3 +103,25 @@ jobs:
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --quiet dist/*.whl
           /tmp/smoke/bin/python -c "import agentprobe; from agentprobe import ToolFailureInjector, AgentProbeTracer; print('agentprobe', agentprobe.__version__)"
+
+  sdist-tests:
+    name: Test suite from the source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --sdist
+
+      - name: Extract, install, and run the bundled tests
+        run: |
+          mkdir /tmp/sdist && tar -xzf dist/*.tar.gz -C /tmp/sdist --strip-components=1
+          cd /tmp/sdist
+          pip install ".[dev,plotting]" langchain-openai
+          pytest tests/ -q -m "not slow and not integration"

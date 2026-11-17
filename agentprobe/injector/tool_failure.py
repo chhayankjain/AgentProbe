@@ -167,8 +167,12 @@ class ToolFailureInjector:
     def __init__(self, config: ToolFailureConfig | None = None) -> None:
         self.config = config or ToolFailureConfig()
         self._rng = random.Random(self.config.seed)
+        # Separate stream for malformed payloads, so payload choice is reproducible
+        # from the seed without shifting the injection schedule drawn from _rng.
+        self._payload_rng = _payload_rng(self.config.seed)
         self._log: list[InjectionResult] = []
         self._call_count = 0
+        self._injected_count = 0
 
     # ------------------------------------------------------------------
     # Decorator API
@@ -244,10 +248,16 @@ class ToolFailureInjector:
     def injection_log(self) -> list[InjectionResult]:
         return list(self._log)
 
+    def counts(self) -> tuple[int, int]:
+        """``(completed tool calls, injected faults)`` so far, for per-trial deltas."""
+        return len(self._log), self._injected_count
+
     def reset(self) -> None:
         self._log.clear()
         self._call_count = 0
+        self._injected_count = 0
         self._rng = random.Random(self.config.seed)
+        self._payload_rng = _payload_rng(self.config.seed)
 
     def summary(self) -> dict[str, Any]:
         """Aggregate statistics over all recorded calls."""
@@ -321,6 +331,8 @@ class ToolFailureInjector:
                 raise
             finally:
                 rec.latency_ms = (time.perf_counter() - start) * 1000
+                if rec.injected:
+                    self._injected_count += 1
                 self._log.append(rec)
 
     async def _execute_async(self, fn: Callable, name: str, *args: Any, **kwargs: Any) -> Any:
@@ -367,6 +379,8 @@ class ToolFailureInjector:
                 raise
             finally:
                 rec.latency_ms = (time.perf_counter() - start) * 1000
+                if rec.injected:
+                    self._injected_count += 1
                 self._log.append(rec)
 
     def _build_exception(self) -> ToolCallError:
@@ -374,7 +388,9 @@ class ToolFailureInjector:
             case ToolFailureType.TIMEOUT:
                 return ToolCallTimeout(f"Tool call timed out after {self.config.timeout_seconds}s")
             case ToolFailureType.MALFORMED_OUTPUT:
-                payload = self.config.malformed_payload or _random_malformed_payload()
+                payload = self.config.malformed_payload or self._payload_rng.choice(
+                    _MALFORMED_PAYLOADS
+                )
                 return ToolCallMalformedOutput(f"Tool returned unparseable output: {payload!r}")
             case ToolFailureType.RATE_LIMIT:
                 return ToolCallRateLimited(retry_after=self.config.retry_after_seconds)
@@ -400,5 +416,6 @@ _MALFORMED_PAYLOADS = [
 ]
 
 
-def _random_malformed_payload() -> str:
-    return random.choice(_MALFORMED_PAYLOADS)
+def _payload_rng(seed: int | None) -> random.Random:
+    """Independent, seeded stream for payload selection (unseeded if *seed* is None)."""
+    return random.Random(f"agentprobe-payload:{seed}") if seed is not None else random.Random()

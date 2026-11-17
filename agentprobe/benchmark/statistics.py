@@ -109,7 +109,13 @@ def mean_ci(
 # Effect Sizes
 # ---------------------------------------------------------------------------
 
-EffectMagnitude = Literal["negligible", "small", "medium", "large"]
+EffectMagnitude = Literal["negligible", "small", "medium", "large", "undefined"]
+
+
+def _finite(arr: np.ndarray, what: str) -> np.ndarray:
+    if not np.all(np.isfinite(arr)):
+        raise ValueError(f"{what} contains NaN or infinite values")
+    return arr
 
 
 def _interpret_d(d: float) -> EffectMagnitude:
@@ -149,6 +155,9 @@ def cohens_h(p1: float, p2: float) -> tuple[float, EffectMagnitude]:
     (h_value, interpretation) where interpretation is one of
     ``"negligible"``, ``"small"``, ``"medium"``, ``"large"``.
     """
+    for p in (p1, p2):
+        if not (math.isfinite(p) and 0.0 <= p <= 1.0):
+            raise ValueError(f"proportions must be finite and in [0, 1], got {p}")
     h = 2 * (math.asin(math.sqrt(p1)) - math.asin(math.sqrt(p2)))
     return (h, _interpret_h(h))
 
@@ -168,17 +177,21 @@ def cohens_d(
     -------
     (d_value, interpretation).
     """
-    a1 = np.asarray(group1, dtype=np.float64)
-    a2 = np.asarray(group2, dtype=np.float64)
+    a1 = _finite(np.asarray(group1, dtype=np.float64), "group1")
+    a2 = _finite(np.asarray(group2, dtype=np.float64), "group2")
     n1, n2 = len(a1), len(a2)
     if n1 < 2 or n2 < 2:
         raise ValueError("Both groups need at least 2 observations")
     var1, var2 = float(np.var(a1, ddof=1)), float(np.var(a2, ddof=1))
     pooled_std = math.sqrt(((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2))
+    mean_diff = float(np.mean(a1)) - float(np.mean(a2))
     if pooled_std == 0:
-        d = 0.0
-    else:
-        d = (float(np.mean(a1)) - float(np.mean(a2))) / pooled_std
+        # Both groups are constant. Equal constants: no effect. Different constants:
+        # the standardized effect is undefined (division by zero), not zero.
+        if mean_diff == 0:
+            return (0.0, "negligible")
+        return (math.nan, "undefined")
+    d = mean_diff / pooled_std
     return (d, _interpret_d(d))
 
 
@@ -257,8 +270,8 @@ def compare_distributions(
 
     Non-parametric -- does not assume normality.
     """
-    a1 = np.asarray(group1, dtype=np.float64)
-    a2 = np.asarray(group2, dtype=np.float64)
+    a1 = _finite(np.asarray(group1, dtype=np.float64), "group1")
+    a2 = _finite(np.asarray(group2, dtype=np.float64), "group2")
     if len(a1) < 1 or len(a2) < 1:
         raise ValueError("Both groups need at least 1 observation")
     stat, p = stats.mannwhitneyu(a1, a2, alternative="two-sided")
@@ -280,7 +293,15 @@ def compare_multiple_groups(
     """
     if len(groups) < 2:
         raise ValueError("Need at least 2 groups")
-    arrays = [np.asarray(g, dtype=np.float64) for g in groups]
+    arrays = [_finite(np.asarray(g, dtype=np.float64), f"group {i}") for i, g in enumerate(groups)]
+    if len({float(x) for a in arrays for x in a}) <= 1:
+        # Every observation identical: H is undefined, and there is no evidence of a difference.
+        return HypothesisTestResult(
+            test_name="Kruskal-Wallis H test (all observations identical)",
+            statistic=math.nan,
+            p_value=1.0,
+            significant=False,
+        )
     stat, p = stats.kruskal(*arrays)
     return HypothesisTestResult(
         test_name="Kruskal-Wallis H test",

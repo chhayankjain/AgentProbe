@@ -41,6 +41,7 @@ from langgraph.prebuilt import ToolNode
 
 from agentprobe.agents.base import message_text
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
+from agentprobe.llm import llm_call_boundary
 from agentprobe.observer.tracer import get_tracer
 
 _tracer = get_tracer(__name__)
@@ -119,7 +120,9 @@ class LangGraphToolAgent:
     ) -> None:
         self._llm = llm
         self._max_iterations = max_iterations
-        self._injector = ToolFailureInjector(failure_config) if failure_config else None
+        # Always present: with no fault configured it is a pass-through (type NONE never
+        # injects), but it still counts tool calls so baseline trials carry evidence.
+        self._injector = ToolFailureInjector(failure_config or ToolFailureConfig())
         self._tools = _make_tools(self._injector)
         self._graph = self._build_graph()
 
@@ -184,7 +187,7 @@ class LangGraphToolAgent:
         tool_node = ToolNode(self._tools)
 
         def agent_node(state: AgentState) -> AgentState:
-            with _tracer.start_as_current_span("langgraph.node.agent"):
+            with _tracer.start_as_current_span("langgraph.node.agent"), llm_call_boundary():
                 response = llm_with_tools.invoke(state["messages"])
                 return {"messages": [response]}
 

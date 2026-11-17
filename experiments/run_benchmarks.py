@@ -63,6 +63,14 @@ RESULTS_DIR = Path(__file__).parent / "results"
 # Failure configurations
 # ---------------------------------------------------------------------------
 
+#: This script is the Phase 1 (discovery) protocol. Its injection probabilities
+#: are NOT matched across fault types; use run_experiment_v2.py for the matched
+#: Phase 2 protocol the paper's main comparisons use.
+PROTOCOL = (
+    "phase1-discovery: p=0.20 timeout/malformed_output, p=0.15 rate_limit/api_error "
+    "(unmatched), no answer grading"
+)
+
 FAILURE_CONFIGS: dict[str, ToolFailureConfig | None] = {
     "none": None,
     "timeout": ToolFailureConfig(
@@ -246,6 +254,10 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    _console.print(f"[yellow]Protocol: {PROTOCOL}[/yellow]")
+    _console.print(
+        "[yellow]For the matched protocol (p=0.20 everywhere) use run_experiment_v2.py.[/yellow]"
+    )
     spec = spec_from_args(args)
     if not spec.is_local:
         spec.resolve_api_key()
@@ -285,8 +297,10 @@ def main() -> None:
             llm_spec=spec,
         )
         meta_path = RESULTS_DIR / "experiment_metadata.json"
+        meta_dict = meta.to_dict()
+        meta_dict["protocol"] = PROTOCOL
         with open(meta_path, "w") as f:
-            json.dump(meta.to_dict(), f, indent=2)
+            json.dump(meta_dict, f, indent=2)
         _console.print(f"[green]Metadata saved to {meta_path}[/green]")
 
 

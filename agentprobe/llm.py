@@ -46,6 +46,8 @@ from __future__ import annotations
 
 import argparse
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -126,6 +128,9 @@ PROVIDER_PRESETS: dict[str, ProviderPreset] = {
 }
 
 PROVIDER_NAMES: tuple[str, ...] = tuple(PROVIDER_PRESETS)
+
+#: Providers whose OpenAI-compatible API accepts ``parallel_tool_calls``.
+_PARALLEL_TOOL_CALLS_FLAG_PROVIDERS: frozenset[str] = frozenset({"openai", "groq", "openrouter"})
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +368,10 @@ def autogen_llm_config(spec: LLMSpec) -> dict[str, Any]:
     }
     # pyautogen merges top-level keys into every ChatCompletion.create call.
     cfg: dict[str, Any] = {"config_list": [entry], "temperature": spec.temperature}
+    if spec.provider in _PARALLEL_TOOL_CALLS_FLAG_PROVIDERS:
+        # The shim turns this into ``parallel_tool_calls=False`` when tools are sent;
+        # pyautogen can execute only one call per turn.
+        cfg["agentprobe_parallel_tool_calls"] = False
     if spec.timeout_seconds is not None:
         cfg["request_timeout"] = spec.timeout_seconds
     return cfg
@@ -404,6 +413,11 @@ def autogen_effective_settings(spec: LLMSpec) -> dict[str, Any]:
         "max_retries": spec.max_retries,
         "max_retry_period_seconds": (spec.max_retries + 2) * retry_wait,
         "stop_on_final_answer": spec.provider == "gemini",
+        "parallel_tool_calls": (
+            "disabled via provider flag"
+            if spec.provider in _PARALLEL_TOOL_CALLS_FLAG_PROVIDERS
+            else "provider default; >1 call per turn rejected as harness_error"
+        ),
     }
 
 
@@ -457,16 +471,38 @@ _BACKEND_EXCEPTION_NAMES: frozenset[str] = frozenset(
 )
 
 
-def is_llm_backend_error(exc: BaseException) -> bool:
-    """True if *exc* came from the LLM provider or its transport, not from the agent.
+_LLM_CALL_MARK = "__agentprobe_llm_call__"
 
-    Injected tool faults (``agentprobe.injector.tool_failure.ToolCallError`` and
-    subclasses) and the harness's own timeout are never backend errors. The check
-    walks ``__cause__``/``__context__`` so a framework that wraps the provider
-    exception is still recognised.
+
+def mark_llm_call_error(exc: BaseException) -> BaseException:
+    """Tag *exc* as having been raised by an LLM model call and return it."""
+    try:
+        setattr(exc, _LLM_CALL_MARK, True)
+    except (AttributeError, TypeError):  # pragma: no cover - immutable exception types
+        pass
+    return exc
+
+
+@contextmanager
+def llm_call_boundary() -> Iterator[None]:
+    """Wrap exactly one LLM model call. Any exception raised inside is tagged as
+    coming from the model call before it propagates.
+
+    The built-in adapters use this around every model call. Custom agents
+    should do the same, otherwise provider errors are treated as ordinary
+    agent failures (the safe default).
     """
-    if isinstance(exc, BackendRetriesExhausted):
-        return True
+    try:
+        yield
+    except BaseException as exc:
+        mark_llm_call_error(exc)
+        raise
+
+
+def looks_like_provider_error(exc: BaseException) -> bool:
+    """Class/module heuristic: does *exc* (or its cause chain) look like an
+    LLM-client or HTTP-transport error? On its own this cannot tell an LLM
+    failure from a tool that uses the same transport (httpx, requests, ...)."""
     seen: set[int] = set()
     cur: BaseException | None = exc
     while cur is not None and id(cur) not in seen:
@@ -477,6 +513,31 @@ def is_llm_backend_error(exc: BaseException) -> bool:
             return False
         if mod.startswith(_BACKEND_MODULE_PREFIXES) or name in _BACKEND_EXCEPTION_NAMES:
             return True
+        cur = cur.__cause__ or cur.__context__
+    return False
+
+
+def is_llm_backend_error(exc: BaseException) -> bool:
+    """True only if *exc* was raised by an LLM model call **and** is a
+    provider/transport error.
+
+    Identification happens at the LLM invocation boundary (see
+    :func:`llm_call_boundary`): a transport exception by itself does not show
+    whether the model or a tool failed, so an ``httpx.ReadTimeout`` raised by a
+    real tool stays an agent-visible failure and is measured as one. Injected
+    tool faults and harness limitations are never backend errors.
+    """
+    if isinstance(exc, BackendRetriesExhausted):
+        return True
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if getattr(cur, _LLM_CALL_MARK, False):
+            return isinstance(cur, BackendRetriesExhausted) or looks_like_provider_error(cur)
+        mod = type(cur).__module__ or ""
+        if mod.startswith("agentprobe.") and not isinstance(cur, BackendRetriesExhausted):
+            return False  # injected fault or harness error sits on top
         cur = cur.__cause__ or cur.__context__
     return False
 
@@ -551,6 +612,9 @@ __all__ = [
     "autogen_agent_kwargs",
     "autogen_effective_settings",
     "is_llm_backend_error",
+    "looks_like_provider_error",
+    "llm_call_boundary",
+    "mark_llm_call_error",
     "BackendRetriesExhausted",
     "add_llm_args",
     "spec_from_args",

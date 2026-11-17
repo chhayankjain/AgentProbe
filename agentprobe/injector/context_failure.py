@@ -94,6 +94,7 @@ class ContextFailureConfig:
         failure_probability: Probability [0, 1] of injecting on each call.
         token_limit: Token budget to simulate (OVERFLOW).
         drop_fraction: Fraction of messages to drop (LOST_STATE). Range [0, 1].
+            ``0`` keeps every message; any positive value drops at least one.
         inject_n_fake_messages: Number of hallucinated messages to inject (HALLUCINATED_HISTORY).
         fake_role: Role to use for hallucinated messages ("user" or "assistant").
         seed: RNG seed for reproducible experiments.
@@ -264,6 +265,10 @@ class ContextFailureInjector:
     ) -> list[Any]:
         if not messages:
             return messages
+        if self.config.drop_fraction == 0:
+            span.set_attribute("context.dropped_messages", 0)
+            return list(messages)
+        # Any positive fraction drops at least one message.
         n_to_drop = max(1, int(len(messages) * self.config.drop_fraction))
         indices_to_drop = set(self._rng.sample(range(len(messages)), min(n_to_drop, len(messages))))
         result = [m for i, m in enumerate(messages) if i not in indices_to_drop]

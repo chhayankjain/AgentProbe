@@ -182,8 +182,9 @@ class TestBaseAgentProtocol:
         agent = LangGraphToolAgent(llm=MagicMock())
         assert isinstance(agent, BaseAgent)
         agent.reset()  # no-op, must not raise
-        assert agent.injector is None
-        assert agent.get_injector_summary() == {}
+        # Pass-through injector: counts tool calls, never injects.
+        assert agent.injector is not None
+        assert agent.get_injector_summary()["injected_failures"] == 0
 
     def test_langgraph_adapter_keeps_injector_across_reset(self):
         from agentprobe.agents.langgraph_agent import LangGraphToolAgent
