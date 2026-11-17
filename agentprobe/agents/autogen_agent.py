@@ -100,10 +100,6 @@ def _activate(limiter: Any, max_retries: int | None) -> None:
     st.consecutive = 0
 
 
-def _reset_backend_failures() -> None:
-    _state().consecutive = 0
-
-
 def _clear_tool_call_cache() -> None:
     _state().cache = {}
 

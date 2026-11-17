@@ -51,7 +51,15 @@ jobs:
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --quiet dist/*.whl
-          /tmp/smoke/bin/python -c "import agentprobe; from agentprobe import ToolFailureInjector, AgentProbeTracer; print('agentprobe', agentprobe.__version__)"
+          /tmp/smoke/bin/python - <<'PY'
+          from importlib.resources import files
+          import agentprobe
+          from agentprobe import ToolFailureInjector, AgentProbeTracer
+          from agentprobe.testing import probe
+          assert files("agentprobe").joinpath("py.typed").is_file()
+          print("agentprobe", agentprobe.__version__)
+          PY
+          /tmp/smoke/bin/python -m agentprobe.demo --runs 2 --p 0
 
       - uses: actions/upload-artifact@v7
         with:

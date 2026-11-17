@@ -27,14 +27,13 @@ Usage — explicit call::
 Usage — LangChain tool wrapping::
 
     from langchain_core.tools import tool
-    from agentprobe.injector.tool_failure import inject_langchain_tool
 
     @tool
     def web_search(query: str) -> str:
         \"\"\"Search the web.\"\"\"
         return _real_search(query)
 
-    faulty_tool = inject_langchain_tool(web_search, injector)
+    faulty_tool = injector.inject_langchain_tool(web_search)
 """
 
 from __future__ import annotations

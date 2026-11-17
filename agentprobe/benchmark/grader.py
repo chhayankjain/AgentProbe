@@ -8,7 +8,7 @@ Usage::
     from agentprobe.benchmark.grader import ResponseGrader
 
     grader = ResponseGrader(threshold=0.5)
-    result = grader.grade("Tokyo has 14 million people", ["tokyo", "population", "million"])
+    result = grader.grade("Tokyo's population is 14 million", ["tokyo", "population", "million"])
     # result.score = 1.0, result.is_correct = True
 
     # Silent failure detection

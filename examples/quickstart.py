@@ -3,8 +3,8 @@
     pip install agentprobe-toolkit
     python examples/quickstart.py
 
-This is the same thing as ``python -m agentprobe.demo`` but spelled out step by
-step so you can copy the pieces into your own code. Replace the scripted model
+This uses the same building blocks as ``python -m agentprobe.demo``, spelled out
+step by step so you can copy the pieces into your own code. Replace the scripted model
 with a real one (``agentprobe.llm.build_chat_model``) and the rest is unchanged.
 """
 
@@ -31,19 +31,33 @@ faults = ToolFailureConfig(
     seed=42,
 )
 
-# 3. Build the agent. Real usage: llm = build_chat_model(LLMSpec.from_provider("ollama", "llama3.1"))
+# 3. Build the agent. Replace the scripted model with build_chat_model(LLMSpec(...))
+#    to use a real backend.
 agent = LangGraphToolAgent(llm=ScriptedToolCallingModel(), failure_config=faults)
 
-# 4. Run a small benchmark: 10 runs, one harness retry after a failure.
+
+def calculator_task(run_id: int, _task: str) -> dict[str, str | int]:
+    """Use the task the scripted model's fixed calculator expression answers."""
+    return {"input": "Calculate 15% of 847.", "run_id": run_id}
+
+
+# 4. Run a small benchmark: 10 matching calculator tasks, one retry after a failure.
 results = BenchmarkRunner(
     agent=agent,
     config=BenchmarkConfig(n_runs=10, failure_config=faults, recovery_attempts=1),
+    task_fn=calculator_task,
 ).run()
 
 # 5. Metrics and the per-call injection log, each entry linked to an OpenTelemetry span.
 m = MetricsCalculator().compute(results)
-print(f"\nfailure rate {m.failure_rate:.0%} | recovery rate {m.recovery_rate} | P99 {m.p99_latency_ms:.0f} ms")
+print(
+    f"\nfailure rate {m.failure_rate:.0%} | recovery rate {m.recovery_rate} | "
+    f"P99 {m.p99_latency_ms:.0f} ms"
+)
 for rec in agent.injector.injection_log:
-    print(f"  call {rec.call_index}: {rec.tool_name:<10} injected={rec.injected!s:<5} span={rec.span_id}")
+    print(
+        f"  call {rec.call_index}: {rec.tool_name:<10} "
+        f"injected={rec.injected!s:<5} span={rec.span_id}"
+    )
 
 tracer.shutdown()

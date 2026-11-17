@@ -10,14 +10,14 @@ git clone https://github.com/chhayankjain/AgentProbe.git
 cd AgentProbe
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev,plotting,ollama]"   # installs the agentprobe-toolkit distribution in editable mode
+pip install -e ".[dev,plotting]"   # no model or API key needed for the offline suite
 
 # Run tests
-pytest tests/ -v
+pytest tests/ examples/your_agent -v -m "not slow and not integration"
 
 # Run linter
-ruff check agentprobe/ tests/
-ruff format --check agentprobe/ tests/
+ruff check agentprobe/ tests/ examples/
+ruff format --check agentprobe/ tests/ examples/
 ```
 
 ## Where to start
@@ -32,7 +32,7 @@ ruff format --check agentprobe/ tests/
 1. Fork the repo and create a branch from `main`
 2. Make your changes
 3. Add or update tests as needed
-4. Ensure `pytest tests/ -v` passes and `ruff check` is clean
+4. Run the offline tests and lint/format checks above
 5. Open a pull request against `main`
 
 ## Code Style
@@ -47,6 +47,7 @@ ruff format --check agentprobe/ tests/
 Experiments require [Ollama](https://ollama.ai) running locally:
 
 ```bash
+pip install -e ".[ollama]"
 ollama pull llama3.1
 python experiments/run_experiment_v2.py --frameworks langgraph --model llama3.1 --seed 42
 ```

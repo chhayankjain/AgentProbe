@@ -2,12 +2,12 @@
 
 Computes:
   - Failure rate        : fraction of runs that raised an exception
-  - MTTR                : mean time to recovery (seconds from failure to next success)
+  - MTTR                : mean recorded recovery invocation latency (milliseconds)
   - P50 / P90 / P99     : latency percentiles across all runs
   - Recovery rate       : fraction of failures from which the agent recovered
   - Failure distribution: breakdown by failure category
 
-All computations are pure Python + NumPy — no LLM calls.
+Computations use the Python standard library; pandas export is optional. No LLM calls.
 
 Usage::
 
@@ -19,7 +19,7 @@ Usage::
     print(metrics.failure_rate)   # e.g. 0.12
     print(metrics.p99_latency_ms) # e.g. 4820.0
 
-    df = metrics.to_dataframe()   # pandas DataFrame for paper plots
+    df = calc.to_dataframe([metrics])   # optional pandas DataFrame for plots
 """
 
 from __future__ import annotations

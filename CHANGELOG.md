@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Maintenance
+- Include the typing marker and documentation in distributions; wheel checks now exercise the public probe API and offline demo, and source-archive checks run the tutorial tests.
+- Remove unused imports, an unused AutoGen helper, and notebook-only development dependencies; use the public paper-task helper in the active experiment runner.
+- Align contributor instructions and architecture/examples documentation with the own-agent workflow; correct API examples and metric units, run lint and format checks on examples, and use a matching calculator task in the benchmark quickstart.
+- Set the async fixture loop scope explicitly and ignore generated coverage/JUnit output.
+
 ### Added
 - **Test your own agent** with `agentprobe.testing.probe()`: wrap the tools your agent already uses (plain sync/async functions and LangChain tools; originals are never modified), declare deterministic fault scenarios, run the agent, and assert on the outcome (#63, #96)
 - Scenarios: `fail_first(n)`, `fail_times(n).then_succeed()`, `always_fail()`, `returns(value)`, `slow(ms=...)`, `with_probability(p, seed=...)`, with any named fault or exception. Rules for one tool form a sequence (#65)

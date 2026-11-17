@@ -4,11 +4,13 @@ This document explains AgentProbe's internal design to help contributors navigat
 
 ## 1. System overview
 
-Four library layers plus the experiment harness that drives them. Only `agentprobe/` ships in the PyPI package; `experiments/` is the paper's harness and stays in the repo.
+AgentProbe has two execution paths. For tests of an existing agent, `agentprobe.testing.probe()` wraps copies of its tools, applies deterministic scenarios, and returns evidence and assertions in `ProbeResult`. The instrumentation and cancellation contract is in [docs/instrumentation.md](docs/instrumentation.md).
+
+The research path uses four library layers plus the experiment harness below. Only `agentprobe/` ships in the wheel. The source archive also includes examples, documentation, tests, and active experiment scripts; historical result data stay in the repository.
 
 ```mermaid
 flowchart TB
-    subgraph EXP["experiments/  (paper harness, not packaged)"]
+    subgraph EXP["experiments/  (paper harness; scripts included in sdist)"]
         direction LR
         RUNv2["run_experiment_v2.py<br/>Phase 2 matrix + checkpoints"]
         QUAL["run_qualification.py<br/>p=1.0 trace-linked validation"]
@@ -18,13 +20,14 @@ flowchart TB
 
     subgraph PKG["agentprobe/  (PyPI: agentprobe-toolkit)"]
         direction TB
+        PROBE["testing.py / probe.py<br/>existing tools · deterministic scenarios<br/>evidence snapshots · assertion gates"]
         subgraph BENCH["benchmark/"]
             RUNNER["BenchmarkRunner<br/>N runs · timeout thread · 1 retry"]
             METRICS["MetricsCalculator<br/>failure/recovery rate · MTTR · P50/P90/P99"]
-            GRADER["ResponseGrader<br/>keyword / exact-answer grading"]
+            GRADER["ResponseGrader<br/>keyword grading"]
             STATS["statistics.py<br/>Wilson CI · Cohen's d/h"]
             TASKS["PAPER_PROMPTS (default)<br/>tasks/ corpora (55 queries)"]
-            META["metadata.py<br/>git · pip freeze · ollama · hardware"]
+            META["metadata.py<br/>git · dependency versions · Ollama · hardware"]
         end
         subgraph AGENTS["agents/  (BaseAgent protocol)"]
             LG["LangGraphToolAgent<br/>hand-built ReAct graph"]
@@ -48,21 +51,23 @@ flowchart TB
         PROMS["Prometheus → Grafana"]
     end
 
-    RUNv2 & QUAL & DIAG --> RUNNER
+    RUNv2 --> RUNNER
+    QUAL --> LG & LC & AG
+    DIAG --> AG & LLM
     RUNNER --> LG & LC & AG
     RUNNER --> METRICS & GRADER & META
     METRICS --> STATS
     TASKS --> RUNNER
     LG & LC & AG --> TOOLINJ
     LG & LC & AG --> LLM
-    TOOLINJ & RUNNER & LG & LC & AG --> TRACER
+    PROBE & TOOLINJ & RUNNER & LG & LC & AG --> TRACER
     RUNNER --> CLS
     TRACER --> OTELB
     PROM --> PROMS
     RUNv2 --> AN
 ```
 
-**Reading the diagram.** The experiment scripts never touch the frameworks directly: they build an adapter, hand it to `BenchmarkRunner`, and read back `RunResult` records. Each adapter creates its own `ToolFailureInjector` and wraps its tools with it, so injection happens identically regardless of framework. Every layer emits OpenTelemetry spans through the shared tracer.
+**Reading the diagram.** The matrix runner builds adapters, hands them to `BenchmarkRunner`, and reads back `RunResult` records. Qualification invokes adapters directly; the diagnostic compares a direct model client with the AutoGen adapter. Each research adapter creates its own `ToolFailureInjector`. The own-agent probe wraps supplied tools without requiring these adapters or the benchmark runner. Runners, adapters, probes, and injectors emit OpenTelemetry spans through the shared tracer.
 
 ## 2. One trial, end to end
 

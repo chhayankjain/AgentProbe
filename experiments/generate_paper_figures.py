@@ -26,6 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,7 +34,6 @@ import numpy as np
 from experiments.analyze_cross_model import (
     analyze_batch,
     load_batch,
-    wilson_ci,
 )
 
 # ---------------------------------------------------------------------------

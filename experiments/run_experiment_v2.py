@@ -34,8 +34,7 @@ import os
 import platform
 import subprocess
 import sys
-import time
-from dataclasses import fields, asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -46,6 +45,9 @@ from rich.console import Console
 from rich.table import Table
 
 from agentprobe.benchmark.grader import ResponseGrader
+from agentprobe.benchmark.metrics import MetricsCalculator
+from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, paper_task_fn
+from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
 from agentprobe.llm import (
     LLMSpec,
     add_llm_args,
@@ -55,10 +57,6 @@ from agentprobe.llm import (
     build_chat_model,
     spec_from_args,
 )
-from agentprobe.benchmark.metrics import MetricsCalculator
-from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, RunResult
-from agentprobe.benchmark.metadata import capture_metadata
-from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
 
 _console = Console()
 
@@ -66,7 +64,7 @@ _console = Console()
 # Task definitions with correctness criteria
 # ---------------------------------------------------------------------------
 
-# Expected keywords for grading each prompt (index matches _default_task_fn)
+# Expected keywords for grading each prompt (index matches paper_task_fn)
 TASK_GRADING = {
     "tool_use": [
         # "What is the capital of France?"
@@ -532,8 +530,7 @@ def run_single_condition(
         # Per-trial tool evidence comes from the runner's injector snapshots.
 
         # Get the input text from the task function
-        from agentprobe.benchmark.runner import _default_task_fn
-        task_input = _default_task_fn(r.run_id, task)
+        task_input = paper_task_fn(r.run_id, task)
         input_text = str(task_input.get("input", ""))
 
         record = EnhancedRunRecord(
