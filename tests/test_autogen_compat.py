@@ -11,7 +11,7 @@ from agentprobe.agents import autogen_agent as ag
 
 
 def _reset() -> None:
-    ag._TOOL_CALL_CACHE.clear()
+    ag._clear_tool_call_cache()
 
 
 def test_extras_restored_on_echoed_function_call():
@@ -77,7 +77,7 @@ def test_cache_is_bounded():
         ag._remember_tool_call(
             {"function": {"name": "f", "arguments": str(i)}, "extra_content": {}}
         )
-    assert sum(len(v) for v in ag._TOOL_CALL_CACHE.values()) <= ag._TOOL_CALL_CACHE_MAX
+    assert sum(len(v) for v in ag._state().cache.values()) <= ag._TOOL_CALL_CACHE_MAX
 
 
 def test_stop_on_final_answer_sets_termination_predicate():

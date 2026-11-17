@@ -55,33 +55,69 @@ _tracer = get_tracer(__name__)
 
 _COMPAT_PATCHED = False
 
-# Providers such as Gemini 3 attach provider extras (a ``thought_signature``
-# under ``extra_content``) to each tool call and reject the next request unless
-# the echoed function call carries them. pyautogen 0.1.14 stores only the legacy
-# ``function_call`` {name, arguments}, so the shim remembers every full
-# ``tool_calls`` entry *in response order* and restores the k-th occurrence of a
-# (name, arguments) pair with the k-th remembered entry for that pair. The cache
-# is cleared by ``AutoGenToolAgent.reset()`` at the start of each conversation,
-# so identical calls in different trials never cross-contaminate. Entries without
-# extras are never rewritten, so Ollama requests are byte-identical.
-_TOOL_CALL_CACHE: dict[tuple[str, str], list[dict[str, Any]]] = {}
+# Shim state is **per thread**, and each AutoGenToolAgent activates its own
+# settings in the thread that runs its conversation (``_activate`` at the start
+# of every ``invoke``). pyautogen runs a chat synchronously in the calling
+# thread, and BenchmarkRunner gives every invocation its own worker thread, so
+# differently configured agents, or concurrent conversations in different
+# threads, cannot change each other's throttle, retry limit, or tool-call cache.
+#
+# Tool-call cache: providers such as Gemini 3 attach provider extras (a
+# ``thought_signature`` under ``extra_content``) to each tool call and reject
+# the next request unless the echoed call carries them. pyautogen 0.1.14 keeps
+# only the legacy ``function_call`` {name, arguments}, so the shim remembers
+# every full ``tool_calls`` entry in response order and restores the k-th
+# occurrence of a (name, arguments) pair with the k-th remembered entry.
+# Entries without extras are never rewritten, so Ollama requests are unchanged.
+#
+# Retry bound: pyautogen 0.1.14 retries ServiceUnavailableError,
+# APIConnectionError and APIError with no limit, so the shim counts consecutive
+# transient provider errors and raises BackendRetriesExhausted past the limit.
 _TOOL_CALL_CACHE_MAX = 256
-
-#: Optional client-side throttle applied around every ChatCompletion.create.
-_RATE_LIMITER: Any = None
-
-#: Retries allowed for consecutive transient provider errors before the shim
-#: raises BackendRetriesExhausted. pyautogen 0.1.14 retries ServiceUnavailable,
-#: APIConnectionError and APIError without any limit, so the bound must live here.
-_MAX_BACKEND_RETRIES = 6
-_RETRY_STATE = threading.local()
+_DEFAULT_MAX_BACKEND_RETRIES = 6
+_STATE = threading.local()
 
 #: The unpatched ``openai.ChatCompletion.create``; set by ``_patch_openai_compat``.
 _ORIGINAL_CREATE: Any = None
 
 
+def _state() -> threading.local:
+    if not hasattr(_STATE, "cache"):
+        _STATE.cache = {}
+        _STATE.limiter = None
+        _STATE.max_retries = _DEFAULT_MAX_BACKEND_RETRIES
+        _STATE.consecutive = 0
+    return _STATE
+
+
+def _activate(limiter: Any, max_retries: int | None) -> None:
+    """Make *this* agent's settings the active ones for the current thread and
+    start a fresh conversation (empty tool-call cache, zero failure count)."""
+    st = _state()
+    st.limiter = limiter  # None means unlimited: never inherit another agent's limiter
+    st.max_retries = _DEFAULT_MAX_BACKEND_RETRIES if max_retries is None else max_retries
+    st.cache = {}
+    st.consecutive = 0
+
+
 def _reset_backend_failures() -> None:
-    _RETRY_STATE.consecutive = 0
+    _state().consecutive = 0
+
+
+def _clear_tool_call_cache() -> None:
+    _state().cache = {}
+
+
+def _build_limiter(requests_per_minute: float | None) -> Any:
+    if requests_per_minute is None:
+        return None
+    from langchain_core.rate_limiters import InMemoryRateLimiter
+
+    return InMemoryRateLimiter(
+        requests_per_second=requests_per_minute / 60.0,
+        check_every_n_seconds=0.1,
+        max_bucket_size=1,
+    )
 
 
 def _is_transient_provider_error(exc: BaseException) -> bool:
@@ -105,17 +141,13 @@ def _is_transient_provider_error(exc: BaseException) -> bool:
     return True
 
 
-def _clear_tool_call_cache() -> None:
-    _TOOL_CALL_CACHE.clear()
-
-
 def _remember_tool_call(tool_call: dict[str, Any]) -> None:
+    cache = _state().cache
     fn = tool_call.get("function", {})
     key = (fn.get("name", ""), fn.get("arguments", ""))
-    total = sum(len(v) for v in _TOOL_CALL_CACHE.values())
-    if total >= _TOOL_CALL_CACHE_MAX:
-        _TOOL_CALL_CACHE.clear()
-    _TOOL_CALL_CACHE.setdefault(key, []).append(dict(tool_call))
+    if sum(len(v) for v in cache.values()) >= _TOOL_CALL_CACHE_MAX:
+        cache.clear()
+    cache.setdefault(key, []).append(dict(tool_call))
 
 
 def _restore_tool_calls(messages: list[Any]) -> list[Any]:
@@ -124,6 +156,7 @@ def _restore_tool_calls(messages: list[Any]) -> list[Any]:
     The k-th legacy occurrence of a (name, arguments) pair maps to the k-th
     remembered entry for that pair, so repeated identical calls keep their own
     ids and signatures."""
+    cache = _state().cache
     out: list[Any] = []
     seen: dict[tuple[str, str], int] = {}
     for msg in messages:
@@ -132,7 +165,7 @@ def _restore_tool_calls(messages: list[Any]) -> list[Any]:
             key = (fc.get("name", ""), fc.get("arguments", ""))
             idx = seen.get(key, 0)
             seen[key] = idx + 1
-            entries = _TOOL_CALL_CACHE.get(key, [])
+            entries = cache.get(key, [])
             cached = entries[idx] if idx < len(entries) else None
             if cached is not None and cached.get("extra_content"):
                 rewritten = {k: v for k, v in msg.items() if k != "function_call"}
@@ -146,39 +179,16 @@ def _restore_tool_calls(messages: list[Any]) -> list[Any]:
 def configure_compat(
     requests_per_minute: float | None = None, max_retries: int | None = None
 ) -> dict[str, Any]:
-    """Apply the process-wide knobs pyautogen 0.1.14 exposes only globally.
-
-    * ``requests_per_minute`` installs a token-bucket limiter that the shim
-      acquires before every ``ChatCompletion.create``.
-    * ``max_retries`` maps onto pyautogen's time-based retry window:
-      ``Completion.max_retry_period = max_retries * Completion.retry_wait_time``
-      (``0`` disables its internal retries so backend errors surface to the
-      harness, which has its own retry policy).
-
-    Returns the effective settings for metadata.
-    """
-    global _RATE_LIMITER, _MAX_BACKEND_RETRIES
-    effective: dict[str, Any] = {}
-    if requests_per_minute is not None:
-        from langchain_core.rate_limiters import InMemoryRateLimiter
-
-        _RATE_LIMITER = InMemoryRateLimiter(
-            requests_per_second=requests_per_minute / 60.0,
-            check_every_n_seconds=0.1,
-            max_bucket_size=1,
-        )
-        effective["requests_per_minute"] = requests_per_minute
-    if max_retries is not None:
-        _MAX_BACKEND_RETRIES = max_retries
-        try:
-            from autogen import Completion
-
-            Completion.max_retry_period = max_retries * Completion.retry_wait_time
-            effective["max_retry_period_seconds"] = Completion.max_retry_period
-        except ImportError:
-            pass
-        effective["max_retries"] = max_retries
-    return effective
+    """Activate a throttle and retry limit for the current thread and return the
+    effective settings. ``None`` means unlimited throttle / default retry limit;
+    it always replaces whatever was active before. ``AutoGenToolAgent`` calls the
+    same machinery per invocation; use this directly only outside an agent."""
+    limiter = _build_limiter(requests_per_minute)
+    _activate(limiter, max_retries)
+    return {
+        "requests_per_minute": requests_per_minute,
+        "max_retries": _state().max_retries,
+    }
 
 
 def _patch_openai_compat() -> None:
@@ -212,25 +222,26 @@ def _patch_openai_compat() -> None:
         kwargs.pop("function_call", None)
         if isinstance(kwargs.get("messages"), list):
             kwargs["messages"] = _restore_tool_calls(kwargs["messages"])
-        if _RATE_LIMITER is not None:
-            _RATE_LIMITER.acquire(blocking=True)
+        st = _state()
+        if st.limiter is not None:
+            st.limiter.acquire(blocking=True)
 
         try:
             resp = _ORIGINAL_CREATE(*args, **kwargs)
         except Exception as exc:
             if not _is_transient_provider_error(exc):
                 raise
-            count = getattr(_RETRY_STATE, "consecutive", 0) + 1
-            _RETRY_STATE.consecutive = count
-            if count > _MAX_BACKEND_RETRIES:
-                _RETRY_STATE.consecutive = 0
+            st.consecutive += 1
+            if st.consecutive > st.max_retries:
+                limit = st.max_retries
+                st.consecutive = 0
                 from agentprobe.llm import BackendRetriesExhausted
 
                 raise BackendRetriesExhausted(
-                    f"{type(exc).__name__} persisted after {_MAX_BACKEND_RETRIES} retries"
+                    f"{type(exc).__name__} persisted after {limit} retries"
                 ) from exc
             raise  # pyautogen sleeps retry_wait_time and calls again
-        _RETRY_STATE.consecutive = 0
+        st.consecutive = 0
 
         # --- response: tool_calls → function_call ---
         for choice in resp.get("choices", []):
@@ -267,9 +278,12 @@ class AutoGenToolAgent:
             that reject requests ending with a model turn (Gemini); see
             :func:`agentprobe.llm.autogen_agent_kwargs`.
         requests_per_minute: Client-side throttle applied to every LLM call
-            (process-wide, since pyautogen 0.1.14 has no per-client hook).
-        max_retries: Mapped onto pyautogen's time-based retry window; see
-            :func:`configure_compat`.
+            Activated per invocation in the conversation's own thread, so it
+            never leaks to other agents. ``None`` means unthrottled.
+        max_retries: Consecutive transient provider errors tolerated per call
+            before ``BackendRetriesExhausted`` (default 6). Also sets this
+            agent's pyautogen ``max_retry_period`` so pyautogen's own window
+            never cuts the sequence short.
     """
 
     framework = "autogen"
@@ -283,17 +297,27 @@ class AutoGenToolAgent:
         requests_per_minute: float | None = None,
         max_retries: int | None = None,
     ) -> None:
-        self._llm_config = llm_config
         self._max_turns = max_turns
         self._stop_on_final_answer = stop_on_final_answer
-        self._effective = configure_compat(requests_per_minute, max_retries)
-        self._effective.update(
-            {
-                "temperature": llm_config.get("temperature"),
-                "request_timeout_seconds": llm_config.get("request_timeout"),
-                "stop_on_final_answer": stop_on_final_answer,
-            }
-        )
+        self._requests_per_minute = requests_per_minute
+        self._max_retries = _DEFAULT_MAX_BACKEND_RETRIES if max_retries is None else max_retries
+        self._limiter = _build_limiter(requests_per_minute)
+        retry_wait = 10  # pyautogen Completion.retry_wait_time default
+        # Per-agent pyautogen window (llm_config keys reach _get_response), sized so
+        # the shim's count is always the binding limit.
+        self._llm_config = {
+            **llm_config,
+            "retry_wait_time": retry_wait,
+            "max_retry_period": (self._max_retries + 2) * retry_wait,
+        }
+        self._effective = {
+            "temperature": llm_config.get("temperature"),
+            "request_timeout_seconds": llm_config.get("request_timeout"),
+            "requests_per_minute": requests_per_minute,
+            "max_retries": self._max_retries,
+            "max_retry_period_seconds": self._llm_config["max_retry_period"],
+            "stop_on_final_answer": stop_on_final_answer,
+        }
         self._injector = ToolFailureInjector(failure_config) if failure_config else None
         _patch_openai_compat()
         self._agents = self._build_agents()
@@ -356,8 +380,9 @@ class AutoGenToolAgent:
         completion cache. Called automatically at the start of every
         ``invoke()``. Injector state is intentionally preserved (condition-wide).
         """
-        _clear_tool_call_cache()  # per-conversation identity for restored tool calls
-        _reset_backend_failures()
+        # This agent's throttle/retry limit become active for this thread, and the
+        # tool-call cache and failure count start fresh for the new conversation.
+        _activate(self._limiter, self._max_retries)
         user_proxy, assistant = self._agents
         if user_proxy is None or assistant is None:
             return  # pyautogen not installed; invoke() will raise a clear ImportError

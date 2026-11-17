@@ -186,26 +186,24 @@ def test_autogen_config_carries_temperature():
     assert cfg["temperature"] == 0.7
 
 
-def test_autogen_throttle_and_retry_window_are_applied():
-    pytest.importorskip("autogen")
-    from autogen import Completion
-
-    from agentprobe.agents import autogen_agent as ag
-
-    old = Completion.max_retry_period
-    try:
-        eff = ag.configure_compat(requests_per_minute=30, max_retries=2)
-        assert ag._RATE_LIMITER is not None
-        assert Completion.max_retry_period == 2 * Completion.retry_wait_time
-        assert eff["requests_per_minute"] == 30 and eff["max_retries"] == 2
-    finally:
-        ag._RATE_LIMITER = None
-        Completion.max_retry_period = old
-
+def test_autogen_effective_settings_reported():
     s = autogen_effective_settings(
         LLMSpec.from_provider("gemini", model="m", requests_per_minute=5)
     )
     assert s["requests_per_minute"] == 5 and s["stop_on_final_answer"] is True
+    assert s["max_retry_period_seconds"] == (6 + 2) * 10
+
+
+def test_agent_sets_its_own_pyautogen_retry_window():
+    pytest.importorskip("autogen")
+    from agentprobe.agents.autogen_agent import AutoGenToolAgent
+
+    cfg = {"config_list": [{"model": "m", "api_base": "http://x", "api_key": "k"}]}
+    agent = AutoGenToolAgent(llm_config=cfg, max_retries=2, requests_per_minute=30)
+    assert agent._llm_config["max_retry_period"] == 40  # (2 + 2) * 10, per agent
+    assert cfg.get("max_retry_period") is None  # caller's dict untouched
+    eff = agent.effective_settings()
+    assert eff["max_retries"] == 2 and eff["requests_per_minute"] == 30
 
 
 # --- Finding 5: repeated identical tool calls keep their own identity --------
@@ -249,7 +247,7 @@ def test_cache_cleared_between_conversations():
         llm_config={"config_list": [{"model": "m", "api_base": "http://x", "api_key": "k"}]}
     )
     agent.reset()
-    assert ag._TOOL_CALL_CACHE == {}
+    assert ag._state().cache == {}
 
 
 # --- Finding 6: repeated tracer construction keeps library spans ------------
@@ -304,7 +302,6 @@ def test_pyautogen_retry_loop_is_bounded(monkeypatch, exc_name, max_retries):
     from agentprobe.llm import BackendRetriesExhausted, is_llm_backend_error
 
     ag._patch_openai_compat()
-    old_max = ag._MAX_BACKEND_RETRIES
     calls = {"n": 0}
 
     def failing(*a, **k):
@@ -316,7 +313,6 @@ def test_pyautogen_retry_loop_is_bounded(monkeypatch, exc_name, max_retries):
     monkeypatch.setattr(ag, "_ORIGINAL_CREATE", failing)
     try:
         ag.configure_compat(max_retries=max_retries)
-        ag._reset_backend_failures()
         with pytest.raises(BackendRetriesExhausted) as info:
             autogen.ChatCompletion._get_response(
                 {
@@ -330,8 +326,7 @@ def test_pyautogen_retry_loop_is_bounded(monkeypatch, exc_name, max_retries):
         assert isinstance(info.value.__cause__, getattr(oe, exc_name))
         assert is_llm_backend_error(info.value)
     finally:
-        ag._MAX_BACKEND_RETRIES = old_max
-        ag._reset_backend_failures()
+        ag.configure_compat()
 
 
 def test_transient_error_then_success_resets_counter(monkeypatch):
@@ -341,7 +336,6 @@ def test_transient_error_then_success_resets_counter(monkeypatch):
     from agentprobe.agents import autogen_agent as ag
 
     ag._patch_openai_compat()
-    old_max = ag._MAX_BACKEND_RETRIES
     seq = iter([oe.ServiceUnavailableError("503"), {"choices": [{"message": {"content": "ok"}}]}])
 
     def flaky(*a, **k):
@@ -352,8 +346,7 @@ def test_transient_error_then_success_resets_counter(monkeypatch):
 
     monkeypatch.setattr(ag, "_ORIGINAL_CREATE", flaky)
     try:
-        ag._MAX_BACKEND_RETRIES = 1
-        ag._reset_backend_failures()
+        ag.configure_compat(max_retries=1)
         resp = autogen.ChatCompletion._get_response(
             {
                 "model": "gpt-4",
@@ -363,9 +356,9 @@ def test_transient_error_then_success_resets_counter(monkeypatch):
             use_cache=False,
         )
         assert resp["choices"][0]["message"]["content"] == "ok"
-        assert ag._RETRY_STATE.consecutive == 0
+        assert ag._state().consecutive == 0
     finally:
-        ag._MAX_BACKEND_RETRIES = old_max
+        ag.configure_compat()
 
 
 def test_content_filter_and_invalid_request_are_not_counted():
@@ -391,3 +384,125 @@ def test_runner_treats_exhausted_retries_as_backend_error():
 
     r = BenchmarkRunner(agent=Exhausted(), config=_cfg(backend_error_retries=0)).run()[0]
     assert r.status == "backend_error" and r.failure_category == "infrastructure"
+
+
+# --- Round 2, item 2: resume compares by key presence, including None ---------
+
+
+def test_resume_rejects_change_from_explicit_none():
+    import run_experiment_v2 as r
+
+    orig = {"model": "m", "llm_provider": "groq", "llm_requests_per_minute": None}
+    cur = {"model": "m", "llm_provider": "groq", "llm_requests_per_minute": 10}
+    problems = r.resume_mismatches(orig, cur)
+    assert any("llm_requests_per_minute" in p for p in problems)
+
+
+def test_resume_accepts_identical_config_including_none():
+    import run_experiment_v2 as r
+
+    meta = {k: None for k in r.RESUME_COMPAT_KEYS}
+    meta.update(model="m", seed=42)
+    assert r.resume_mismatches(dict(meta), dict(meta)) == []
+
+
+def test_resume_of_legacy_batch_checks_documented_defaults():
+    import run_experiment_v2 as r
+
+    legacy = {
+        "model": "llama3.1",
+        "seed": 42,
+        "n_runs_per_condition": 30,
+        "injection_probability": 0.2,
+    }  # pre-provider batch: no llm_* keys
+    same = dict(
+        legacy,
+        llm_provider="ollama",
+        llm_base_url="http://localhost:11434/v1",
+        llm_requests_per_minute=None,
+        llm_temperature=0.0,
+        llm_timeout_seconds=120.0,
+        llm_max_retries=6,
+    )
+    assert r.resume_mismatches(legacy, same) == []
+    throttled = dict(same, llm_requests_per_minute=10)
+    assert any("pre-provider" in p for p in r.resume_mismatches(legacy, throttled))
+    hosted = dict(same, llm_provider="groq")
+    assert any("llm_provider" in p for p in r.resume_mismatches(legacy, hosted))
+
+
+# --- Round 2, item 3: throttle never leaks between differently configured agents
+
+
+def _limiter_of_thread():
+    from agentprobe.agents import autogen_agent as ag
+
+    return ag._state().limiter
+
+
+def test_unthrottled_configuration_clears_previous_limiter():
+    pytest.importorskip("autogen")
+    from agentprobe.agents import autogen_agent as ag
+
+    ag.configure_compat(requests_per_minute=30)
+    assert _limiter_of_thread() is not None
+    ag.configure_compat(requests_per_minute=None)
+    assert _limiter_of_thread() is None
+
+
+def test_agents_activate_their_own_settings():
+    pytest.importorskip("autogen")
+    from agentprobe.agents import autogen_agent as ag
+    from agentprobe.agents.autogen_agent import AutoGenToolAgent
+
+    cfg = {"config_list": [{"model": "m", "api_base": "http://x", "api_key": "k"}]}
+    throttled = AutoGenToolAgent(llm_config=cfg, requests_per_minute=30, max_retries=1)
+    free = AutoGenToolAgent(llm_config=cfg)  # created after: must not inherit or clobber
+
+    throttled.reset()
+    assert _limiter_of_thread() is throttled._limiter and ag._state().max_retries == 1
+    free.reset()
+    assert _limiter_of_thread() is None and ag._state().max_retries == 6
+    throttled.reset()
+    assert _limiter_of_thread() is throttled._limiter
+
+
+def test_concurrent_conversations_have_isolated_state():
+    """Two threads, interleaved: each keeps its own cache, limiter and retry limit."""
+    pytest.importorskip("autogen")
+    import threading
+
+    from agentprobe.agents import autogen_agent as ag
+
+    barrier = threading.Barrier(2)
+    seen: dict[str, tuple] = {}
+
+    def worker(name: str, rpm, retries: int, call_id: str) -> None:
+        ag.configure_compat(requests_per_minute=rpm, max_retries=retries)
+        ag._remember_tool_call(
+            {
+                "id": call_id,
+                "type": "function",
+                "function": {"name": "calculator", "arguments": "{}"},
+                "extra_content": {"sig": call_id},
+            }
+        )
+        barrier.wait()  # both threads have written before either reads
+        legacy = [
+            {
+                "role": "assistant",
+                "content": None,
+                "function_call": {"name": "calculator", "arguments": "{}"},
+            }
+        ]
+        restored = ag._restore_tool_calls(legacy)[0]["tool_calls"][0]["id"]
+        seen[name] = (restored, ag._state().limiter is not None, ag._state().max_retries)
+
+    a = threading.Thread(target=worker, args=("a", 30, 1, "call-a"))
+    b = threading.Thread(target=worker, args=("b", None, 4, "call-b"))
+    a.start()
+    b.start()
+    a.join()
+    b.join()
+    assert seen["a"] == ("call-a", True, 1)
+    assert seen["b"] == ("call-b", False, 4)

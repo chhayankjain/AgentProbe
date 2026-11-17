@@ -391,18 +391,18 @@ def autogen_agent_kwargs(spec: LLMSpec) -> dict[str, Any]:
 def autogen_effective_settings(spec: LLMSpec) -> dict[str, Any]:
     """What the AutoGen adapter will actually apply for *spec*, for metadata.
 
-    pyautogen 0.1.14 has no per-request retry count; ``max_retries`` is mapped
-    onto its time-based retry window (``max_retry_period`` =
-    ``max_retries * retry_wait_time`` seconds). The ``--rpm`` throttle is
-    applied by the compatibility shim around every ``ChatCompletion.create``.
+    The compatibility shim enforces ``max_retries`` consecutive transient
+    provider errors per call and the ``--rpm`` throttle, both per agent; the
+    agent's pyautogen ``max_retry_period`` is ``(max_retries + 2) * 10`` s so
+    pyautogen's own window never cuts the sequence short.
     """
-    retry_wait = 10.0  # pyautogen Completion.retry_wait_time default
+    retry_wait = 10
     return {
         "temperature": spec.temperature,
         "request_timeout_seconds": spec.timeout_seconds,
         "requests_per_minute": spec.requests_per_minute,
         "max_retries": spec.max_retries,
-        "max_retry_period_seconds": spec.max_retries * retry_wait,
+        "max_retry_period_seconds": (spec.max_retries + 2) * retry_wait,
         "stop_on_final_answer": spec.provider == "gemini",
     }
 

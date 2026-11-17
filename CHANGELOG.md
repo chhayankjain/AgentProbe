@@ -10,7 +10,8 @@
 - AutoGen retries are bounded for every transient provider error. pyautogen 0.1.14 retries `ServiceUnavailableError`, `APIConnectionError` and `APIError` with no limit; the shim now counts consecutive failures and raises `BackendRetriesExhausted` (an infrastructure error) after `--max-retries`
 - AutoGen thought-signature cache keeps every repeated identical call in order and is cleared per conversation, so restored history can no longer swap ids/signatures
 - `AgentProbeTracer` reuses one process-wide provider (or an SDK provider the application already registered); later instances attach exporters to it instead of creating a provider library spans bypass, and `shutdown()` only flushes
-- `--resume` also rejects changed timeout, retry, throttle and temperature settings
+- `--resume` also rejects changed timeout, retry, throttle and temperature settings, comparing by key presence so an explicit `None` (unlimited RPM) counts as a value. Batches recorded before provider support are checked against the documented defaults they ran with (Ollama, temperature 0, no throttle)
+- AutoGen throttle, retry limit and tool-call cache are per agent and per thread: each agent activates its own settings at the start of every conversation, `None` clears a previous throttle, the pyautogen retry window is set in each agent's own `llm_config` instead of on the global class, and concurrent conversations in different threads no longer share state
 - Demo uses a calculator prompt matching its scripted model and reports correct final answers separately from execution success
 
 ### Added
