@@ -27,10 +27,12 @@ import time
 from typing import Any
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import AgentMiddleware
 from langchain_core.tools import tool
 
 from agentprobe.agents.base import message_text
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
+from agentprobe.llm import llm_call_boundary
 from agentprobe.observer.tracer import get_tracer
 
 _tracer = get_tracer(__name__)
@@ -39,6 +41,19 @@ _SYSTEM_PROMPT = (
     "You are a reliable AI assistant. Use the provided tools to answer questions "
     "accurately. If a tool call fails, acknowledge the failure and try a different approach."
 )
+
+
+class _LLMCallBoundaryMiddleware(AgentMiddleware):  # type: ignore[misc]
+    """Tags exceptions raised by the model call (not by tools) so the runner can
+    tell provider failures apart from tool failures that share a transport."""
+
+    def wrap_model_call(self, request: Any, handler: Any) -> Any:
+        with llm_call_boundary():
+            return handler(request)
+
+    async def awrap_model_call(self, request: Any, handler: Any) -> Any:
+        with llm_call_boundary():
+            return await handler(request)
 
 
 def _make_tools(injector: ToolFailureInjector | None = None) -> list[Any]:
@@ -86,12 +101,15 @@ class LangChainToolAgent:
         recursion_limit: int = 25,
     ) -> None:
         self._llm = llm
-        self._injector = ToolFailureInjector(failure_config) if failure_config else None
+        # Always present: with no fault configured it is a pass-through (type NONE never
+        # injects), but it still counts tool calls so baseline trials carry evidence.
+        self._injector = ToolFailureInjector(failure_config or ToolFailureConfig())
         self._tools = _make_tools(self._injector)
         self._agent = create_agent(
             self._llm,
             self._tools,
             system_prompt=_SYSTEM_PROMPT,
+            middleware=[_LLMCallBoundaryMiddleware()],
         )
         self._recursion_limit = recursion_limit
 

@@ -213,7 +213,14 @@ class EnhancedRunRecord:
     recovery_status: str = "n/a"  # recovered | failed | unassessed | not_attempted | n/a
 
     # Tool evidence (reviewer concern #3, #4)
-    tool_call_count: int = 0
+    # Per trial (this run's own tool activity):
+    tool_call_count: int = 0  # trial_tool_calls + recovery_tool_calls
+    trial_tool_calls: int = 0
+    trial_injections: int = 0
+    recovery_tool_calls: int = 0
+    recovery_injections: int = 0
+    # Condition-wide totals, identical on every row of a condition (kept for
+    # compatibility with the published batches and analysis scripts; use max, never sum):
     injector_calls: int = 0
     injector_injections: int = 0
 
@@ -521,8 +528,7 @@ def run_single_condition(
             injector_summary = agent.get_injector_summary()
 
         # Get tool call count: agent.invoke() returns dict with "tool_calls" key
-        # but runner stores str(output). Parse it back or use injector_calls as proxy.
-        tool_calls = injector_summary.get("total_calls", 0)
+        # Per-trial tool evidence comes from the runner's injector snapshots.
 
         # Get the input text from the task function
         from agentprobe.benchmark.runner import _default_task_fn
@@ -545,7 +551,11 @@ def run_single_condition(
             recovery_latency_ms=r.recovery_latency_ms,
             recovery_output=r.recovery_output,
             recovery_status=getattr(r, "recovery_status", "n/a"),
-            tool_call_count=tool_calls,
+            tool_call_count=r.trial_tool_calls + r.recovery_tool_calls,
+            trial_tool_calls=r.trial_tool_calls,
+            trial_injections=r.trial_injections,
+            recovery_tool_calls=r.recovery_tool_calls,
+            recovery_injections=r.recovery_injections,
             injector_calls=injector_summary.get("total_calls", 0),
             injector_injections=injector_summary.get("injected_failures", 0),
             grade_score=grade.score,
@@ -836,6 +846,9 @@ def run_pilot(model: str, batch_dir: Path, seed: int = 42) -> bool:
 # Post-experiment analysis
 # ---------------------------------------------------------------------------
 
+#: Recorded in experiment_metadata.json so a batch states which protocol made it.
+PROTOCOL = "phase2-matched: p=0.20 for every fault type, seed 42, 30 runs, answer grading"
+
 _RECORD_FIELDS = {f.name for f in fields(EnhancedRunRecord)}
 
 
@@ -865,6 +878,7 @@ def load_completed_records(batch_dir: Path, state: ExperimentState) -> list[Enha
 #: Settings a resume must not change. Compared by key presence, so an explicit
 #: ``None`` (e.g. unlimited RPM) is a real value, not "unknown".
 RESUME_COMPAT_KEYS: tuple[str, ...] = (
+    "protocol",
     "model",
     "seed",
     "n_runs_per_condition",
@@ -882,6 +896,7 @@ RESUME_COMPAT_KEYS: tuple[str, ...] = (
 #: Resuming such a batch is allowed only if these still hold. Their timeout and
 #: client-retry behaviour was not recorded, so those keys cannot be checked.
 LEGACY_LLM_DEFAULTS: dict[str, Any] = {
+    "protocol": PROTOCOL,
     "llm_provider": "ollama",
     "llm_base_url": "http://localhost:11434/v1",
     "llm_requests_per_minute": None,
@@ -1077,6 +1092,7 @@ def main() -> None:
     )
     # Exact backend description (provider, model id, endpoint, key *variable*).
     meta.update(llm_spec.describe())
+    meta["protocol"] = PROTOCOL
     if "autogen" in args.frameworks:
         meta["llm_autogen_effective"] = autogen_effective_settings(llm_spec)
     if meta_path.exists():

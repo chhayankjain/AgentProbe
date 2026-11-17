@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Fixed (from code review)
+- LLM backend errors are identified at the **LLM-call boundary**, not by exception class: adapters wrap every model call in `agentprobe.llm.llm_call_boundary()` (LangGraph node, LangChain middleware, AutoGen shim). A real tool failing with `httpx.ReadTimeout` is now measured as an agent failure instead of being excluded. Custom agents should wrap their model calls the same way
+- AutoGen no longer silently executes only the first of several parallel tool calls: such a turn raises `ParallelToolCallsUnsupported` and the trial is recorded as `status="harness_error"` (excluded, `n_harness_errors`). OpenAI, Groq and OpenRouter are asked for `parallel_tool_calls=false`
+- Per-trial tool evidence: `trial_tool_calls`, `trial_injections`, `recovery_tool_calls`, `recovery_injections` on every record, from injector snapshots around each invocation; `tool_call_count` is now per trial. `injector_calls`/`injector_injections` keep their condition-total meaning. Adapters always install a pass-through injector, so baseline conditions also record tool calls (previously 0)
+- `cohens_d` returns `(nan, "undefined")` for different constant groups instead of a misleading 0; statistics reject non-finite inputs; Kruskal-Wallis on all-identical data returns p=1 instead of raising
+- Malformed payloads come from a separate seeded stream, reproducible from the seed without shifting the injection schedule
+- `drop_fraction=0` keeps every message (any positive fraction still drops at least one)
+- The source distribution includes the experiment scripts and examples its tests import; CI runs the test suite from the extracted sdist
+- Experiment metadata records a `protocol` label (`phase1-discovery` with unmatched probabilities vs `phase2-matched`); `run_benchmarks.py` prints which one it runs, and resume rejects a protocol change
 - AutoGen conditions no longer construct an unused LangChain model, so hosted AutoGen runs work in the `openai<1` environment
 - LLM backend errors during the *recovery* call are retried with backoff and, if persistent, recorded as `recovery_status="unassessed"`; `MetricsCalculator` drops those from the recovery-rate denominator and reports `n_recovery_unassessed`. `RunResult` gains `recovery_status` (`recovered`/`failed`/`unassessed`/`not_attempted`/`n/a`)
 - `run_experiment_v2.py --resume` with a subset of conditions rebuilds `combined_summary.json` and `manifest.json` from every checkpointed condition on disk instead of shrinking them; the manifest lists `completed_conditions` and `n_records_this_invocation`

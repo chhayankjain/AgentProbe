@@ -14,7 +14,12 @@ import pytest
 from agentprobe.benchmark.metrics import MetricsCalculator
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, RunResult
 from agentprobe.injector.tool_failure import ToolCallRateLimited
-from agentprobe.llm import LLMSpec, autogen_effective_settings, autogen_llm_config
+from agentprobe.llm import (
+    LLMSpec,
+    autogen_effective_settings,
+    autogen_llm_config,
+    mark_llm_call_error,
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "experiments"))
 
@@ -69,7 +74,7 @@ class InjectedThenBackend:
         if self.calls == 1:
             raise ToolCallRateLimited()
         if self.calls - 1 <= self.backend_failures:
-            raise FakeRateLimitError("429 from provider")
+            raise mark_llm_call_error(FakeRateLimitError("429 from provider"))
         return {"output": "ok"}
 
 
@@ -417,6 +422,7 @@ def test_resume_of_legacy_batch_checks_documented_defaults():
     }  # pre-provider batch: no llm_* keys
     same = dict(
         legacy,
+        protocol=r.PROTOCOL,
         llm_provider="ollama",
         llm_base_url="http://localhost:11434/v1",
         llm_requests_per_minute=None,

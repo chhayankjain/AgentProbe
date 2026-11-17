@@ -13,6 +13,14 @@ without knowing which one it is:
   by design (see :meth:`ToolFailureInjector.reset`).
 * ``get_injector_summary()`` — aggregate injection statistics for the condition.
 
+Optional, used by :class:`~agentprobe.benchmark.runner.BenchmarkRunner` when present:
+
+* ``injector`` — the agent's :class:`ToolFailureInjector`; its ``counts()`` give
+  per-trial tool-call and injection evidence.
+* Wrap every LLM model call in :func:`agentprobe.llm.llm_call_boundary`. Only
+  exceptions raised inside it can be classified as provider (backend) errors;
+  everything else counts as an agent failure, which is the safe default.
+
 Usage::
 
     from agentprobe.agents import BaseAgent

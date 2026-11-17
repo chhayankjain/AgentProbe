@@ -220,15 +220,21 @@ def _patch_openai_compat() -> None:
             kwargs["tools"] = [{"type": "function", "function": f} for f in functions]
         # Also remove function_call if present (incompatible with tools)
         kwargs.pop("function_call", None)
+        parallel_flag = kwargs.pop("agentprobe_parallel_tool_calls", None)
+        if parallel_flag is not None and "tools" in kwargs:
+            kwargs["parallel_tool_calls"] = parallel_flag
         if isinstance(kwargs.get("messages"), list):
             kwargs["messages"] = _restore_tool_calls(kwargs["messages"])
         st = _state()
         if st.limiter is not None:
             st.limiter.acquire(blocking=True)
 
+        from agentprobe.llm import mark_llm_call_error
+
         try:
             resp = _ORIGINAL_CREATE(*args, **kwargs)
         except Exception as exc:
+            mark_llm_call_error(exc)  # raised by the model call, not by a tool
             if not _is_transient_provider_error(exc):
                 raise
             st.consecutive += 1
@@ -237,8 +243,8 @@ def _patch_openai_compat() -> None:
                 st.consecutive = 0
                 from agentprobe.llm import BackendRetriesExhausted
 
-                raise BackendRetriesExhausted(
-                    f"{type(exc).__name__} persisted after {limit} retries"
+                raise mark_llm_call_error(
+                    BackendRetriesExhausted(f"{type(exc).__name__} persisted after {limit} retries")
                 ) from exc
             raise  # pyautogen sleeps retry_wait_time and calls again
         st.consecutive = 0
@@ -247,6 +253,13 @@ def _patch_openai_compat() -> None:
         for choice in resp.get("choices", []):
             msg = choice.get("message", {})
             tool_calls = msg.get("tool_calls")
+            if tool_calls and len(tool_calls) > 1:
+                # pyautogen 0.1.14 executes one function_call per turn; running only
+                # the first would silently drop the rest.
+                from agentprobe.errors import ParallelToolCallsUnsupported
+
+                names = [tc.get("function", {}).get("name", "?") for tc in tool_calls]
+                raise ParallelToolCallsUnsupported(len(tool_calls), names)
             if tool_calls and not msg.get("function_call"):
                 first = tool_calls[0]
                 _remember_tool_call(first)
@@ -318,7 +331,9 @@ class AutoGenToolAgent:
             "max_retry_period_seconds": self._llm_config["max_retry_period"],
             "stop_on_final_answer": stop_on_final_answer,
         }
-        self._injector = ToolFailureInjector(failure_config) if failure_config else None
+        # Always present: with no fault configured it is a pass-through (type NONE never
+        # injects), but it still counts tool calls so baseline trials carry evidence.
+        self._injector = ToolFailureInjector(failure_config or ToolFailureConfig())
         _patch_openai_compat()
         self._agents = self._build_agents()
 
