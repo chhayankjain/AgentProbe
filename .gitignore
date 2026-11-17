@@ -20,10 +20,14 @@ ENV/
 # Testing
 .pytest_cache/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
 .tox/
 .mypy_cache/
 .ruff_cache/
+/agentprobe-example.xml
+/agentprobe-results.xml
 
 # Jupyter
 .ipynb_checkpoints/

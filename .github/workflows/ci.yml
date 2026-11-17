@@ -58,10 +58,10 @@ jobs:
         run: pip install ruff
 
       - name: Ruff check
-        run: ruff check agentprobe/ tests/
+        run: ruff check agentprobe/ tests/ examples/
 
       - name: Ruff format check
-        run: ruff format --check agentprobe/ tests/
+        run: ruff format --check agentprobe/ tests/ examples/
 
   typecheck:
     runs-on: ubuntu-latest
@@ -105,7 +105,15 @@ jobs:
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --quiet dist/*.whl
-          /tmp/smoke/bin/python -c "import agentprobe; from agentprobe import ToolFailureInjector, AgentProbeTracer; print('agentprobe', agentprobe.__version__)"
+          /tmp/smoke/bin/python - <<'PY'
+          from importlib.resources import files
+          import agentprobe
+          from agentprobe import ToolFailureInjector, AgentProbeTracer
+          from agentprobe.testing import probe
+          assert files("agentprobe").joinpath("py.typed").is_file()
+          print("agentprobe", agentprobe.__version__)
+          PY
+          /tmp/smoke/bin/python -m agentprobe.demo --runs 2 --p 0
 
   sdist-tests:
     name: Test suite from the source distribution
@@ -126,5 +134,8 @@ jobs:
         run: |
           mkdir /tmp/sdist && tar -xzf dist/*.tar.gz -C /tmp/sdist --strip-components=1
           cd /tmp/sdist
+          test -f docs/instrumentation.md
+          test -f CONTRIBUTING.md
           pip install ".[dev,plotting]" langchain-openai
           pytest tests/ -q -m "not slow and not integration"
+          pytest examples/your_agent -q
