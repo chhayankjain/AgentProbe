@@ -38,7 +38,8 @@ exception escaped, the known bug reported as
 (the model isn't running, the fault never fired, a different exception) is a real failure.
 
 The commit is pinned, so these results don't change on their own. Point `AGENTS_FROM_SCRATCH_DIR` at a
-checkout with a fix and the same tests pass instead of xfailing. The before/after run against the
+checkout with a fix and they pass instead of xfailing. Passing means the run completes without an
+unhandled exception; the tests don't check what the agent did next. The before/after run against the
 proposed fix ([#71](https://github.com/langchain-ai/agents-from-scratch/pull/71)) is in
 [`results/validation-2026-11-18.md`](results/validation-2026-11-18.md): with #71 the timeout test
 passes, and the outage test then hits a separate known bug (#61) until open PR #65 is applied too;

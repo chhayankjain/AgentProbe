@@ -48,14 +48,19 @@ The tests inject `TimeoutError` and LangChain's `ToolException`, the exception t
 AgentProbe's own fault classes don't subclass them, so code that handles real timeouts wouldn't
 catch them (tracked in AgentProbe [#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114)).
 
+Each cell says whether the run **completed without an unhandled exception**. The tests check that the
+fault fired and that no exception escaped; they don't check whether the meeting was rescheduled, the
+reply was truthful, or actions were duplicated.
+
 | Scenario | Original | With the fix (#71) | With #71 and open PR #65 |
 |---|---|---|---|
-| Calendar times out once | run ends with the timeout | recovers | recovers |
-| Scheduling always fails | run ends with the error | `KeyError: None` | recovers |
+| Calendar times out once | ends with the timeout | completes | completes |
+| Scheduling always fails | ends with the error | ends with `KeyError: None` | completes |
 
 The fix did what it should, and that exposed a second, already-known bug: once the error reaches the
 model, the local model sometimes answers without a tool call, and the graph's router returns `None`
-(upstream #61, fixed by open PR #65). With both changes, every scenario passes. Fault tests are good
+(upstream #61, fixed by open PR #65). With both changes, every scenario completes without an
+unhandled exception. Fault tests are good
 at finding exactly this kind of interaction, because they exercise the paths that fixes open up.
 
 ## Also observed (not reported)

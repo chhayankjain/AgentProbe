@@ -53,19 +53,36 @@ def upstream(checkout: str):
 
 
 @contextmanager
-def local_agent(ea, probe, model: str = "qwen2.5:7b"):
+def local_agent(ea, probe, model: str = "qwen2.5:7b", *, make_llm=None, router_schema=None):
     """Point the assistant at a local model and probed copies of its tools.
-    Yields the compiled graph; restores the three globals on exit."""
-    from email_assistant.schemas import RouterSchema
-    from langchain_ollama import ChatOllama
+    Yields the compiled graph; restores the three globals on exit.
 
-    saved = (ea.llm_router, ea.llm_with_tools, ea.tools_by_name)
+    Every replacement is built before any global changes, so a failure while
+    setting up (an unreachable model, a binding error) leaves the module as it was.
+    ``make_llm`` and ``router_schema`` exist so this can be tested without a model.
+    """
+    if router_schema is None:
+        from email_assistant.schemas import RouterSchema
+
+        router_schema = RouterSchema
+    if make_llm is None:
+        from langchain_ollama import ChatOllama
+
+        def make_llm():
+            return ChatOllama(model=model, temperature=0)
+
     wrapped = probe.wrap(ea.tools)
-    llm = ChatOllama(model=model, temperature=0)
-    ea.llm_router = llm.with_structured_output(RouterSchema)
-    ea.llm_with_tools = llm.bind_tools(wrapped, tool_choice="any")
-    ea.tools_by_name = {t.name: t for t in wrapped}
+    llm = make_llm()
+    replacements = {
+        "llm_router": llm.with_structured_output(router_schema),
+        "llm_with_tools": llm.bind_tools(wrapped, tool_choice="any"),
+        "tools_by_name": {t.name: t for t in wrapped},
+    }
+    saved = {name: getattr(ea, name) for name in replacements}
     try:
+        for name, value in replacements.items():
+            setattr(ea, name, value)
         yield ea.email_assistant
     finally:
-        ea.llm_router, ea.llm_with_tools, ea.tools_by_name = saved
+        for name, value in saved.items():
+            setattr(ea, name, value)
