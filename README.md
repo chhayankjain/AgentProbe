@@ -7,15 +7,160 @@
 [![PyPI](https://img.shields.io/pypi/v/agentprobe-toolkit.svg)](https://pypi.org/project/agentprobe-toolkit/)
 [![GitHub release](https://img.shields.io/github/v/release/chhayankjain/agentprobe-toolkit)](https://github.com/chhayankjain/agentprobe-toolkit/releases)
 
-**Fault injection and observability toolkit for LLM agents**
+**Test how your LLM agent handles tool failures, in pytest, with no model or API key.**
 
-AgentProbe wraps an agent's tools with seeded, logged fault injectors (timeouts, malformed output, rate limits, API errors), traces every invocation and tool call with OpenTelemetry, and reports failure rate, recovery rate, MTTR, and latency percentiles across frameworks. It ships adapters for LangGraph, LangChain, and AutoGen, plus the scripts and data behind the companion paper.
+Your agent's tools will time out, hit rate limits, and return garbage. AgentProbe wraps the tools your agent already uses, breaks them on purpose and deterministically, and checks what your agent did about it. The test fails unless every fault you declared **actually fired**, so an agent that skips the tool or answers from a cache can't look resilient.
 
-Companion to the paper: *"AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents"* (submitted to MAKE, MDPI, 2026).
+[Install](#install) · [Your first fault test](#your-first-fault-test) · [What a failure looks like](#what-a-failure-looks-like) · [Scenarios](#what-you-can-break) · [Assertions](#what-you-can-check) · [CI](#run-it-in-ci) · [Tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md) · [For researchers](#for-researchers-the-benchmark-and-the-paper)
 
 ---
 
-## Failure Taxonomy
+## Install
+
+```bash
+pip install "agentprobe-toolkit>=1.4" pytest
+```
+
+> **Pre-release:** the testing API ships in AgentProbe 1.4, which is not on PyPI yet. Until it is, install from GitHub:
+>
+> ```bash
+> pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit@main" pytest
+> python -c "import agentprobe; print(agentprobe.__version__)"   # 1.4.0.dev0 or later
+> ```
+
+You install `agentprobe-toolkit` and import `agentprobe`, the same way `pip install scikit-learn` gives you `import sklearn`. Python 3.11+.
+
+## Your first fault test
+
+Say `answer(question, tools)` is your agent and `TOOLS` maps tool names to the functions it calls. This test checks that when the payment service is down, the agent admits it instead of claiming success:
+
+```python
+from agentprobe.testing import probe
+
+from my_agent import TOOLS, answer
+
+
+def test_admits_failure_when_payment_service_is_down():
+    with probe() as p:
+        tools = p.wrap(TOOLS)                                   # probed copies; your tools are untouched
+        p.on("payment_status").always_fail(with_="timeout")     # break one tool, every call
+        result = p.run(lambda q: answer(q, tools), "Did order 42 go through?")
+        result.assert_no_crash()
+        result.assert_answer_not_contains("is confirmed")       # never claim unverified success
+        result.assert_not_called("send_receipt")                # no receipt for an unconfirmed payment
+```
+
+Run it with `pytest`. Nothing is mocked except the fault: your agent runs for real, with real tools, and AgentProbe only steps in at the tool boundary.
+
+## What a failure looks like
+
+Point the same test at an agent that swallows the error and reports success anyway, and pytest shows you exactly what happened:
+
+```text
+AssertionError: answer does not contain 'is confirmed': answer was 'Order 42 is confirmed and paid; receipt sent for order 42.'
+
+Observed
+  1. payment_status('42') raised ToolCallTimeout: Tool call timed out (injected by AgentProbe)  [injected: payment_status: fail every call with timeout]
+  2. send_receipt('42') returned 'receipt sent for order 42'
+  scenarios:
+    [exercised] payment_status: fail every call with timeout (required; injected 1/open-ended, 1 call(s) to payment_status)
+Asserted
+  [fail] answer does not contain 'is confirmed': answer was 'Order 42 is confirmed and paid; receipt sent for order 42.'
+Inferred (heuristics over the call log)
+  fallbacks: [('payment_status', 'send_receipt')]
+```
+
+And an agent that never calls the tool (a cache, a hard-coded answer) fails even if every assertion would pass:
+
+```text
+AgentProbe gate FAILED: scenarios 0/1 required exercised, assertions 0/0 required passed
+  - scenario 'payment_status: fail every call with timeout' not exercised: the agent never called 'payment_status' (tools called: none). It may have bypassed the tool or used a cached answer.
+```
+
+## What you can break
+
+Scenarios are declared per tool with `p.on("tool_name")` and are deterministic: the same calls fail on every run.
+
+| Scenario | Use it to test |
+|---|---|
+| `fail_first(n)` | Recovery: the first *n* calls fail, then the tool works |
+| `fail_times(n).then_succeed()` | The same, spelled out |
+| `always_fail()` | Outage: every call fails. Does the agent give up honestly? |
+| `returns(value, times=1)` | Wrong, stale or incomplete data instead of an exception |
+| `slow(ms=..., times=1)` | Latency, together with `p.run(..., timeout=...)` |
+| `with_probability(p, seed=...)` | Random, seeded faults for experiments |
+
+Faults: `"timeout"`, `"rate_limit"`, `"api_error"`, `"malformed_output"`, or any exception class or instance via `with_=`. Rules for one tool apply in order, so `fail_first(1).returns("stale", times=2)` fails call 1, returns stale data for calls 2 and 3, then lets calls through.
+
+## What you can check
+
+| Assertion | Passes when |
+|---|---|
+| `assert_answer_contains(text)` | The agent produced an answer containing *text* |
+| `assert_answer_not_contains(text)` | The agent produced an answer **without** *text*. A crash or `None` never passes |
+| `assert_no_crash()` | No exception escaped the agent |
+| `assert_within(seconds)` | The run finished in time |
+| `assert_called(tool)` / `assert_not_called(tool)` | The tool was or wasn't called; in-flight calls count |
+| `assert_scenarios_exercised()` | Every required fault fired (also enforced automatically when the `with` block ends) |
+
+The result keeps what was **observed** (every tool call with arguments, outcome and injected fault), what you **asserted** (pass, fail or unassessed) and what is **inferred** (`result.retries`, `result.fallbacks`) apart. `print(result.summary())` shows all three; `result.to_dict()` is versioned, JSON-safe output for CI artifacts.
+
+## Works with your stack
+
+- **Plain functions**, sync or `async`: pass a list, tuple or `{name: function}` dict to `p.wrap(...)`.
+- **LangChain tools** (`@tool`, `StructuredTool`, `BaseTool` subclasses): wrapped as copies with the same schema.
+- **LangGraph**: pass the wrapped tools to your graph. The prebuilt ReAct agent re-raises tool exceptions by default; use `ToolNode(tools, handle_tool_errors=True)` if your agent should see the error and recover.
+- **Any agent callable** or object with `invoke()`: `p.run(agent, input)`.
+- **Async agents and async tests:** `await p.arun(agent, input, timeout=...)`. Async agents are cancelled at the deadline.
+
+What AgentProbe guarantees about your tools (never modified, cleanup on exceptions and cancellation, concurrency, agents that outlive their deadline) is in [docs/instrumentation.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/docs/instrumentation.md).
+
+## Run it in CI
+
+Fault tests are ordinary pytest tests, so any CI runs them. A ready-made GitHub Actions workflow is in [`examples/your_agent/ci.yml`](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/ci.yml):
+
+```yaml
+- run: pip install "agentprobe-toolkit>=1.4" pytest
+- run: pytest tests/ --junitxml=agentprobe-results.xml
+```
+
+The [10-minute tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md) walks through a complete example agent, shows the same tests catching a deliberately broken version, and sets up CI.
+
+## Try the demo (no model, no key)
+
+```bash
+pip install agentprobe-toolkit
+python -m agentprobe.demo                      # rate-limit faults, p=0.3, 10 runs
+python -m agentprobe.demo --fault timeout --p 0.5 --runs 20
+python -m agentprobe.demo --json               # machine-readable report
+```
+
+The demo runs a small LangGraph agent on a scripted, deterministic model, injects seeded faults into its calculator tool, and prints the metrics, the per-call injection log with OpenTelemetry span ids, and each run's outcome.
+
+## Get involved
+
+- **Have a real agent?** Try AgentProbe on it and tell us where it hurt ([#68](https://github.com/chhayankjain/agentprobe-toolkit/issues/68)). That's the most valuable contribution there is.
+- **Want to contribute code?** [Good first issues](https://github.com/chhayankjain/agentprobe-toolkit/labels/good%20first%20issue) are small and need no model or API key. Setup is in [CONTRIBUTING.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/CONTRIBUTING.md).
+- **Where it's going:** [ROADMAP.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ROADMAP.md). Next up: a pytest plugin, secret redaction in reports, tool-call argument and order checks, and a fault coverage report.
+- **Questions and ideas:** [Discussions](https://github.com/chhayankjain/agentprobe-toolkit/discussions).
+
+---
+
+## For researchers: the benchmark and the paper
+
+AgentProbe began as the toolkit behind the paper *"AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents"* (submitted to MAKE, MDPI, 2026). The benchmark side runs agents many times under seeded, probabilistic faults and reports failure rate, recovery rate, MTTR and latency percentiles across LangGraph, LangChain and AutoGen. Everything below documents that toolkit and how to reproduce the paper.
+
+```bash
+# From a clone, for development or to run the paper's experiments
+git clone https://github.com/chhayankjain/agentprobe-toolkit.git && cd agentprobe-toolkit
+pip install -e ".[dev,plotting,ollama]"
+
+# The AutoGen adapter targets pyautogen 0.1.14 and needs openai<1.0, which
+# conflicts with langchain-openai. Install it in its own environment:
+#   pip install "agentprobe-toolkit[ollama,autogen]"
+```
+
+### Failure taxonomy
 
 AgentProbe organises agent failures into five categories. Only the first has been exercised in a published experiment; the status column says exactly what exists for each.
 
@@ -29,65 +174,7 @@ AgentProbe organises agent failures into five categories. Only the first has bee
 
 Note that the current "malformed output" injector raises an exception at the tool boundary rather than returning corrupted data to the model, so it tests the agent's exception path, not its parsing. See issue [#28](https://github.com/chhayankjain/agentprobe-toolkit/issues/28).
 
----
-
-## Installation
-
-```bash
-# From PyPI (LangGraph + LangChain adapters, local Ollama backend)
-pip install "agentprobe-toolkit[ollama]"
-
-# From a clone, for development or to run the paper's experiments
-git clone https://github.com/chhayankjain/agentprobe-toolkit.git && cd agentprobe-toolkit
-pip install -e ".[dev,plotting,ollama]"
-
-# The AutoGen adapter targets pyautogen 0.1.14 and needs openai<1.0, which
-# conflicts with langchain-openai. Install it in its own environment:
-#   pip install "agentprobe-toolkit[ollama,autogen]"
-```
-
-The distribution is named `agentprobe-toolkit` because `agentprobe` was already taken on PyPI by an unrelated project. The import name is `agentprobe`.
-
-## Test your own agent
-
-Wrap the tools your agent already uses, break one on purpose, and check the outcome. No model or API key needed.
-
-> **Pre-release:** this API ships in AgentProbe 1.4, which is not on PyPI yet. Until it is, install from GitHub:
->
-> ```bash
-> pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit@main" pytest
-> python -c "import agentprobe; print(agentprobe.__version__)"   # 1.4.0.dev0 or later
-> ```
->
-> Once 1.4 is released, `pip install "agentprobe-toolkit>=1.4" pytest` is enough.
-
-```python
-from agentprobe.testing import probe
-
-def test_admits_failure_when_payment_service_is_down():
-    with probe() as p:
-        tools = p.wrap(TOOLS)                                  # probed copies; your tools are untouched
-        p.on("payment_status").always_fail(with_="timeout")
-        result = p.run(lambda q: answer(q, tools), "Did order 42 go through?")
-        result.assert_no_crash()
-        result.assert_answer_not_contains("is confirmed")      # never claim unverified success
-```
-
-When the block ends, AgentProbe also checks that every declared fault **actually fired**. An agent that skips the tool or answers from a cache can't pass. Scenarios: `fail_first(n)`, `fail_times(n).then_succeed()`, `always_fail()`, `returns(value)`, `slow(ms=...)`, `with_probability(p, seed=...)`. Works with plain functions and LangChain tools.
-
-The [10-minute tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md) walks through an example agent, shows the same test catching a deliberately broken version, and ships a CI workflow you can copy. [docs/instrumentation.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/docs/instrumentation.md) explains what AgentProbe guarantees about your tools.
-
-## Try it in 60 seconds (no model, no key)
-
-```bash
-pip install agentprobe-toolkit
-python -m agentprobe.demo                      # rate-limit faults, p=0.3, 10 runs
-python -m agentprobe.demo --fault timeout --p 0.5 --runs 20
-```
-
-The demo wraps the LangGraph adapter around a scripted, deterministic chat model, injects seeded faults into the calculator tool, runs a short benchmark, and prints the metrics, the per-call injection log with its OpenTelemetry span ids, and each run's outcome. [`examples/quickstart.py`](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/quickstart.py) is the same thing in 30 lines you can copy. Swap `ScriptedToolCallingModel` for a real model via `agentprobe.llm.build_chat_model` and nothing else changes.
-
-## Quick Start
+### Benchmark quick start (Ollama)
 
 ```bash
 # Start Ollama with Llama 3.1 (used in all paper experiments)
@@ -109,7 +196,7 @@ python experiments/run_benchmarks.py \
     --save-results
 ```
 
-## Programmatic Usage
+### Benchmark API
 
 ```python
 from langchain_ollama import ChatOllama
@@ -159,7 +246,7 @@ print(f"P99 latency: {metrics.p99_latency_ms:.0f}ms")
 print(agent.get_injector_summary())
 ```
 
-### Injecting faults into your own tools
+#### Probabilistic injectors (lower-level API)
 
 The injector is framework-agnostic. Wrap any callable, or any LangChain `BaseTool`:
 
@@ -179,12 +266,12 @@ print(injector.summary())        # total_calls, injected_failures, failures_by_t
 print(injector.injection_log)    # one record per call with args, return/exception, span_id
 ```
 
-### Two prompt sets
+#### Two prompt sets
 
 - **Paper prompts (default).** `BenchmarkRunner` cycles the five prompts per task in `agentprobe.benchmark.runner.PAPER_PROMPTS`. Every batch in the paper used these.
 - **Graded corpora.** `agentprobe.benchmark.tasks` holds 25 tool-use, 15 RAG, and 15 multi-agent queries with keyword graders. They have not been used in a published experiment. Run them with `task_fn=corpus_task_fn("tool_use")` or `run_benchmarks.py --query-set corpus`.
 
-### Metric definitions
+#### Metric definitions
 
 - **Failure**: the agent invocation raised an exception that reached the harness. A wrong-but-exception-free answer is *not* a failure here; use the grader for that.
 - **Recovery**: the harness re-invoked the agent once (injector still active) and that call succeeded. This is a harness-level retry, not agent-internal self-repair.
@@ -192,7 +279,7 @@ print(injector.injection_log)    # one record per call with args, return/excepti
 - **P50/P90/P99**: ceiling nearest-rank percentiles of per-run latency. For n < 100, P99 equals the sample maximum. Injected timeouts sleep for real, so latency under the timeout condition includes the injected delay.
 - **Recovery rate** is `None` when a condition had no failures.
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart LR
@@ -236,7 +323,7 @@ agentprobe/
 
 See [ARCHITECTURE.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ARCHITECTURE.md) for design decisions.
 
-## Observability Stack
+### Observability stack
 
 ```bash
 # Start Prometheus + Grafana + Jaeger
@@ -257,7 +344,7 @@ exporter.start()  # /metrics on :8000
 exporter.record_benchmark_run(results)
 ```
 
-## Supported Frameworks & LLMs
+### Supported frameworks and LLM backends
 
 | Framework | Adapter | Validated in paper | Notes |
 |-----------|---------|--------------------|-------|
@@ -279,7 +366,7 @@ exporter.record_benchmark_run(results)
 | Google AI Studio (Gemini), LangGraph/LangChain adapters | `google` | `.[google]` | **No** | `GEMINI_API_KEY`, native `langchain-google-genai`. Required for Gemini 3 models: their tool calls carry thought signatures that the OpenAI-compatible endpoint drops on the second turn (HTTP 400) |
 | Anthropic (Claude) | `anthropic` | `.[anthropic]` | **No** | `ANTHROPIC_API_KEY`; LangGraph/LangChain adapters only |
 
-### Hosted backends
+#### Hosted backends
 
 Every experiment script (`run_experiment_v2.py`, `run_qualification.py`, `run_benchmarks.py`, `smoke_test_model.py`, `autogen_diagnostic.py`) takes the same flags, defined in `agentprobe.llm`:
 
@@ -317,24 +404,11 @@ Hosted models change silently and are not seed-reproducible; treat hosted batche
 
 Free-tier notes from testing (November 2026): Google AI Studio's `gemini-3-flash-preview` allows 20 requests per day per project, enough for a smoke test but not a batch; the `*-flash-lite` models have separate, larger quotas, shown only inside AI Studio. Google now issues keys starting with `AQ.` as well as `AIza`. Groq's free tier is capped by tokens per day. Check the per-model quota in the provider console before launching a 450-run batch.
 
-## Running Tests
-
-```bash
-pip install -e ".[dev,plotting]"   # from a clone
-pytest tests/ -v
-
-# Skip slow/integration tests
-pytest tests/ -v -m "not slow and not integration"
-
-# Lint
-ruff check agentprobe/ tests/
-```
-
-## Reproducing Paper Results
+### Reproducing the paper's results
 
 The paper reports a two-phase study using Llama 3.1 8B (Q4_K_M) via Ollama, with injection seed 42 throughout.
 
-### Phase 1 — Discovery (1,050 runs)
+#### Phase 1 — Discovery (1,050 runs)
 
 Phase 1 uses `run_benchmarks.py` with 30 runs for LangGraph/LangChain and 10 for AutoGen across 3 task types and 5 fault conditions. This phase discovered that AutoGen never invokes tools due to a legacy API-parameter mismatch.
 
@@ -356,7 +430,7 @@ python experiments/run_benchmarks.py \
     --n-runs 10 --provider ollama --model llama3.1 --save-results
 ```
 
-### Phase 2 — Patched Validation (450 runs)
+#### Phase 2 — Patched Validation (450 runs)
 
 Phase 2 uses `run_experiment_v2.py` with the patched AutoGen adapter (proper `tool_name=` recording, `_patch_openai_compat()` for the functions/tools protocol gap). Runs 30 trials per condition across 3 frameworks × 5 fault conditions on tool-use tasks only, with matched p=0.20 injection probability.
 
@@ -366,7 +440,7 @@ python experiments/run_experiment_v2.py \
     --model llama3.1 --seed 42
 ```
 
-### Qualification Experiment (12 trials)
+#### Qualification Experiment (12 trials)
 
 A small, targeted validation with deterministic calculator tasks and guaranteed fault injection (p=1.0). Produces a self-contained JSON artifact with inputs, outputs, tool events, injection log entries (with args/returns), and linked OTel trace span IDs.
 
@@ -376,7 +450,7 @@ python experiments/run_qualification.py \
     --model llama3.1
 ```
 
-### Cross-Model Validation
+#### Cross-Model Validation
 
 Repeats the qualification and Phase 2 protocol on additional models (Mistral 7B, Qwen2.5 7B):
 
@@ -401,7 +475,7 @@ python experiments/analyze_cross_model.py \
 
 Results are saved to `experiments/results_v2/`.
 
-### AutoGen Diagnostic (Direct Client vs Shim)
+#### AutoGen Diagnostic (Direct Client vs Shim)
 
 A diagnostic comparing the AutoGen adapter pipeline against a direct OpenAI-compatible client on the same three deterministic tasks. The compared paths differ in message format, stopping policy, and temperature handling; results are consistent with the adapter layer being a major contributor to low answer-string presence but do not isolate a single cause:
 
@@ -415,7 +489,7 @@ python experiments/autogen_diagnostic.py --model qwen2.5:7b
 
 Diagnostic artifacts are saved to `experiments/results_v2/diagnostic_*/`.
 
-### Analysis
+#### Analysis
 
 Phase 2 uses the corrected summaries under `experiments/results_v2/`. The original Phase 1 output (now at `experiments/archive_v1/results/combined_summary.json`) contains known counting bugs and is kept only for the historical record. The paper's tables are derived from:
 - **Phase 2 batch (Llama 3.1):** `experiments/results_v2/20261111_113514/`
@@ -430,9 +504,16 @@ Phase 2 uses the corrected summaries under `experiments/results_v2/`. The origin
 
 > **Model digests:** All three models use Q4_K_M quantization. Ollama digest prefixes: Llama `46e0c10c039e`, Mistral `6577803aa9a0`, Qwen `845dbda0ea48`. The `experiment_metadata.json` files in historical batches record `model_digest: unknown` because digest capture was added after the experiments ran; the digests listed here were identified post-hoc from the same Ollama installation.
 
-## Roadmap and contributing
+## Development
 
-The goal: developers keep AgentProbe tests in their CI because they catch failures they care about. Next up (v1.4) is the smallest end-to-end workflow: add a fault test to the agent you already have, with proof the fault actually fired, and run it in pytest and CI. Design-partner feedback then shapes v1.5. See [ROADMAP.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ROADMAP.md) for the full plan and [good first issues](https://github.com/chhayankjain/agentprobe-toolkit/labels/good%20first%20issue) to get started; no model or API key needed.
+```bash
+git clone https://github.com/chhayankjain/agentprobe-toolkit.git && cd agentprobe-toolkit
+pip install -e ".[dev,plotting]"                     # no model or API key needed
+pytest tests/ examples/your_agent -m "not slow and not integration"
+ruff check agentprobe/ tests/ examples/ && ruff format --check agentprobe/ tests/ examples/
+```
+
+See [CONTRIBUTING.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/CONTRIBUTING.md) for the workflow and [ARCHITECTURE.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ARCHITECTURE.md) for how the code fits together.
 
 ## Citation
 
