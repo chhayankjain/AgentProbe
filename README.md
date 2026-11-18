@@ -1,11 +1,11 @@
 # AgentProbe
 
-[![CI](https://github.com/chhayankjain/AgentProbe/actions/workflows/ci.yml/badge.svg)](https://github.com/chhayankjain/AgentProbe/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/chhayankjain/AgentProbe/actions/workflows/codeql.yml/badge.svg)](https://github.com/chhayankjain/AgentProbe/actions/workflows/codeql.yml)
+[![CI](https://github.com/chhayankjain/agentprobe-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/chhayankjain/agentprobe-toolkit/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/chhayankjain/agentprobe-toolkit/actions/workflows/codeql.yml/badge.svg)](https://github.com/chhayankjain/agentprobe-toolkit/actions/workflows/codeql.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/chhayankjain/AgentProbe/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/agentprobe-toolkit.svg)](https://pypi.org/project/agentprobe-toolkit/)
-[![GitHub release](https://img.shields.io/github/v/release/chhayankjain/AgentProbe)](https://github.com/chhayankjain/AgentProbe/releases)
+[![GitHub release](https://img.shields.io/github/v/release/chhayankjain/agentprobe-toolkit)](https://github.com/chhayankjain/agentprobe-toolkit/releases)
 
 **Fault injection and observability toolkit for LLM agents**
 
@@ -27,7 +27,7 @@ AgentProbe organises agent failures into five categories. Only the first has bee
 | 4 | **Latency** | P99 spikes, cascading slowdowns, jitter | Injector implemented; latency in the paper is a by-product of tool faults, not independently injected (`injector/latency_failure.py`) |
 | 5 | **Consistency** | Non-deterministic outputs, divergent multi-agent state | Detected only, via a Jaccard-similarity classifier; nothing is injected (`observer/classifier.py`) |
 
-Note that the current "malformed output" injector raises an exception at the tool boundary rather than returning corrupted data to the model, so it tests the agent's exception path, not its parsing. See issue [#28](https://github.com/chhayankjain/AgentProbe/issues/28).
+Note that the current "malformed output" injector raises an exception at the tool boundary rather than returning corrupted data to the model, so it tests the agent's exception path, not its parsing. See issue [#28](https://github.com/chhayankjain/agentprobe-toolkit/issues/28).
 
 ---
 
@@ -38,7 +38,7 @@ Note that the current "malformed output" injector raises an exception at the too
 pip install "agentprobe-toolkit[ollama]"
 
 # From a clone, for development or to run the paper's experiments
-git clone https://github.com/chhayankjain/AgentProbe.git && cd AgentProbe
+git clone https://github.com/chhayankjain/agentprobe-toolkit.git && cd agentprobe-toolkit
 pip install -e ".[dev,plotting,ollama]"
 
 # The AutoGen adapter targets pyautogen 0.1.14 and needs openai<1.0, which
@@ -55,7 +55,7 @@ Wrap the tools your agent already uses, break one on purpose, and check the outc
 > **Pre-release:** this API ships in AgentProbe 1.4, which is not on PyPI yet. Until it is, install from GitHub:
 >
 > ```bash
-> pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/AgentProbe@main" pytest
+> pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit@main" pytest
 > python -c "import agentprobe; print(agentprobe.__version__)"   # 1.4.0.dev0 or later
 > ```
 >
@@ -75,7 +75,7 @@ def test_admits_failure_when_payment_service_is_down():
 
 When the block ends, AgentProbe also checks that every declared fault **actually fired**. An agent that skips the tool or answers from a cache can't pass. Scenarios: `fail_first(n)`, `fail_times(n).then_succeed()`, `always_fail()`, `returns(value)`, `slow(ms=...)`, `with_probability(p, seed=...)`. Works with plain functions and LangChain tools.
 
-The [10-minute tutorial](https://github.com/chhayankjain/AgentProbe/blob/main/examples/your_agent/README.md) walks through an example agent, shows the same test catching a deliberately broken version, and ships a CI workflow you can copy. [docs/instrumentation.md](https://github.com/chhayankjain/AgentProbe/blob/main/docs/instrumentation.md) explains what AgentProbe guarantees about your tools.
+The [10-minute tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md) walks through an example agent, shows the same test catching a deliberately broken version, and ships a CI workflow you can copy. [docs/instrumentation.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/docs/instrumentation.md) explains what AgentProbe guarantees about your tools.
 
 ## Try it in 60 seconds (no model, no key)
 
@@ -85,7 +85,7 @@ python -m agentprobe.demo                      # rate-limit faults, p=0.3, 10 ru
 python -m agentprobe.demo --fault timeout --p 0.5 --runs 20
 ```
 
-The demo wraps the LangGraph adapter around a scripted, deterministic chat model, injects seeded faults into the calculator tool, runs a short benchmark, and prints the metrics, the per-call injection log with its OpenTelemetry span ids, and each run's outcome. [`examples/quickstart.py`](https://github.com/chhayankjain/AgentProbe/blob/main/examples/quickstart.py) is the same thing in 30 lines you can copy. Swap `ScriptedToolCallingModel` for a real model via `agentprobe.llm.build_chat_model` and nothing else changes.
+The demo wraps the LangGraph adapter around a scripted, deterministic chat model, injects seeded faults into the calculator tool, runs a short benchmark, and prints the metrics, the per-call injection log with its OpenTelemetry span ids, and each run's outcome. [`examples/quickstart.py`](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/quickstart.py) is the same thing in 30 lines you can copy. Swap `ScriptedToolCallingModel` for a real model via `agentprobe.llm.build_chat_model` and nothing else changes.
 
 ## Quick Start
 
@@ -207,7 +207,7 @@ flowchart LR
     INJ --> LOG["injection log<br/>args · result · span_id"]
 ```
 
-Full diagrams (per-trial sequence, injector internals, data flow, observability stack, CI/release) are in [ARCHITECTURE.md](https://github.com/chhayankjain/AgentProbe/blob/main/ARCHITECTURE.md).
+Full diagrams (per-trial sequence, injector internals, data flow, observability stack, CI/release) are in [ARCHITECTURE.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ARCHITECTURE.md).
 
 ```
 agentprobe/
@@ -234,7 +234,7 @@ agentprobe/
     └── autogen_agent.py         # AutoGen two-agent pipeline (pyautogen 0.1.14 + compat shim)
 ```
 
-See [ARCHITECTURE.md](https://github.com/chhayankjain/AgentProbe/blob/main/ARCHITECTURE.md) for design decisions.
+See [ARCHITECTURE.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ARCHITECTURE.md) for design decisions.
 
 ## Observability Stack
 
@@ -263,7 +263,7 @@ exporter.record_benchmark_run(results)
 |-----------|---------|--------------------|-------|
 | LangGraph | `LangGraphToolAgent` | Yes (Llama 3.1, Mistral 7B, Qwen2.5 7B) | Hand-built ReAct graph |
 | LangChain | `LangChainToolAgent` | Yes (same models) | Uses `create_agent`, which compiles to LangGraph; shares an execution path with the LangGraph adapter, so results converge |
-| AutoGen | `AutoGenToolAgent` | Yes, with caveats | Targets **pyautogen 0.1.14** through a `functions`→`tools` compatibility shim. Phase 1 found it silently bypassed tools; Phase 2 patched that. Modern `ag2` / `autogen-agentchat` 0.4+ is not yet supported ([roadmap](https://github.com/chhayankjain/AgentProbe/issues/38)) |
+| AutoGen | `AutoGenToolAgent` | Yes, with caveats | Targets **pyautogen 0.1.14** through a `functions`→`tools` compatibility shim. Phase 1 found it silently bypassed tools; Phase 2 patched that. Modern `ag2` / `autogen-agentchat` 0.4+ is not yet supported ([roadmap](https://github.com/chhayankjain/agentprobe-toolkit/issues/38)) |
 
 | LLM Backend | `--provider` | Install extra | Validated in paper | Notes |
 |-------------|--------------|---------------|--------------------|-------|
@@ -426,13 +426,13 @@ Phase 2 uses the corrected summaries under `experiments/results_v2/`. The origin
 - **Qualification (Mistral 7B):** `experiments/results_v2/qualification_20261111_233116/` (12 trials, 8 passed)
 - **Qualification (Qwen2.5 7B):** `experiments/results_v2/qualification_20261111_233320/` (12 trials, 10 passed)
 
-> **Source map:** The authoritative mapping from each paper table cell to its batch directory is in [`experiments/results_v2/paper_source_map.json`](https://github.com/chhayankjain/AgentProbe/blob/main/experiments/results_v2/paper_source_map.json). The Qwen2.5 column combines two batches: LangGraph/LangChain from `20261112_040156` and AutoGen from `20261112_063451` (corrected output extractor). Llama and Mistral use their single original batches. The `analyze_cross_model.py` script does not automatically merge these; use the source map to select the correct batch per framework.
+> **Source map:** The authoritative mapping from each paper table cell to its batch directory is in [`experiments/results_v2/paper_source_map.json`](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/experiments/results_v2/paper_source_map.json). The Qwen2.5 column combines two batches: LangGraph/LangChain from `20261112_040156` and AutoGen from `20261112_063451` (corrected output extractor). Llama and Mistral use their single original batches. The `analyze_cross_model.py` script does not automatically merge these; use the source map to select the correct batch per framework.
 
 > **Model digests:** All three models use Q4_K_M quantization. Ollama digest prefixes: Llama `46e0c10c039e`, Mistral `6577803aa9a0`, Qwen `845dbda0ea48`. The `experiment_metadata.json` files in historical batches record `model_digest: unknown` because digest capture was added after the experiments ran; the digests listed here were identified post-hoc from the same Ollama installation.
 
 ## Roadmap and contributing
 
-The goal: developers keep AgentProbe tests in their CI because they catch failures they care about. Next up (v1.4) is the smallest end-to-end workflow: add a fault test to the agent you already have, with proof the fault actually fired, and run it in pytest and CI. Design-partner feedback then shapes v1.5. See [ROADMAP.md](https://github.com/chhayankjain/AgentProbe/blob/main/ROADMAP.md) for the full plan and [good first issues](https://github.com/chhayankjain/AgentProbe/labels/good%20first%20issue) to get started; no model or API key needed.
+The goal: developers keep AgentProbe tests in their CI because they catch failures they care about. Next up (v1.4) is the smallest end-to-end workflow: add a fault test to the agent you already have, with proof the fault actually fired, and run it in pytest and CI. Design-partner feedback then shapes v1.5. See [ROADMAP.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ROADMAP.md) for the full plan and [good first issues](https://github.com/chhayankjain/agentprobe-toolkit/labels/good%20first%20issue) to get started; no model or API key needed.
 
 ## Citation
 
@@ -447,4 +447,4 @@ The goal: developers keep AgentProbe tests in their CI because they catch failur
 
 ## License
 
-MIT — see [LICENSE](https://github.com/chhayankjain/AgentProbe/blob/main/LICENSE).
+MIT — see [LICENSE](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/LICENSE).

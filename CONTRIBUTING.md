@@ -6,8 +6,8 @@ Thanks for your interest in contributing! Here's how to get started.
 
 ```bash
 # Clone and install
-git clone https://github.com/chhayankjain/AgentProbe.git
-cd AgentProbe
+git clone https://github.com/chhayankjain/agentprobe-toolkit.git
+cd agentprobe-toolkit
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev,plotting]"   # no model or API key needed for the offline suite
@@ -23,7 +23,7 @@ ruff format --check agentprobe/ tests/ examples/
 ## Where to start
 
 - [ROADMAP.md](ROADMAP.md) explains what we're building and why, milestone by milestone.
-- [Good first issues](https://github.com/chhayankjain/AgentProbe/labels/good%20first%20issue) are small and need no model or API key.
+- [Good first issues](https://github.com/chhayankjain/agentprobe-toolkit/labels/good%20first%20issue) are small and need no model or API key.
 - Every roadmap issue has **Why / Scope / Acceptance criteria / Where to start / Size**. Comment to claim one. We aim to reply within two working days; see the [maintainer service targets](ROADMAP.md#maintainer-service-targets), including what happens when maintainers are away.
 - Have a real agent? Trying AgentProbe on it and reporting friction (#68) is the most valuable contribution right now.
 
@@ -54,8 +54,8 @@ python experiments/run_experiment_v2.py --frameworks langgraph --model llama3.1 
 
 ## Reporting Issues
 
-- Use the [bug report template](https://github.com/chhayankjain/AgentProbe/issues/new?template=bug_report.yml) for bugs
-- Use the [feature request template](https://github.com/chhayankjain/AgentProbe/issues/new?template=feature_request.yml) for ideas
+- Use the [bug report template](https://github.com/chhayankjain/agentprobe-toolkit/issues/new?template=bug_report.yml) for bugs
+- Use the [feature request template](https://github.com/chhayankjain/agentprobe-toolkit/issues/new?template=feature_request.yml) for ideas
 
 ## License
 

@@ -18,7 +18,7 @@ authors:
 version: "1.4.0.dev0"
 date-released: "2026-11-17"
 license: MIT
-repository-code: "https://github.com/chhayankjain/AgentProbe"
+repository-code: "https://github.com/chhayankjain/agentprobe-toolkit"
 url: "https://pypi.org/project/agentprobe-toolkit/"
 keywords:
   - llm-agents

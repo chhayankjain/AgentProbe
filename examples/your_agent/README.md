@@ -15,7 +15,7 @@ def answer(question, tools=TOOLS, *, broken=False): ...
 > **Pre-release:** this API ships in AgentProbe 1.4, which is not on PyPI yet. Until it is, install from GitHub:
 >
 > ```bash
-> pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/AgentProbe@main" pytest
+> pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit@main" pytest
 > python -c "import agentprobe; print(agentprobe.__version__)"   # 1.4.0.dev0 or later
 > ```
 >

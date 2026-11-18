@@ -80,11 +80,11 @@ autogen = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/chhayankjain/AgentProbe"
-Repository = "https://github.com/chhayankjain/AgentProbe"
-Issues = "https://github.com/chhayankjain/AgentProbe/issues"
-Changelog = "https://github.com/chhayankjain/AgentProbe/blob/main/CHANGELOG.md"
-Roadmap = "https://github.com/chhayankjain/AgentProbe/issues/38"
+Homepage = "https://github.com/chhayankjain/agentprobe-toolkit"
+Repository = "https://github.com/chhayankjain/agentprobe-toolkit"
+Issues = "https://github.com/chhayankjain/agentprobe-toolkit/issues"
+Changelog = "https://github.com/chhayankjain/agentprobe-toolkit/blob/main/CHANGELOG.md"
+Roadmap = "https://github.com/chhayankjain/agentprobe-toolkit/issues/38"
 
 # The distribution is ``agentprobe-toolkit`` (``agentprobe`` was already taken on PyPI);
 # the import name stays ``agentprobe``. Hatchling must be told explicitly, since it
