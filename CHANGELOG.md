@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Added
-- `examples/real_model_agent/`: fault tests on a real LLM agent (LangChain `create_agent` on local Ollama), with results across two models and two prompts. Skipped automatically when Ollama isn't running
+- `examples/real_model_agent/`: fault tests on a real LLM agent (LangChain `create_agent` on local Ollama). Recovery is checked on the call log (right order, right arguments, confirmation before the receipt), not on wording. Includes `run_matrix.py` and the saved evidence for its results table across two models, two prompts and two tool-error messages. Live tests are marked `integration`; CI compiles the example and runs its offline call-log checks
 
 ## [1.4.0] - 2026-11-18
 

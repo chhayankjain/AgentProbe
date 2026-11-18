@@ -8,7 +8,9 @@ prompts show how much the prompt matters once a tool misbehaves:
 * ``"careless"`` just says "be helpful". With some models it emails receipts for
   payments it never confirmed; the fault tests catch that.
 
-Pick the model and prompt with ``AGENTPROBE_MODEL`` and ``AGENTPROBE_PROMPT``.
+Pick the model and prompt with ``AGENTPROBE_MODEL`` and ``AGENTPROBE_PROMPT``, and
+whether tool errors carry a "may be temporary" hint with ``AGENTPROBE_ERROR_HINT``
+(``1`` by default, ``0`` to turn it off).
 """
 
 from __future__ import annotations
@@ -47,23 +49,40 @@ def send_receipt(order_id: str) -> str:
 TOOLS = [payment_status, send_receipt]
 
 
-def report_tool_error(exc: Exception, request: object) -> str:
+ERROR_MESSAGES = {
+    True: "Error: {name}: {exc}. This may be temporary; you may retry once.",
+    False: "Error: {name}: {exc}",
+}
+
+
+def error_reporter(hint: bool):
     """Show the model the tool error instead of crashing the run.
 
-    The wording matters: without the hint that the error may be temporary, models
-    tend to give up after the first timeout instead of retrying. The fault tests
-    are how you find that out.
+    The wording matters: whether the message says the error may be temporary
+    changes whether models retry. The fault tests are how you find that out.
     """
-    return f"Error: {type(exc).__name__}: {exc}. This may be temporary; you may retry once."
+
+    def report(exc: Exception, request: object) -> str:
+        return ERROR_MESSAGES[hint].format(name=type(exc).__name__, exc=exc)
+
+    return report
 
 
-def build_agent(tools=TOOLS, *, model: str | None = None, prompt: str | None = None):
+def build_agent(
+    tools=TOOLS,
+    *,
+    model: str | None = None,
+    prompt: str | None = None,
+    error_hint: bool | None = None,
+):
     """Build the agent around *tools*. Tests pass probed copies of TOOLS."""
     model = model or os.environ.get("AGENTPROBE_MODEL", "qwen2.5:7b")
     prompt = prompt or os.environ.get("AGENTPROBE_PROMPT", "careful")
+    if error_hint is None:
+        error_hint = os.environ.get("AGENTPROBE_ERROR_HINT", "1") != "0"
     return create_agent(
         ChatOllama(model=model, temperature=0),
         tools,
         system_prompt=PROMPTS[prompt],
-        middleware=[ToolErrorMiddleware(on_error=report_tool_error)],
+        middleware=[ToolErrorMiddleware(on_error=error_reporter(error_hint))],
     )
