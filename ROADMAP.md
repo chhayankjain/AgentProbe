@@ -75,6 +75,7 @@ The rest of this list is the v1.5 backlog, worked in priority order. Not every i
 | Record and replay model responses so fault tests run offline in CI | #105 |
 | Failure reports: terminal diagnostics and versioned JSON (pytest's JUnit for CI viewers) | #72 |
 | Redact secrets and personal data in reports | #102 |
+| Injected faults catchable like real failures (`ToolCallTimeout` is a `TimeoutError`) | #114 |
 | Fault coverage report: which tools were tested against which faults | #104 |
 | `agentprobe check`: pass only if every required scenario was exercised and every required assertion passed | #74 |
 | Graph support for documented LangGraph shapes with explicit tool selection | #64 |

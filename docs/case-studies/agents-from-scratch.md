@@ -5,8 +5,8 @@
 meetings and writes replies.
 **Result:** tool exceptions escape the assistant's tool node and end the run. Reported upstream as
 [agents-from-scratch#70](https://github.com/langchain-ai/agents-from-scratch/issues/70) with a
-model-free reproduction; fix and regression tests proposed in
-[agents-from-scratch#71](https://github.com/langchain-ai/agents-from-scratch/pull/71).
+model-free reproduction; a fix with regression tests is proposed in
+[agents-from-scratch#71](https://github.com/langchain-ai/agents-from-scratch/pull/71) (not yet reviewed by the maintainers).
 **Time:** about an hour from cloning the repo to a confirmed finding.
 
 ## What we did
@@ -40,6 +40,24 @@ The other three graphs in the repository invoke tools the same way; we inspected
 the basic graph, and the issue says so. In the Gmail graph, the registered Gmail tools catch their
 own errors and return a message, so the gap matters most for tools that raise.
 
+## Before and after the proposed fix
+
+We then ran the example's tests against the original code and against the proposed fix, three runs
+each on the same local model ([validation record](../../examples/third_party_agent/results/validation-2026-11-18.md)).
+The tests inject `TimeoutError` and LangChain's `ToolException`, the exception types the fix handles:
+AgentProbe's own fault classes don't subclass them, so code that handles real timeouts wouldn't
+catch them (tracked in AgentProbe [#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114)).
+
+| Scenario | Original | With the fix (#71) | With #71 and open PR #65 |
+|---|---|---|---|
+| Calendar times out once | run ends with the timeout | recovers | recovers |
+| Scheduling always fails | run ends with the error | `KeyError: None` | recovers |
+
+The fix did what it should, and that exposed a second, already-known bug: once the error reaches the
+model, the local model sometimes answers without a tool call, and the graph's router returns `None`
+(upstream #61, fixed by open PR #65). With both changes, every scenario passes. Fault tests are good
+at finding exactly this kind of interaction, because they exercise the paths that fixes open up.
+
 ## Also observed (not reported)
 
 In the third scenario, Qwen 2.5 called the reply tool twice with identical arguments in all three
@@ -63,3 +81,6 @@ own model.
   the pattern in the example; a first-class helper is a candidate for v1.5.
 - Graphs that end on a tool call give `result.answer == ""`; checks need the call log. Better answer
   extraction for such graphs is another v1.5 candidate.
+- Injected faults should be catchable the way real failures are: an injected timeout should be a
+  `TimeoutError` ([#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114)). Until then, pass the
+  exception your code handles with `with_=`.
