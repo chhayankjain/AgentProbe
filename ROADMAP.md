@@ -70,8 +70,12 @@ The rest of this list is the v1.5 backlog, worked in priority order. Not every i
 | Fixes for friction found by design partners | filed from #68 |
 | pytest plugin: `probe` fixture and marker, shipped in the package | #69 |
 | Outcome assertions: no crash, answer contains, within deadline, retry budget, admits failure | #70 |
+| Tool-call assertions: arguments, order and call counts | #103 |
 | Scripted mode for CI, live mode for real models, cost guards, pass-rate thresholds | #71 |
+| Record and replay model responses so fault tests run offline in CI | #105 |
 | Failure reports: terminal diagnostics and versioned JSON (pytest's JUnit for CI viewers) | #72 |
+| Redact secrets and personal data in reports | #102 |
+| Fault coverage report: which tools were tested against which faults | #104 |
 | `agentprobe check`: pass only if every required scenario was exercised and every required assertion passed | #74 |
 | Graph support for documented LangGraph shapes with explicit tool selection | #64 |
 | Adapter contract and conformance test suite | #78 |
@@ -152,6 +156,7 @@ Browse all [good first issues](https://github.com/chhayankjain/AgentProbe/labels
 - **A general plugin registry.** Designed after several real integrations show what the interface needs (#78 comes first).
 - **Security and prompt-injection fuzzing.** A different problem with different users. AgentProbe stays focused on reliability.
 - **Dashboards** (#31). Reports in CI come first.
+- **Faults at the model call** (#106): rate limits, timeouts and errors from the LLM provider. Tool faults come first; picked up when design partners ask.
 
 These can change when users ask for them. Open a [Discussion](https://github.com/chhayankjain/AgentProbe/discussions) with your use case.
 
