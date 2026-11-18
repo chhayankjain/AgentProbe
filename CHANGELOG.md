@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- `examples/real_model_agent/`: fault tests on a real LLM agent (LangChain `create_agent` on local Ollama), with results across two models and two prompts. Skipped automatically when Ollama isn't running
+
 ## [1.4.0] - 2026-11-18
 
 Test the agent you already have: wrap its tools, declare deterministic faults, and fail the test unless every fault actually fired. See the README and the tutorial in `examples/your_agent/`.
