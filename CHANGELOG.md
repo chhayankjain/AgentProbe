@@ -33,6 +33,7 @@ Test the agent you already have: wrap its tools, declare deterministic faults, a
 - The GitHub repository is now `chhayankjain/agentprobe-toolkit`, matching the PyPI name; old URLs redirect. The import name stays `agentprobe`
 - The README leads with the developer workflow; the benchmark toolkit and paper reproduction moved to a "For researchers" section
 - New pull requests automatically request a maintainer review (CODEOWNERS)
+- Documented that unfaulted calls still run real tools (with their side effects) and that 1.4 reports are not redacted (#102)
 
 
 ## [1.3.0] - 2026-11-17

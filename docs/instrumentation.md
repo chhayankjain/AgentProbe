@@ -76,6 +76,8 @@ If the code awaiting `arun()` is itself cancelled (for example, a test timeout),
 
 ## Reports
 
+**Real tools run, and reports are not redacted (1.4).** A call that receives a fault (`raise` or `returns`) never reaches the wrapped tool; every other call does, including calls delayed by `slow()`, so side effects happen as usual. Use sandboxed or test-double tools where side effects matter. Recorded arguments, return values, answers and assertion messages are kept verbatim in `summary()`, assertion errors and `to_dict()`; keep secrets and personal data out of fault-test inputs, or keep the JSON out of shared CI artifacts. Automatic redaction is tracked in #102.
+
 **Arguments are frozen when the call starts.** `CallRecord.args` and `kwargs` hold a JSON-safe snapshot taken at the call boundary, so changing your objects later can't alter recorded evidence. The live objects are kept separately in `raw_args` and `raw_kwargs` for debugging; they are never serialized and may change. Nothing is deep-copied, so locks, clients and callbacks are safe to pass.
 
 `result.summary()` prints what was observed, asserted and inferred. `result.to_dict()` is always JSON-safe (schema version `1.2`): JSON values pass through; datetimes, decimals, UUIDs, paths and enums become strings; bytes become `{"type": "bytes", "length", "preview"}`; anything else becomes `{"type", "repr"}`. Your objects are never modified.

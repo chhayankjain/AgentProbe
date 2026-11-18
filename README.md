@@ -111,6 +111,11 @@ The result keeps what was **observed** (every tool call with arguments, outcome 
 
 What AgentProbe guarantees about your tools (never modified, cleanup on exceptions and cancellation, concurrency, agents that outlive their deadline) is in [docs/instrumentation.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/docs/instrumentation.md).
 
+### Good to know before you wire in real tools
+
+- **Real tools really run.** A call that gets a fault (`fail_*`, `always_fail`, `returns`) never reaches your tool, but every other call does, including calls delayed by `slow()`. If a tool sends email, charges a card or writes to a database, point it at a sandbox or a test double in your fault tests.
+- **Reports are not redacted yet.** Summaries, assertion messages and `to_dict()` include tool arguments, return values and answers as they were. Keep secrets and customer data out of fault-test inputs, or don't upload the JSON as a CI artifact. Automatic redaction is planned ([#102](https://github.com/chhayankjain/agentprobe-toolkit/issues/102)).
+
 ## Run it in CI
 
 Fault tests are ordinary pytest tests, so any CI runs them. A ready-made GitHub Actions workflow is in [`examples/your_agent/ci.yml`](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/ci.yml):
