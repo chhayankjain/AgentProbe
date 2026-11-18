@@ -46,7 +46,7 @@ jobs:
 
       - name: Check the real-model example offline (live tests need Ollama and are skipped)
         run: |
-          python -m py_compile examples/real_model_agent/*.py
+          python -m py_compile examples/real_model_agent/*.py examples/third_party_agent/*.py
           pytest examples/real_model_agent -v --tb=short -m "not slow and not integration"
 
   lint:
