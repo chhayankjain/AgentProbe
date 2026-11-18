@@ -19,10 +19,16 @@ never try to re-upload the same version number.
 1. **GitHub environments.** In the repo settings create two environments, `pypi` and `testpypi`.
    Optionally add yourself as a required reviewer on `pypi` so a tag push pauses for approval.
 2. **PyPI pending publisher.** On <https://pypi.org/manage/account/publishing/> add a *pending*
-   publisher for project `agentprobe-toolkit` with owner `chhayankjain`, repository `AgentProbe`,
+   publisher for project `agentprobe-toolkit` with owner `chhayankjain`, repository `agentprobe-toolkit`,
    workflow `release.yml`, environment `pypi`. The first successful upload creates the project.
 3. **TestPyPI pending publisher.** Same on <https://test.pypi.org/manage/account/publishing/>
    with environment `testpypi`.
+
+> **If the repository is ever renamed:** PyPI and TestPyPI only accept uploads from the repository
+> name in the trusted publisher, and green CI does not check this. On each site open the project's
+> **Manage → Publishing** page, add a publisher with the new repository name (same owner, workflow
+> and environment), then remove the old one. The repository was renamed from `AgentProbe` to
+> `agentprobe-toolkit` on 2026-11-18.
 
 ## Dry run (TestPyPI)
 
