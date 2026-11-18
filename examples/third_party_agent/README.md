@@ -30,7 +30,8 @@ isn't running. No OpenAI key is needed and no request leaves your machine.
 | `test_failed_scheduling_still_gets_a_reply` | scheduling returns an error message instead of raising | passes: the agent replies |
 
 The expected failures are reported upstream as
-[agents-from-scratch#70](https://github.com/langchain-ai/agents-from-scratch/issues/70). They are
+[agents-from-scratch#70](https://github.com/langchain-ai/agents-from-scratch/issues/70), with a fix
+proposed in [#71](https://github.com/langchain-ai/agents-from-scratch/pull/71). They are
 marked `xfail(strict=True)`, so they turn red here as soon as the upstream bug is fixed.
 
 ## How the harness works

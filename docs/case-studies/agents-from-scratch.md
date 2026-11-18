@@ -5,7 +5,8 @@
 meetings and writes replies.
 **Result:** tool exceptions escape the assistant's tool node and end the run. Reported upstream as
 [agents-from-scratch#70](https://github.com/langchain-ai/agents-from-scratch/issues/70) with a
-model-free reproduction and a tested fix proposal.
+model-free reproduction; fix and regression tests proposed in
+[agents-from-scratch#71](https://github.com/langchain-ai/agents-from-scratch/pull/71).
 **Time:** about an hour from cloning the repo to a confirmed finding.
 
 ## What we did
