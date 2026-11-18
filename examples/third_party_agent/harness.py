@@ -1,46 +1,71 @@
 """Run a third-party agent under AgentProbe without editing its code.
 
-Target: the email assistant in langchain-ai/agents-from-scratch (commit 603fc7a).
-That module builds a GPT-4.1 client and its tools when it is imported, and has no
-parameter for passing tools in. So we import it with a placeholder OpenAI key and a
-dead OpenAI address (no request can leave the machine), then replace three module
-globals: the router model, the tool-calling model, and the name -> tool table.
-Their prompts, nodes and edges run unchanged.
+Target: the email assistant in langchain-ai/agents-from-scratch. That module builds
+a GPT-4.1 client and its tools when it is imported, and has no parameter for
+passing tools in. ``upstream()`` imports it with a placeholder OpenAI key and a
+dead OpenAI address (no request can leave the machine); ``local_agent()`` swaps
+three module globals (the router model, the tool-calling model, and the
+name -> tool table) for a local Ollama model and AgentProbe-wrapped tools. Their
+prompts, nodes and edges run unchanged.
 
-This "swap the module globals" pattern works for any agent that builds its tools at
-import time. If you own the agent, prefer adding a ``tools`` parameter instead.
+Both are context managers and undo everything on exit: environment variables,
+``sys.path``, the imported upstream modules, and the swapped globals. So this
+example can run alongside other tests without affecting them.
 """
 
 from __future__ import annotations
 
 import os
 import sys
+from contextlib import contextmanager
 
-UPSTREAM = os.environ.get("AGENTS_FROM_SCRATCH_DIR", "")
-
-
-def load():
-    """Import the upstream email assistant. Returns (module, sample meeting email)."""
-    if not UPSTREAM or not os.path.isdir(os.path.join(UPSTREAM, "src", "email_assistant")):
-        raise RuntimeError("set AGENTS_FROM_SCRATCH_DIR to a checkout of agents-from-scratch")
-    sys.path.insert(0, os.path.join(UPSTREAM, "src"))
-    os.environ["OPENAI_API_KEY"] = "placeholder-not-used"
-    os.environ["OPENAI_BASE_URL"] = "http://127.0.0.1:9/v1"  # nothing listens here
-
-    import email_assistant.email_assistant as ea
-    from email_assistant.eval.email_dataset import email_input_4
-
-    return ea, email_input_4
+ENV = {"OPENAI_API_KEY": "placeholder-not-used", "OPENAI_BASE_URL": "http://127.0.0.1:9/v1"}
 
 
-def use_local_model(ea, probe, model: str = "qwen2.5:7b"):
-    """Point the assistant at a local Ollama model and probed copies of its tools."""
+@contextmanager
+def upstream(checkout: str):
+    """Import the email assistant from *checkout*. Yields (module, sample email)."""
+    src = os.path.join(os.path.abspath(checkout), "src")
+    if not os.path.isdir(os.path.join(src, "email_assistant")):
+        raise RuntimeError(f"{checkout} is not an agents-from-scratch checkout")
+    saved_env = {k: os.environ.get(k) for k in ENV}
+    saved_path = list(sys.path)
+    before = set(sys.modules)
+    os.environ.update(ENV)
+    sys.path.insert(0, src)
+    try:
+        import email_assistant.email_assistant as ea
+        from email_assistant.eval.email_dataset import email_input_4
+
+        if not os.path.abspath(ea.__file__).startswith(src):
+            raise RuntimeError(f"imported {ea.__file__}, expected the module under {src}")
+        yield ea, email_input_4
+    finally:
+        for name in set(sys.modules) - before:
+            if name == "email_assistant" or name.startswith("email_assistant."):
+                del sys.modules[name]
+        sys.path[:] = saved_path
+        for k, v in saved_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+@contextmanager
+def local_agent(ea, probe, model: str = "qwen2.5:7b"):
+    """Point the assistant at a local model and probed copies of its tools.
+    Yields the compiled graph; restores the three globals on exit."""
     from email_assistant.schemas import RouterSchema
     from langchain_ollama import ChatOllama
 
+    saved = (ea.llm_router, ea.llm_with_tools, ea.tools_by_name)
     wrapped = probe.wrap(ea.tools)
     llm = ChatOllama(model=model, temperature=0)
     ea.llm_router = llm.with_structured_output(RouterSchema)
     ea.llm_with_tools = llm.bind_tools(wrapped, tool_choice="any")
     ea.tools_by_name = {t.name: t for t in wrapped}
-    return ea.email_assistant
+    try:
+        yield ea.email_assistant
+    finally:
+        ea.llm_router, ea.llm_with_tools, ea.tools_by_name = saved
