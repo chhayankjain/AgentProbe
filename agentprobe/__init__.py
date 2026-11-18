@@ -21,7 +21,7 @@ from agentprobe.observer.classifier import FailureCategory, FailureClassifier
 from agentprobe.observer.tracer import AgentProbeTracer, get_tracer
 from agentprobe.probe import Probe, ProbeGateError, ProbeResult
 
-__version__ = "1.4.0.dev0"
+__version__ = "1.4.0"
 
 __all__ = [
     "__version__",

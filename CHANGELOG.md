@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-18
+
+Test the agent you already have: wrap its tools, declare deterministic faults, and fail the test unless every fault actually fired. See the README and the tutorial in `examples/your_agent/`.
+
 ### Maintenance
 - Include the typing marker and documentation in distributions; wheel checks now exercise the public probe API and offline demo, and source-archive checks run the tutorial tests.
 - Remove unused imports, an unused AutoGen helper, and notebook-only development dependencies; use the public paper-task helper in the active experiment runner.
@@ -22,6 +26,13 @@
 - Scenario validation at declaration: positive whole-number counts, finite delays and probabilities, and no rules after one that applies to every call
 - `to_dict()` is always JSON-safe (schema 1.2)
 - Tutorial and example (`examples/your_agent/`): an order-status agent, a deliberately broken version the tests catch, a cache-skipping agent the gate rejects, and a copyable CI workflow (#67)
+- `python -m agentprobe.demo --json` writes the demo report as one JSON object (#100, thanks @Zlongyang for the first community contribution)
+- `py.typed` marker: type checkers now use AgentProbe's annotations
+
+### Changed
+- The GitHub repository is now `chhayankjain/agentprobe-toolkit`, matching the PyPI name; old URLs redirect. The import name stays `agentprobe`
+- The README leads with the developer workflow; the benchmark toolkit and paper reproduction moved to a "For researchers" section
+- New pull requests automatically request a maintainer review (CODEOWNERS)
 
 
 ## [1.3.0] - 2026-11-17
