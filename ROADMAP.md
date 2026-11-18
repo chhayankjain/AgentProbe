@@ -6,7 +6,7 @@
 
 Everything below serves that one question. Research use (the paper's experiments) stays fully supported, but it is a separate track and does not set priorities.
 
-Live tracking: [milestones](https://github.com/chhayankjain/AgentProbe/milestones) and the pinned [roadmap issue #38](https://github.com/chhayankjain/AgentProbe/issues/38).
+Live tracking: [milestones](https://github.com/chhayankjain/agentprobe-toolkit/milestones) and the pinned [roadmap issue #38](https://github.com/chhayankjain/agentprobe-toolkit/issues/38).
 
 ---
 
@@ -144,7 +144,7 @@ New here? These are small, self-contained, and need no model or API key:
 - #83 — `nox` dev tasks
 - #84 — New issue templates
 
-Browse all [good first issues](https://github.com/chhayankjain/AgentProbe/labels/good%20first%20issue). Comment on an issue to claim it. Have a real agent? #68 is the most valuable contribution of all: try it and tell us where it hurt.
+Browse all [good first issues](https://github.com/chhayankjain/agentprobe-toolkit/labels/good%20first%20issue). Comment on an issue to claim it. Have a real agent? #68 is the most valuable contribution of all: try it and tell us where it hurt.
 
 ## What we're deliberately not doing yet
 
@@ -158,7 +158,7 @@ Browse all [good first issues](https://github.com/chhayankjain/AgentProbe/labels
 - **Dashboards** (#31). Reports in CI come first.
 - **Faults at the model call** (#106): rate limits, timeouts and errors from the LLM provider. Tool faults come first; picked up when design partners ask.
 
-These can change when users ask for them. Open a [Discussion](https://github.com/chhayankjain/AgentProbe/discussions) with your use case.
+These can change when users ask for them. Open a [Discussion](https://github.com/chhayankjain/agentprobe-toolkit/discussions) with your use case.
 
 ## Maintainer service targets
 
