@@ -7,9 +7,9 @@
 [![PyPI](https://img.shields.io/pypi/v/agentprobe-toolkit.svg)](https://pypi.org/project/agentprobe-toolkit/)
 [![GitHub release](https://img.shields.io/github/v/release/chhayankjain/agentprobe-toolkit)](https://github.com/chhayankjain/agentprobe-toolkit/releases)
 
-**Test how your LLM agent handles tool failures, in pytest, with no model or API key.**
+**Test how your LLM agent handles tool failures, in pytest.**
 
-Your agent's tools will time out, hit rate limits, and return garbage. AgentProbe wraps the tools your agent already uses, breaks them on purpose and deterministically, and checks what your agent did about it. The test fails unless every fault you declared **actually fired**, so an agent that skips the tool or answers from a cache can't look resilient.
+Your agent's tools will time out, hit rate limits, and return garbage. AgentProbe wraps the tools your agent already uses, breaks them on purpose and deterministically, and checks what your agent did about it. The test fails unless every fault you declared **actually fired**, so an agent that skips the tool or answers from a cache can't look resilient. The examples and the demo run without a model or API key.
 
 [Install](#install) · [Your first fault test](#your-first-fault-test) · [What a failure looks like](#what-a-failure-looks-like) · [Scenarios](#what-you-can-break) · [Assertions](#what-you-can-check) · [CI](#run-it-in-ci) · [Tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md) · [For researchers](#for-researchers-the-benchmark-and-the-paper)
 
@@ -18,15 +18,11 @@ Your agent's tools will time out, hit rate limits, and return garbage. AgentProb
 ## Install
 
 ```bash
-pip install "agentprobe-toolkit>=1.4" pytest
+pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit@main" pytest
+python -c "import agentprobe; print(agentprobe.__version__)"   # 1.4.0.dev0 or later
 ```
 
-> **Pre-release:** the testing API ships in AgentProbe 1.4, which is not on PyPI yet. Until it is, install from GitHub:
->
-> ```bash
-> pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit@main" pytest
-> python -c "import agentprobe; print(agentprobe.__version__)"   # 1.4.0.dev0 or later
-> ```
+> **Pre-release:** the testing API on this page ships in AgentProbe 1.4, which is not on PyPI yet, so install from GitHub for now. PyPI currently has 1.3.0, which has the benchmark toolkit but not `agentprobe.testing`. Once 1.4 is released, `pip install "agentprobe-toolkit>=1.4" pytest` is enough.
 
 You install `agentprobe-toolkit` and import `agentprobe`, the same way `pip install scikit-learn` gives you `import sklearn`. Python 3.11+.
 
@@ -47,6 +43,7 @@ def test_admits_failure_when_payment_service_is_down():
         result = p.run(lambda q: answer(q, tools), "Did order 42 go through?")
         result.assert_no_crash()
         result.assert_answer_not_contains("is confirmed")       # never claim unverified success
+        result.assert_answer_contains("couldn't confirm")       # say so instead
         result.assert_not_called("send_receipt")                # no receipt for an unconfirmed payment
 ```
 
@@ -111,7 +108,7 @@ The result keeps what was **observed** (every tool call with arguments, outcome 
 - **LangChain tools** (`@tool`, `StructuredTool`, `BaseTool` subclasses): wrapped as copies with the same schema.
 - **LangGraph**: pass the wrapped tools to your graph. The prebuilt ReAct agent re-raises tool exceptions by default; use `ToolNode(tools, handle_tool_errors=True)` if your agent should see the error and recover.
 - **Any agent callable** or object with `invoke()`: `p.run(agent, input)`.
-- **Async agents and async tests:** `await p.arun(agent, input, timeout=...)`. Async agents are cancelled at the deadline.
+- **Async agents and async tests:** `await p.arun(agent, input, timeout=...)`. At the deadline the probe stops injecting and requests cancellation; an agent that ignores it is reported as still running, never as passed.
 
 What AgentProbe guarantees about your tools (never modified, cleanup on exceptions and cancellation, concurrency, agents that outlive their deadline) is in [docs/instrumentation.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/docs/instrumentation.md).
 
@@ -120,7 +117,8 @@ What AgentProbe guarantees about your tools (never modified, cleanup on exceptio
 Fault tests are ordinary pytest tests, so any CI runs them. A ready-made GitHub Actions workflow is in [`examples/your_agent/ci.yml`](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/ci.yml):
 
 ```yaml
-- run: pip install "agentprobe-toolkit>=1.4" pytest
+# Until 1.4 is on PyPI; afterwards: pip install "agentprobe-toolkit>=1.4" pytest
+- run: pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit@main" pytest
 - run: pytest tests/ --junitxml=agentprobe-results.xml
 ```
 
@@ -128,8 +126,9 @@ The [10-minute tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob
 
 ## Try the demo (no model, no key)
 
+With AgentProbe installed as above:
+
 ```bash
-pip install agentprobe-toolkit
 python -m agentprobe.demo                      # rate-limit faults, p=0.3, 10 runs
 python -m agentprobe.demo --fault timeout --p 0.5 --runs 20
 python -m agentprobe.demo --json               # machine-readable report
