@@ -12,14 +12,11 @@ def answer(question, tools=TOOLS, *, broken=False): ...
 
 ## 2. Install
 
-> **Pre-release:** this API ships in AgentProbe 1.4, which is not on PyPI yet. Until it is, install from GitHub:
->
-> ```bash
-> pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit@main" pytest
-> python -c "import agentprobe; print(agentprobe.__version__)"   # 1.4.0.dev0 or later
-> ```
->
-> Once 1.4 is released, `pip install "agentprobe-toolkit>=1.4" pytest` is enough.
+```bash
+pip install "agentprobe-toolkit>=1.4" pytest
+```
+
+This API needs AgentProbe 1.4 or later. No model or API key is needed for this tutorial.
 
 ## 3. Write the fault test
 

@@ -15,8 +15,8 @@ authors:
     given-names: Eugene
     affiliation: Boston University
     orcid: "https://orcid.org/0000-0002-3836-1851"
-version: "1.4.0.dev0"
-date-released: "2026-11-17"
+version: "1.4.0"
+date-released: "2026-11-18"
 license: MIT
 repository-code: "https://github.com/chhayankjain/agentprobe-toolkit"
 url: "https://pypi.org/project/agentprobe-toolkit/"

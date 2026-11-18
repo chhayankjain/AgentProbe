@@ -18,11 +18,10 @@ Your agent's tools will time out, hit rate limits, and return garbage. AgentProb
 ## Install
 
 ```bash
-pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit@main" pytest
-python -c "import agentprobe; print(agentprobe.__version__)"   # 1.4.0.dev0 or later
+pip install "agentprobe-toolkit>=1.4" pytest
 ```
 
-> **Pre-release:** the testing API on this page ships in AgentProbe 1.4, which is not on PyPI yet, so install from GitHub for now. PyPI currently has 1.3.0, which has the benchmark toolkit but not `agentprobe.testing`. Once 1.4 is released, `pip install "agentprobe-toolkit>=1.4" pytest` is enough.
+The testing API on this page (`agentprobe.testing`) needs version 1.4 or later.
 
 You install `agentprobe-toolkit` and import `agentprobe`, the same way `pip install scikit-learn` gives you `import sklearn`. Python 3.11+.
 
@@ -117,8 +116,7 @@ What AgentProbe guarantees about your tools (never modified, cleanup on exceptio
 Fault tests are ordinary pytest tests, so any CI runs them. A ready-made GitHub Actions workflow is in [`examples/your_agent/ci.yml`](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/ci.yml):
 
 ```yaml
-# Until 1.4 is on PyPI; afterwards: pip install "agentprobe-toolkit>=1.4" pytest
-- run: pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit@main" pytest
+- run: pip install "agentprobe-toolkit>=1.4" pytest
 - run: pytest tests/ --junitxml=agentprobe-results.xml
 ```
 
