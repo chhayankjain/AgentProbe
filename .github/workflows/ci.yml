@@ -44,10 +44,10 @@ jobs:
       - name: Run the own-agent example and tutorial tests
         run: pytest examples/your_agent -v --tb=short --junitxml=agentprobe-example.xml
 
-      - name: Check the real-model example offline (live tests need Ollama and are skipped)
+      - name: Check the real-model and third-party examples offline (live tests are skipped)
         run: |
           python -m py_compile examples/real_model_agent/*.py examples/third_party_agent/*.py
-          pytest examples/real_model_agent -v --tb=short -m "not slow and not integration"
+          pytest examples/real_model_agent examples/third_party_agent -v --tb=short -m "not slow and not integration"
 
   lint:
     runs-on: ubuntu-latest

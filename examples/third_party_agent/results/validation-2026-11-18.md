@@ -16,6 +16,10 @@ Q4_K_M), temperature 0. Upstream code imported from each checkout; nothing insta
 
 **Command:** `AGENTS_FROM_SCRATCH_DIR=<checkout> pytest examples/third_party_agent -v`
 
+"pass" means the run completed without an unhandled exception after the injected fault fired. The
+tests don't check whether the meeting was rescheduled, the reply was truthful, or actions were
+duplicated.
+
 | Test | original | patched (#71) | patched + #65 |
 |---|---|---|---|
 | tool node reports tool errors (no model) | xfail (known bug) | pass | pass |

@@ -9,8 +9,11 @@ On commit 603fc7a tool exceptions escape the assistant's tool node
 (langchain-ai/agents-from-scratch#70). A test reports that known bug as an
 expected failure only when the injected fault actually fired and produced exactly
 that crash. Anything else (no model, a fault that never fired, a different
-exception) is a real failure. On a checkout that includes the proposed fix
-(langchain-ai/agents-from-scratch#71) the same tests pass.
+exception) is a real failure. With the proposed fix
+(langchain-ai/agents-from-scratch#71) the model-free and timeout tests pass; the
+outage test also needs open PR #65 (a separate bug, #61). See
+results/validation-2026-11-18.md. "Pass" here means the run completes without an
+unhandled exception; it doesn't check what the agent did next.
 
 Faults use the exception types the fix handles (``TimeoutError``,
 ``ToolException``), because AgentProbe's own fault classes don't subclass them.
