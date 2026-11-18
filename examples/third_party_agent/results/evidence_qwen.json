@@ -1,0 +1,722 @@
+[
+ {
+  "scenario": "calendar check times out once",
+  "run": 1,
+  "exception": "ToolCallTimeout: Tool call timed out (injected by AgentProbe)",
+  "calls": [
+   {
+    "index": 1,
+    "tool": "check_calendar_availability",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "day": "2026-11-21"
+    },
+    "status": "completed",
+    "outcome": "raised",
+    "value": null,
+    "exception_type": "ToolCallTimeout",
+    "exception_message": "Tool call timed out (injected by AgentProbe)",
+    "injected": true,
+    "fault": "check_calendar_availability: fail the first 1 call with timeout",
+    "rule_id": 1,
+    "duration_ms": 0.13962500088382512,
+    "span_id": "0000000000000000",
+    "started_seq": 1,
+    "completed_seq": 2,
+    "after_probe_end": false,
+    "completed_after_close": false
+   }
+  ],
+  "answer": null,
+  "scenarios": [
+   {
+    "rule_id": 1,
+    "tool": "check_calendar_availability",
+    "description": "check_calendar_availability: fail the first 1 call with timeout",
+    "required": true,
+    "planned": 1,
+    "injected": 1,
+    "tool_calls": 1,
+    "boundary_reached": true,
+    "status": "exercised"
+   }
+  ]
+ },
+ {
+  "scenario": "calendar check times out once",
+  "run": 2,
+  "exception": "ToolCallTimeout: Tool call timed out (injected by AgentProbe)",
+  "calls": [
+   {
+    "index": 1,
+    "tool": "check_calendar_availability",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "day": "2026-11-21"
+    },
+    "status": "completed",
+    "outcome": "raised",
+    "value": null,
+    "exception_type": "ToolCallTimeout",
+    "exception_message": "Tool call timed out (injected by AgentProbe)",
+    "injected": true,
+    "fault": "check_calendar_availability: fail the first 1 call with timeout",
+    "rule_id": 1,
+    "duration_ms": 0.08970899216365069,
+    "span_id": "0000000000000000",
+    "started_seq": 1,
+    "completed_seq": 2,
+    "after_probe_end": false,
+    "completed_after_close": false
+   }
+  ],
+  "answer": null,
+  "scenarios": [
+   {
+    "rule_id": 1,
+    "tool": "check_calendar_availability",
+    "description": "check_calendar_availability: fail the first 1 call with timeout",
+    "required": true,
+    "planned": 1,
+    "injected": 1,
+    "tool_calls": 1,
+    "boundary_reached": true,
+    "status": "exercised"
+   }
+  ]
+ },
+ {
+  "scenario": "calendar check times out once",
+  "run": 3,
+  "exception": "ToolCallTimeout: Tool call timed out (injected by AgentProbe)",
+  "calls": [
+   {
+    "index": 1,
+    "tool": "check_calendar_availability",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "day": "2026-11-21"
+    },
+    "status": "completed",
+    "outcome": "raised",
+    "value": null,
+    "exception_type": "ToolCallTimeout",
+    "exception_message": "Tool call timed out (injected by AgentProbe)",
+    "injected": true,
+    "fault": "check_calendar_availability: fail the first 1 call with timeout",
+    "rule_id": 1,
+    "duration_ms": 0.06904201291035861,
+    "span_id": "0000000000000000",
+    "started_seq": 1,
+    "completed_seq": 2,
+    "after_probe_end": false,
+    "completed_after_close": false
+   }
+  ],
+  "answer": null,
+  "scenarios": [
+   {
+    "rule_id": 1,
+    "tool": "check_calendar_availability",
+    "description": "check_calendar_availability: fail the first 1 call with timeout",
+    "required": true,
+    "planned": 1,
+    "injected": 1,
+    "tool_calls": 1,
+    "boundary_reached": true,
+    "status": "exercised"
+   }
+  ]
+ },
+ {
+  "scenario": "scheduling always fails",
+  "run": 1,
+  "exception": "ToolCallAPIError: Tool API returned HTTP 503",
+  "calls": [
+   {
+    "index": 1,
+    "tool": "check_calendar_availability",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "day": "2026-11-21"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "'Available times on 2026-11-21: 9:00 AM, 2:00 PM, 4:00 PM'",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.0991669949144125,
+    "span_id": "0000000000000000",
+    "started_seq": 1,
+    "completed_seq": 2,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 2,
+    "tool": "schedule_meeting",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "attendees": [
+      "lance@company.com"
+     ],
+     "subject": "Tax planning strategies for 2026",
+     "duration_minutes": 45,
+     "preferred_day": "2026-11-21T00:00:00",
+     "start_time": 14
+    },
+    "status": "completed",
+    "outcome": "raised",
+    "value": null,
+    "exception_type": "ToolCallAPIError",
+    "exception_message": "Tool API returned HTTP 503",
+    "injected": true,
+    "fault": "schedule_meeting: fail every call with api_error",
+    "rule_id": 1,
+    "duration_ms": 0.06112499977461994,
+    "span_id": "0000000000000000",
+    "started_seq": 3,
+    "completed_seq": 4,
+    "after_probe_end": false,
+    "completed_after_close": false
+   }
+  ],
+  "answer": null,
+  "scenarios": [
+   {
+    "rule_id": 1,
+    "tool": "schedule_meeting",
+    "description": "schedule_meeting: fail every call with api_error",
+    "required": true,
+    "planned": null,
+    "injected": 1,
+    "tool_calls": 1,
+    "boundary_reached": true,
+    "status": "exercised"
+   }
+  ]
+ },
+ {
+  "scenario": "scheduling always fails",
+  "run": 2,
+  "exception": "ToolCallAPIError: Tool API returned HTTP 503",
+  "calls": [
+   {
+    "index": 1,
+    "tool": "check_calendar_availability",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "day": "2026-11-21"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "'Available times on 2026-11-21: 9:00 AM, 2:00 PM, 4:00 PM'",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.13254099758341908,
+    "span_id": "0000000000000000",
+    "started_seq": 1,
+    "completed_seq": 2,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 2,
+    "tool": "schedule_meeting",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "attendees": [
+      "lance@company.com"
+     ],
+     "subject": "Tax planning strategies for 2026",
+     "duration_minutes": 45,
+     "preferred_day": "2026-11-21T00:00:00",
+     "start_time": 14
+    },
+    "status": "completed",
+    "outcome": "raised",
+    "value": null,
+    "exception_type": "ToolCallAPIError",
+    "exception_message": "Tool API returned HTTP 503",
+    "injected": true,
+    "fault": "schedule_meeting: fail every call with api_error",
+    "rule_id": 1,
+    "duration_ms": 0.08529200567863882,
+    "span_id": "0000000000000000",
+    "started_seq": 3,
+    "completed_seq": 4,
+    "after_probe_end": false,
+    "completed_after_close": false
+   }
+  ],
+  "answer": null,
+  "scenarios": [
+   {
+    "rule_id": 1,
+    "tool": "schedule_meeting",
+    "description": "schedule_meeting: fail every call with api_error",
+    "required": true,
+    "planned": null,
+    "injected": 1,
+    "tool_calls": 1,
+    "boundary_reached": true,
+    "status": "exercised"
+   }
+  ]
+ },
+ {
+  "scenario": "scheduling always fails",
+  "run": 3,
+  "exception": "ToolCallAPIError: Tool API returned HTTP 503",
+  "calls": [
+   {
+    "index": 1,
+    "tool": "check_calendar_availability",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "day": "2026-11-21"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "'Available times on 2026-11-21: 9:00 AM, 2:00 PM, 4:00 PM'",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.08658299339003861,
+    "span_id": "0000000000000000",
+    "started_seq": 1,
+    "completed_seq": 2,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 2,
+    "tool": "schedule_meeting",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "attendees": [
+      "lance@company.com"
+     ],
+     "subject": "Tax planning strategies for 2026",
+     "duration_minutes": 45,
+     "preferred_day": "2026-11-21T00:00:00",
+     "start_time": 14
+    },
+    "status": "completed",
+    "outcome": "raised",
+    "value": null,
+    "exception_type": "ToolCallAPIError",
+    "exception_message": "Tool API returned HTTP 503",
+    "injected": true,
+    "fault": "schedule_meeting: fail every call with api_error",
+    "rule_id": 1,
+    "duration_ms": 0.347833993146196,
+    "span_id": "0000000000000000",
+    "started_seq": 3,
+    "completed_seq": 4,
+    "after_probe_end": false,
+    "completed_after_close": false
+   }
+  ],
+  "answer": null,
+  "scenarios": [
+   {
+    "rule_id": 1,
+    "tool": "schedule_meeting",
+    "description": "schedule_meeting: fail every call with api_error",
+    "required": true,
+    "planned": null,
+    "injected": 1,
+    "tool_calls": 1,
+    "boundary_reached": true,
+    "status": "exercised"
+   }
+  ]
+ },
+ {
+  "scenario": "scheduling returns failure",
+  "run": 1,
+  "exception": null,
+  "calls": [
+   {
+    "index": 1,
+    "tool": "check_calendar_availability",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "day": "2026-11-21"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "'Available times on 2026-11-21: 9:00 AM, 2:00 PM, 4:00 PM'",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.24220900377258658,
+    "span_id": "0000000000000000",
+    "started_seq": 1,
+    "completed_seq": 2,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 2,
+    "tool": "schedule_meeting",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "attendees": [
+      "lance@company.com"
+     ],
+     "subject": "Tax planning strategies for 2026",
+     "duration_minutes": 45,
+     "preferred_day": "2026-11-21T00:00:00",
+     "start_time": 14
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "'Could not schedule the meeting: the calendar service rejected the request.'",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": true,
+    "fault": "schedule_meeting: return 'Could not schedule the meeting: the calendar service rej... for every call",
+    "rule_id": 1,
+    "duration_ms": 0.07016699237283319,
+    "span_id": "0000000000000000",
+    "started_seq": 3,
+    "completed_seq": 4,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 3,
+    "tool": "write_email",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "to": "pm@client.com",
+     "subject": "Re: Tax season let's schedule call",
+     "content": "Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Could you please confirm if one of these times works for you?\n\nLooking forward to discussing tax planning strategies with you.\n\nBest regards,\nLance"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "\"Email sent to pm@client.com with subject 'Re: Tax season let's schedule call' and content: Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Coul...",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.10891600686591119,
+    "span_id": "0000000000000000",
+    "started_seq": 5,
+    "completed_seq": 6,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 4,
+    "tool": "write_email",
+    "tool_call_index": 2,
+    "args": [],
+    "kwargs": {
+     "to": "pm@client.com",
+     "subject": "Re: Tax season let's schedule call",
+     "content": "Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Could you please confirm if one of these times works for you?\n\nLooking forward to discussing tax planning strategies with you.\n\nBest regards,\nLance"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "\"Email sent to pm@client.com with subject 'Re: Tax season let's schedule call' and content: Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Coul...",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.06812499486841261,
+    "span_id": "0000000000000000",
+    "started_seq": 7,
+    "completed_seq": 8,
+    "after_probe_end": false,
+    "completed_after_close": false
+   }
+  ],
+  "answer": "",
+  "scenarios": [
+   {
+    "rule_id": 1,
+    "tool": "schedule_meeting",
+    "description": "schedule_meeting: return 'Could not schedule the meeting: the calendar service rej... for every call",
+    "required": true,
+    "planned": null,
+    "injected": 1,
+    "tool_calls": 1,
+    "boundary_reached": true,
+    "status": "exercised"
+   }
+  ]
+ },
+ {
+  "scenario": "scheduling returns failure",
+  "run": 2,
+  "exception": null,
+  "calls": [
+   {
+    "index": 1,
+    "tool": "check_calendar_availability",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "day": "2026-11-21"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "'Available times on 2026-11-21: 9:00 AM, 2:00 PM, 4:00 PM'",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.36012500640936196,
+    "span_id": "0000000000000000",
+    "started_seq": 1,
+    "completed_seq": 2,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 2,
+    "tool": "schedule_meeting",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "attendees": [
+      "lance@company.com"
+     ],
+     "subject": "Tax planning strategies for 2026",
+     "duration_minutes": 45,
+     "preferred_day": "2026-11-21T00:00:00",
+     "start_time": 14
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "'Could not schedule the meeting: the calendar service rejected the request.'",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": true,
+    "fault": "schedule_meeting: return 'Could not schedule the meeting: the calendar service rej... for every call",
+    "rule_id": 1,
+    "duration_ms": 0.33812499896157533,
+    "span_id": "0000000000000000",
+    "started_seq": 3,
+    "completed_seq": 4,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 3,
+    "tool": "write_email",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "to": "pm@client.com",
+     "subject": "Re: Tax season let's schedule call",
+     "content": "Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Could you please confirm if one of these times works for you?\n\nLooking forward to discussing tax planning strategies with you.\n\nBest regards,\nLance"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "\"Email sent to pm@client.com with subject 'Re: Tax season let's schedule call' and content: Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Coul...",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.43570800335146487,
+    "span_id": "0000000000000000",
+    "started_seq": 5,
+    "completed_seq": 6,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 4,
+    "tool": "write_email",
+    "tool_call_index": 2,
+    "args": [],
+    "kwargs": {
+     "to": "pm@client.com",
+     "subject": "Re: Tax season let's schedule call",
+     "content": "Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Could you please confirm if one of these times works for you?\n\nLooking forward to discussing tax planning strategies with you.\n\nBest regards,\nLance"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "\"Email sent to pm@client.com with subject 'Re: Tax season let's schedule call' and content: Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Coul...",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.24541599850635976,
+    "span_id": "0000000000000000",
+    "started_seq": 7,
+    "completed_seq": 8,
+    "after_probe_end": false,
+    "completed_after_close": false
+   }
+  ],
+  "answer": "",
+  "scenarios": [
+   {
+    "rule_id": 1,
+    "tool": "schedule_meeting",
+    "description": "schedule_meeting: return 'Could not schedule the meeting: the calendar service rej... for every call",
+    "required": true,
+    "planned": null,
+    "injected": 1,
+    "tool_calls": 1,
+    "boundary_reached": true,
+    "status": "exercised"
+   }
+  ]
+ },
+ {
+  "scenario": "scheduling returns failure",
+  "run": 3,
+  "exception": null,
+  "calls": [
+   {
+    "index": 1,
+    "tool": "check_calendar_availability",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "day": "2026-11-21"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "'Available times on 2026-11-21: 9:00 AM, 2:00 PM, 4:00 PM'",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.04091700247954577,
+    "span_id": "0000000000000000",
+    "started_seq": 1,
+    "completed_seq": 2,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 2,
+    "tool": "schedule_meeting",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "attendees": [
+      "lance@company.com"
+     ],
+     "subject": "Tax planning strategies for 2026",
+     "duration_minutes": 45,
+     "preferred_day": "2026-11-21T00:00:00",
+     "start_time": 14
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "'Could not schedule the meeting: the calendar service rejected the request.'",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": true,
+    "fault": "schedule_meeting: return 'Could not schedule the meeting: the calendar service rej... for every call",
+    "rule_id": 1,
+    "duration_ms": 0.04195800283923745,
+    "span_id": "0000000000000000",
+    "started_seq": 3,
+    "completed_seq": 4,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 3,
+    "tool": "write_email",
+    "tool_call_index": 1,
+    "args": [],
+    "kwargs": {
+     "to": "pm@client.com",
+     "subject": "Re: Tax season let's schedule call",
+     "content": "Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Could you please confirm if one of these times works for you?\n\nLooking forward to discussing tax planning strategies with you.\n\nBest regards,\nLance"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "\"Email sent to pm@client.com with subject 'Re: Tax season let's schedule call' and content: Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Coul...",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.48695899022277445,
+    "span_id": "0000000000000000",
+    "started_seq": 5,
+    "completed_seq": 6,
+    "after_probe_end": false,
+    "completed_after_close": false
+   },
+   {
+    "index": 4,
+    "tool": "write_email",
+    "tool_call_index": 2,
+    "args": [],
+    "kwargs": {
+     "to": "pm@client.com",
+     "subject": "Re: Tax season let's schedule call",
+     "content": "Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Could you please confirm if one of these times works for you?\n\nLooking forward to discussing tax planning strategies with you.\n\nBest regards,\nLance"
+    },
+    "status": "completed",
+    "outcome": "returned",
+    "value": "\"Email sent to pm@client.com with subject 'Re: Tax season let's schedule call' and content: Based on your preferences, I propose we meet either at 2:00 PM or 4:00 PM on Tuesday, November 21st. Coul...",
+    "exception_type": null,
+    "exception_message": null,
+    "injected": false,
+    "fault": null,
+    "rule_id": null,
+    "duration_ms": 0.26987500314135104,
+    "span_id": "0000000000000000",
+    "started_seq": 7,
+    "completed_seq": 8,
+    "after_probe_end": false,
+    "completed_after_close": false
+   }
+  ],
+  "answer": "",
+  "scenarios": [
+   {
+    "rule_id": 1,
+    "tool": "schedule_meeting",
+    "description": "schedule_meeting: return 'Could not schedule the meeting: the calendar service rej... for every call",
+    "required": true,
+    "planned": null,
+    "injected": 1,
+    "tool_calls": 1,
+    "boundary_reached": true,
+    "status": "exercised"
+   }
+  ]
+ }
+]
