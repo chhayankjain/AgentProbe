@@ -45,6 +45,22 @@ Each tool call is added to the log the moment it begins, with `status="pending"`
 
 Nested tools are each recorded. If a wrapped tool calls another wrapped tool, both calls appear and both get their faults. Only a tool delegating to *itself* (a LangChain tool's async method calling its own sync method) is counted once.
 
+## Tool-call assertions compare exact copies
+
+`CallRecord.args` and `kwargs` are a report snapshot: bytes keep only a short preview, other objects a shortened `repr`, and tuples become lists. They are never used as comparison evidence. When a call starts, the probe also keeps an exact, immutable copy of its arguments (`exact_args`, `exact_kwargs`, never serialized):
+
+| Value | Kept as |
+|---|---|
+| `None`, `bool`, numbers, `str`, dates and times, `Decimal`, `UUID`, paths, enums | the value itself |
+| bytes, `bytearray`, `memoryview` | length and SHA-256 of the full content |
+| lists, tuples, sets, dicts | copies that keep the container type and the key types |
+| dataclasses, pydantic models | class plus a copy of their fields |
+| anything else | opaque: equal to nothing |
+
+`assert_called_with` compares against these copies with Python's `==`. A call whose relevant argument is opaque can't be decided, so the assertion is `unassessed` (and a required one fails the gate). Passing an object it can't copy as the *expected* value raises `ProbeError`.
+
+When the tool's signature is known (a plain function, or a LangChain tool's argument schema), both sides are bound to parameter names first, so positional and keyword forms of the same argument match. If two wrapped tools share a name with different signatures, arguments are compared as passed.
+
 ## Agents that are still running
 
 `p.run(agent, input, timeout=seconds)` runs the agent in a worker thread. Python cannot force-stop a thread, so an agent can outlive its deadline. When that happens:

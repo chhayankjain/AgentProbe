@@ -99,6 +99,8 @@ Faults: `"timeout"`, `"rate_limit"`, `"api_error"`, `"malformed_output"`, or any
 | `assert_called(tool)` / `assert_not_called(tool)` | The tool was or wasn't called; in-flight calls count |
 | `assert_scenarios_exercised()` | Every required fault fired (also enforced automatically when the `with` block ends) |
 
+Coming in the next release, and on `main` now: `assert_called_with(tool, *args, **kwargs)`, `assert_call_order([...])`, `assert_called_times(tool, n)` and `assert_called_at_most(tool, n)` check the arguments, order and number of tool calls ([tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md#check-the-tool-calls-themselves-next-release)).
+
 The result keeps what was **observed** (every tool call with arguments, outcome and injected fault), what you **asserted** (pass, fail or unassessed) and what is **inferred** (`result.retries`, `result.fallbacks`) apart. `print(result.summary())` shows all three; `result.to_dict()` is versioned, JSON-safe output for CI artifacts.
 
 ## Works with your stack
@@ -143,7 +145,7 @@ The demo runs a small LangGraph agent on a scripted, deterministic model, inject
 
 - **Have a real agent?** Try AgentProbe on it and tell us where it hurt ([#68](https://github.com/chhayankjain/agentprobe-toolkit/issues/68)). That's the most valuable contribution there is.
 - **Want to contribute code?** [Good first issues](https://github.com/chhayankjain/agentprobe-toolkit/labels/good%20first%20issue) are small and need no model or API key. Setup is in [CONTRIBUTING.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/CONTRIBUTING.md).
-- **Where it's going:** [ROADMAP.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ROADMAP.md). Next up: a pytest plugin, secret redaction in reports, tool-call argument and order checks, and a fault coverage report.
+- **Where it's going:** [ROADMAP.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ROADMAP.md). Next up: a pytest plugin, secret redaction in reports and a fault coverage report.
 - **Questions and ideas:** [Discussions](https://github.com/chhayankjain/agentprobe-toolkit/discussions).
 
 ---

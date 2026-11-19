@@ -81,6 +81,10 @@ p.on("payment_status").always_fail(
 
 Useful checks on the result: `assert_answer_contains`, `assert_answer_not_contains`, `assert_no_crash`, `assert_within(seconds)`, `assert_called`, `assert_not_called`. `print(result)` shows what was observed, what you asserted, and what was inferred (retries and fallbacks).
 
+### Check the tool calls themselves (next release)
+
+> **Not in 1.4.0.** These four assertions are on `main` and ship in the next release. To try them now, install from GitHub instead of PyPI: `pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit.git" pytest`
+
 This test checks which tools the agent invoked after a transient failure.
 
 ```python
@@ -94,13 +98,12 @@ with probe() as p:
     result.assert_called_at_most("send_receipt", 1)
 ```
 
-`assert_called_with` compares the positional arguments and any supplied keywords with
-the snapshot taken when the tool was called. Extra keywords on the recorded call are
-allowed. Every keyword, including `required`, is matched against the tool call.
-`assert_call_order` checks invocation order and allows intervening tools.
-Calls in flight count. While the agent is still running, an observed match passes and
-an exceeded count fails. Counts still within the limit and matches still missing are
-reported as `unassessed`.
+- `assert_called_with` passes if **any** call to the tool had these arguments; arguments you leave out aren't checked. This differs from `unittest.mock`, where `assert_called_with` checks only the last call and every argument. `payment_status("42")` and `payment_status(order_id="42")` match each other, including for LangChain tools. Every keyword, including `required`, is matched against the tool call.
+- Values are compared exactly (Python's `==`) against a copy taken when the call started, so changing an object later doesn't change the verdict. If the agent passed an object AgentProbe can't copy exactly (anything other than built-in values, enums, dates, dataclasses or pydantic models), the assertion is `unassessed`, never passed.
+- `assert_call_order` checks the order in which calls **started**, and allows other calls in between.
+- Calls still in flight count. While the agent is still running, a match that was already seen passes and an exceeded count fails; anything that could still change is `unassessed`.
+
+These assertions check which calls were made, not whether they succeeded, and each one can match a different call. Here, `assert_called_with("payment_status", "42")` is satisfied by the first call, the one that failed. To check that the receipt was sent only after a payment check that *returned*, look at the call log: `[c for c in result.calls if c.tool == "payment_status" and c.outcome == "returned"]`.
 
 ## 6. Run it in CI
 
