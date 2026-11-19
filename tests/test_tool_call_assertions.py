@@ -1,5 +1,6 @@
 """Tool-call assertions use the frozen evidence seen at invocation."""
 
+import collections
 import dataclasses
 import datetime
 import decimal
@@ -9,6 +10,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 
+import pydantic
 import pytest
 
 from agentprobe.testing import ProbeError, ProbeGateError, probe
@@ -141,6 +143,20 @@ class _Order:
     items: list
 
 
+@dataclasses.dataclass(eq=False)
+class _IdentityOrder:
+    order_id: str
+
+
+class _Model(pydantic.BaseModel):
+    order_id: str
+    secret: str = pydantic.Field(exclude=True)
+
+
+class _Timestamp(datetime.datetime):
+    """A datetime subclass, like pandas' Timestamp, free to define its own equality."""
+
+
 def _one_call(*args, **kwargs):
     with probe(enforce=False) as p:
         tool = p.wrap({"t": lambda *a, **k: None})["t"]
@@ -159,7 +175,6 @@ def _one_call(*args, **kwargs):
         (_Color.RED, "red"),
         (decimal.Decimal("1.5"), "1.5"),
         ({1, 2}, [1, 2]),
-        (_Order("42", [1]), _Order("42", [2])),
         ({"nested": {"k": b"a" * 40 + b"1"}}, {"nested": {"k": b"a" * 40 + b"2"}}),
     ],
 )
@@ -178,7 +193,6 @@ def test_called_with_never_matches_a_value_that_only_looks_the_same(actual, expe
         ({3, 1, 2}, {2, 3, 1}),
         ({1: "a", "1": "b"}, {"1": "b", 1: "a"}),
         (_Color.RED, _Color.RED),
-        (_Order("42", [1, 2]), _Order("42", [1, 2])),
         (datetime.datetime(2026, 1, 1, 9), datetime.datetime(2026, 1, 1, 9)),
         (1, 1.0),
     ],
@@ -188,18 +202,48 @@ def test_called_with_matches_equal_values(actual, expected):
 
 
 def test_called_with_compares_the_value_at_call_time():
-    order = _Order("42", [1])
+    order = {"order_id": "42", "items": [1]}
     with probe(enforce=False) as p:
         tool = p.wrap({"t": lambda o: None})["t"]
         result = p.run(lambda: tool(order))
-    order.items.append(2)
-    result.assert_called_with("t", _Order("42", [1]))
+    order["items"].append(2)
+    result.assert_called_with("t", {"order_id": "42", "items": [1]})
+    with pytest.raises(AssertionError):
+        result.assert_called_with("t", {"order_id": "42", "items": [1, 2]})
 
 
-def test_called_with_rejects_an_expectation_it_cannot_compare():
+@pytest.mark.parametrize(
+    "expected",
+    [
+        _LongRepr("A"),
+        {"nested": object()},  # nested: must still raise ProbeError, not AttributeError
+        [1, (2, {"k": _LongRepr("A")})],
+        _Order("42", [1]),  # dataclasses can override equality
+        _IdentityOrder("42"),
+        _Model(order_id="42", secret="x"),  # model_dump() drops excluded fields
+        collections.OrderedDict(a=1),  # order-sensitive equality
+        _Timestamp(2026, 1, 1),  # subclasses can define their own equality
+    ],
+)
+def test_called_with_rejects_an_expectation_it_cannot_compare(expected):
     result = _one_call("x")
     with pytest.raises(ProbeError, match="can't compare"):
-        result.assert_called_with("t", _LongRepr("A"))
+        result.assert_called_with("t", expected)
+
+
+@pytest.mark.parametrize(
+    ("actual", "looks_like"),
+    [
+        (_Model(order_id="42", secret="x"), {"order_id": "42"}),
+        (collections.OrderedDict(a=1, b=2), {"a": 1, "b": 2}),
+        (_IdentityOrder("42"), {"order_id": "42"}),
+    ],
+)
+def test_a_recorded_object_with_its_own_equality_is_never_matched(actual, looks_like):
+    result = _one_call(actual)
+    with pytest.raises(AssertionError):
+        result.assert_called_with("t", looks_like)
+    assert result.assertions[-1].status == "unassessed"
 
 
 def test_an_argument_that_cannot_be_compared_is_unassessed_not_passed():

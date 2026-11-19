@@ -450,65 +450,70 @@ class _Opaque:
         return f"<opaque {self.type_name}>"
 
 
-#: Immutable values compared as they are, with Python's own equality.
-_EXACT_SCALARS = (
-    type(None),
-    bool,
-    int,
-    float,
-    complex,
-    str,
-    _dt.datetime,
-    _dt.date,
-    _dt.time,
-    _dt.timedelta,
-    decimal.Decimal,
-    uuid.UUID,
-    pathlib.PurePath,
-    range,
+#: Immutable types compared as they are, with Python's own equality. Matched by
+#: exact type: a subclass (a pandas ``Timestamp`` is a ``datetime``) may define
+#: its own equality, so it is opaque.
+_EXACT_SCALARS = frozenset(
+    {
+        type(None),
+        bool,
+        int,
+        float,
+        complex,
+        str,
+        _dt.datetime,
+        _dt.date,
+        _dt.time,
+        _dt.timedelta,
+        decimal.Decimal,
+        uuid.UUID,
+    }
+)
+_EXACT_PATHS = frozenset(
+    {
+        pathlib.PurePath,
+        pathlib.PurePosixPath,
+        pathlib.PureWindowsPath,
+        pathlib.Path,
+        pathlib.PosixPath,
+        pathlib.WindowsPath,
+    }
 )
 
 
 def _exact(value: Any, _depth: int = 0) -> Any:
     """An immutable copy of *value* that compares like the original did when copied.
 
+    Only built-in types are supported, matched by exact type: ``None``, ``bool``,
+    numbers, ``str``, dates and times, ``Decimal``, ``UUID``, paths, enum members,
+    bytes, and ``list``/``tuple``/``dict``/``set``/``frozenset`` of these.
     Containers become tagged tuples, so a list never equals a tuple and dict keys
     keep their types, as with Python's ``==``. Bytes keep their length and a
-    SHA-256 of the full content. Enums, dataclasses and pydantic models keep their
-    class. Anything else becomes ``_Opaque``.
+    SHA-256 of the full content. Everything else, including subclasses of these
+    types, dataclasses and pydantic models, becomes ``_Opaque``: their equality is
+    user-defined, so a copy can't be trusted to compare the same way.
     """
     if _depth > 50:
         return _Opaque(value)
+    kind = type(value)
+    if kind in _EXACT_SCALARS or kind in _EXACT_PATHS:
+        return value
     if isinstance(value, enum.Enum):
-        return value
-    if isinstance(value, _EXACT_SCALARS):
-        return value
-    if isinstance(value, (bytes, bytearray, memoryview)):
+        return value  # members are singletons: keep the member itself, not a copy
+    if kind in (bytes, bytearray, memoryview):
         raw = bytes(value)
         return ("bytes", len(raw), hashlib.sha256(raw).digest())
-    if isinstance(value, tuple):
+    if kind is tuple:
         return ("tuple", tuple(_exact(v, _depth + 1) for v in value))
-    if isinstance(value, list):
+    if kind is list:
         return ("list", tuple(_exact(v, _depth + 1) for v in value))
-    if isinstance(value, (set, frozenset)):
+    if kind in (set, frozenset):
         return ("set", frozenset(_exact(v, _depth + 1) for v in value))
-    if isinstance(value, dict):
+    if kind is dict:
         return (
             "dict",
             frozenset((_exact(k, _depth + 1), _exact(v, _depth + 1)) for k, v in value.items()),
         )
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        fields = tuple(
-            (f.name, _exact(getattr(value, f.name), _depth + 1))
-            for f in dataclasses.fields(value)
-            if f.compare
-        )
-        return ("dataclass", type(value), fields)
-    if hasattr(type(value), "model_fields") and callable(getattr(value, "model_dump", None)):
-        try:
-            return ("model", type(value), _exact(value.model_dump(), _depth + 1))
-        except Exception:  # noqa: BLE001 - arbitrary user models
-            return _Opaque(value)
     return _Opaque(value)
 
 
@@ -519,12 +524,19 @@ def _exact_or_opaque(value: Any) -> Any:
         return _Opaque(value)
 
 
-def _has_opaque(frozen: Any) -> bool:
+def _find_opaque(frozen: Any) -> _Opaque | None:
+    """The first opaque value inside a copy made by ``_exact``, if any."""
     if isinstance(frozen, _Opaque):
-        return True
+        return frozen
     if isinstance(frozen, (tuple, frozenset)):
-        return any(_has_opaque(v) for v in frozen)
-    return False
+        for v in frozen:
+            if (found := _find_opaque(v)) is not None:
+                return found
+    return None
+
+
+def _has_opaque(frozen: Any) -> bool:
+    return _find_opaque(frozen) is not None
 
 
 def _signature_of(tool: Any) -> inspect.Signature | None:
@@ -842,15 +854,14 @@ class ProbeResult:
         """
         expected_args = tuple(_exact_or_opaque(v) for v in args)
         expected_kwargs = {k: _exact_or_opaque(v) for k, v in kwargs.items()}
-        unsupported = [
-            v.type_name for v in (*expected_args, *expected_kwargs.values()) if _has_opaque(v)
-        ]
-        if unsupported:
-            raise ProbeError(
-                f"assert_called_with can't compare {unsupported[0]} exactly; pass built-in "
-                "values (str, numbers, bytes, lists, tuples, dicts, sets), enums, "
-                "dates, dataclasses or pydantic models"
-            )
+        for v in (*expected_args, *expected_kwargs.values()):
+            if (opaque := _find_opaque(v)) is not None:
+                raise ProbeError(
+                    f"assert_called_with can't compare {opaque.type_name} exactly; expected "
+                    "values must be built-in: None, bool, numbers, str, bytes, dates and "
+                    "times, Decimal, UUID, paths, enum members, or list/tuple/dict/set of "
+                    "these. Check other objects on result.calls[i].raw_args yourself"
+                )
         calls = self._calls_to(tool)
         name = (
             f"tool {tool!r} called with args={_short(_jsonable(list(args)))}, "
