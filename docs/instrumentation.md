@@ -31,6 +31,27 @@ p.on("search").fail_first(1).returns("stale", times=2)
 
 **Validation at declaration.** Counts (`fail_first(n)`, `times=` on `returns` and `slow`) must be positive whole numbers, or `None` where "every call" is allowed. Delays must be finite and non-negative; probabilities between 0 and 1. A rule that applies to every call (`always_fail()`, or `times=None`) must be the last rule for its tool: a rule declared after it could never run, so declaring one raises `ProbeError`. Invalid scenarios fail when you write them, never by silently counting as exercised.
 
+## Match the exception your tool raises
+
+The built-in `"timeout"` raises `ToolCallTimeout`. An agent that retries on
+`except TimeoutError` will handle it, as will one that catches `ToolCallError`.
+The built-in `"rate_limit"` (HTTP 429), `"api_error"` (HTTP 503 in the probe),
+and `"malformed_output"` faults have their own `ToolCallError` subclasses.
+
+Use `with_=` to exercise the handler for a specific client or framework.
+For example, this rule exercises a LangChain agent's `ToolException` handler.
+
+```python
+from langchain_core.tools import ToolException
+
+p.on("payment_status").fail_first(1, with_=ToolException("service unavailable"))
+```
+
+For a connection failure, pass `with_=ConnectionError("connection refused")`.
+For code that catches HTTPX timeouts, pass an `httpx.ReadTimeout("read timed out")`
+instance. To exercise a parser, use `.returns(...)` with the malformed payload
+the tool would actually return.
+
 ## Lifecycle and cleanup
 
 The probe is active inside its `with` block (or `async with`). Leaving the block closes it, whether the block ended normally, raised an exception, or was cancelled (`asyncio.CancelledError`).

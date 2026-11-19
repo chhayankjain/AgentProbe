@@ -65,7 +65,7 @@ class ToolCallError(Exception):
     """Base class for injected tool call errors."""
 
 
-class ToolCallTimeout(ToolCallError):
+class ToolCallTimeout(ToolCallError, TimeoutError):
     """Raised when a tool call exceeds its timeout deadline."""
 
 
