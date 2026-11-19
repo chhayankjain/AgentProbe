@@ -99,7 +99,7 @@ with probe() as p:
 ```
 
 - `assert_called_with` passes if **any** call to the tool had these arguments; arguments you leave out aren't checked. This differs from `unittest.mock`, where `assert_called_with` checks only the last call and every argument. `payment_status("42")` and `payment_status(order_id="42")` match each other, including for LangChain tools. Every keyword, including `required`, is matched against the tool call.
-- Values are compared exactly (Python's `==`) against a copy taken when the call started, so changing an object later doesn't change the verdict. If the agent passed an object AgentProbe can't copy exactly (anything other than built-in values, enums, dates, dataclasses or pydantic models), the assertion is `unassessed`, never passed.
+- Values are compared exactly (Python's `==`) against a copy taken when the call started, so changing an object later doesn't change the verdict. Only built-in values are supported (`None`, `bool`, numbers, `str`, bytes, dates and times, `Decimal`, `UUID`, paths, enum members, and lists, tuples, dicts and sets of these). If the agent passed anything else, such as a dataclass or a pydantic model, the assertion is `unassessed`, never passed, and using one as the expected value raises `ProbeError`.
 - `assert_call_order` checks the order in which calls **started**, and allows other calls in between.
 - Calls still in flight count. While the agent is still running, a match that was already seen passes and an exceeded count fails; anything that could still change is `unassessed`.
 

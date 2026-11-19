@@ -72,13 +72,14 @@ Nested tools are each recorded. If a wrapped tool calls another wrapped tool, bo
 
 | Value | Kept as |
 |---|---|
-| `None`, `bool`, numbers, `str`, dates and times, `Decimal`, `UUID`, paths, enums | the value itself |
-| bytes, `bytearray`, `memoryview` | length and SHA-256 of the full content |
-| lists, tuples, sets, dicts | copies that keep the container type and the key types |
-| dataclasses, pydantic models | class plus a copy of their fields |
+| `None`, `bool`, numbers, `str`, dates and times, `Decimal`, `UUID`, paths, enum members | the value itself |
+| `bytes`, `bytearray`, `memoryview` | length and SHA-256 of the full content |
+| `list`, `tuple`, `dict`, `set`, `frozenset` of the above | copies that keep the container type and the key types |
 | anything else | opaque: equal to nothing |
 
-`assert_called_with` compares against these copies with Python's `==`. A call whose relevant argument is opaque can't be decided, so the assertion is `unassessed` (and a required one fails the gate). Passing an object it can't copy as the *expected* value raises `ProbeError`.
+Types are matched exactly, so subclasses are opaque: a subclass can define its own equality (`OrderedDict` compares order, a pandas `Timestamp` is a `datetime`). Dataclasses and pydantic models are opaque too: their equality is user-defined, and a model's `model_dump()` drops excluded fields, so a copy can't be trusted to compare the way the object does.
+
+`assert_called_with` compares against these copies with Python's `==`. A call whose relevant argument is opaque can't be decided, so the assertion is `unassessed` (and a required one fails the gate). An expected value that contains an opaque value, at any depth, raises `ProbeError`. To check such an object, inspect `result.calls[i].raw_args` yourself, knowing it is the live object and may have changed since the call.
 
 When the tool's signature is known (a plain function, or a LangChain tool's argument schema), both sides are bound to parameter names first, so positional and keyword forms of the same argument match. If two wrapped tools share a name with different signatures, arguments are compared as passed.
 
