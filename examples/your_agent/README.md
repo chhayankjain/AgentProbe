@@ -81,6 +81,27 @@ p.on("payment_status").always_fail(
 
 Useful checks on the result: `assert_answer_contains`, `assert_answer_not_contains`, `assert_no_crash`, `assert_within(seconds)`, `assert_called`, `assert_not_called`. `print(result)` shows what was observed, what you asserted, and what was inferred (retries and fallbacks).
 
+This test checks which tools the agent invoked after a transient failure.
+
+```python
+with probe() as p:
+    tools = p.wrap(TOOLS)
+    p.on("payment_status").fail_first(1)
+    result = p.run(lambda q: answer(q, tools), "Did order 42 go through?")
+    result.assert_called_with("payment_status", "42")
+    result.assert_call_order(["payment_status", "payment_status", "send_receipt"])
+    result.assert_called_times("payment_status", 2)
+    result.assert_called_at_most("send_receipt", 1)
+```
+
+`assert_called_with` compares the positional arguments and any supplied keywords with
+the snapshot taken when the tool was called. Extra keywords on the recorded call are
+allowed. Every keyword, including `required`, is matched against the tool call.
+`assert_call_order` checks invocation order and allows intervening tools.
+Calls in flight count. While the agent is still running, an observed match passes and
+an exceeded count fails. Counts still within the limit and matches still missing are
+reported as `unassessed`.
+
 ## 6. Run it in CI
 
 Copy [`ci.yml`](ci.yml) to `.github/workflows/agent-fault-tests.yml` in your repository. It installs AgentProbe, runs your fault tests, and uploads a JUnit report.

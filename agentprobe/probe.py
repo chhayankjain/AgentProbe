@@ -56,7 +56,7 @@ import random
 import threading
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -637,6 +637,85 @@ class ProbeResult:
         else:
             self._record(name, "pass", "0 calls", required)
         return self
+
+    def _record_call_check(
+        self, name: str, status: str, message: str, calls: list[CallRecord], required: bool
+    ) -> ProbeResult:
+        if status == "unassessed":
+            message += ", and the agent is still running"
+        if status != "pass":
+            recent = ", ".join(f"#{c.index} {c.tool}({_call_args(c)})" for c in calls[-5:])
+            message += f". Recent calls: {recent or 'none'}"
+        self._record(name, status, message, required)
+        return self
+
+    def assert_called_with(self, tool: str, /, *args: Any, **kwargs: Any) -> ProbeResult:
+        """Some call had these positional arguments and at least these keyword arguments.
+
+        All keywords describe the tool call, including keywords named ``tool`` or
+        ``required``. The assertion is required.
+        """
+        expected_args, expected_kwargs = _jsonable(args), _jsonable(kwargs)
+        calls = self._calls_to(tool)
+        name = (
+            f"tool {tool!r} called with args={_short(expected_args)}, "
+            f"kwargs={_short(expected_kwargs)}"
+        )
+        for call in calls:
+            if call.args == expected_args and all(
+                k in call.kwargs and call.kwargs[k] == v for k, v in expected_kwargs.items()
+            ):
+                self._record(name, "pass", f"matched call #{call.index}", True)
+                return self
+        status = "unassessed" if self.still_running else "fail"
+        return self._record_call_check(name, status, "no matching invocation", calls, True)
+
+    def assert_call_order(self, tools: Sequence[str], *, required: bool = True) -> ProbeResult:
+        """Each tool was invoked after the preceding one, with other calls allowed between."""
+        if isinstance(tools, (str, bytes)) or not isinstance(tools, Sequence):
+            raise ProbeError("call order must be a sequence of tool names")
+        if not all(isinstance(tool, str) for tool in tools):
+            raise ProbeError("call order must contain only tool names")
+        name = f"tool call order {list(tools)!r}"
+        selected = set(tools)
+        calls = sorted(
+            (c for c in self.calls if not c.after_probe_end and c.tool in selected),
+            key=lambda c: c.index,
+        )
+        remaining = iter(calls)
+        for position, tool in enumerate(tools, start=1):
+            if not any(c.tool == tool for c in remaining):
+                status = "unassessed" if self.still_running else "fail"
+                message = f"did not observe {tool!r} at position {position} in the expected order"
+                return self._record_call_check(name, status, message, calls, required)
+        self._record(name, "pass", "observed in invocation order", required)
+        return self
+
+    def assert_called_times(self, tool: str, n: int, *, required: bool = True) -> ProbeResult:
+        """Exactly *n* invocations of *tool* started."""
+        return self._assert_call_count(tool, n, at_most=False, required=required)
+
+    def assert_called_at_most(self, tool: str, n: int, *, required: bool = True) -> ProbeResult:
+        """At most *n* invocations of *tool* started."""
+        return self._assert_call_count(tool, n, at_most=True, required=required)
+
+    def _assert_call_count(
+        self, tool: str, n: int, *, at_most: bool, required: bool
+    ) -> ProbeResult:
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ProbeError(f"call count must be a non-negative integer, got {n!r}")
+        name = f"tool {tool!r} called {'at most' if at_most else 'exactly'} {n} time(s)"
+        calls = self._calls_to(tool)
+        count = len(calls)
+        if count > n:
+            status = "fail"
+        elif self.still_running:
+            status = "unassessed"
+        elif at_most or count == n:
+            status = "pass"
+        else:
+            status = "fail"
+        return self._record_call_check(name, status, f"observed {count} call(s)", calls, required)
 
     def assert_scenarios_exercised(self) -> ProbeResult:
         """Every required scenario fired (also enforced when the probe closes)."""
