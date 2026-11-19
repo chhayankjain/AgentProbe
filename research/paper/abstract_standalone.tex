@@ -1,0 +1,36 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{times}
+\usepackage{parskip}
+\usepackage{hyperref}
+
+\begin{document}
+
+\begin{center}
+{\Large\bfseries AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents}
+
+\vspace{1em}
+
+{\large Chhayank Jain\textsuperscript{1}, Sarthak Pattnaik\textsuperscript{2}, Eugene Pinsky\textsuperscript{2,*}}
+
+\vspace{0.5em}
+
+\textsuperscript{1} Arizona State University, Tempe, AZ, USA\\
+\textsuperscript{2} Boston University, Boston, MA, USA\\[0.3em]
+\textsuperscript{*} Correspondence: epinsky@bu.edu
+\end{center}
+
+\vspace{1.5em}
+
+\noindent\textbf{Abstract:}
+The fault tolerance of LLM-based intelligent agents in production is poorly understood. We present AgentProbe, an open-source toolkit combining a five-category failure taxonomy, configurable fault injectors, and OpenTelemetry tracing. We apply it to LangGraph, LangChain, and AutoGen with Llama~3.1 8B via Ollama in a two-phase study. Phase~1 (1,050~runs) reveals that AutoGen never invokes tools because Ollama silently ignores a legacy API parameter. Phase~2 patches AutoGen and reruns 450~runs at matched injection probability ($p = 0.20$; one shared seed, so fault-type cells are not independent replications). We report exception handling separately from answer-string presence, a limited correctness proxy available on 2 of 5 tool-use queries. LangGraph and LangChain share one execution path: under injection, 23.3\% of runs raise an unhandled exception [95\%~Wilson~CI: 11.8--40.9\%], and one retry completes in 71.4\% of these. The tested AutoGen configuration (pyautogen~0.1.14) converts tool exceptions into chat messages, so no run raises, yet the expected answer appears in only 33.3\% of assessable baseline trials versus 100\% for LangGraph/LangChain ($n = 12$ each; historical extractor, Section~7.7). A qualification experiment validates the pipeline via linked traces; Mistral~7B and Qwen2.5~7B show the same patterns. Within these tested configurations, exception-based metrics hide silent tool bypass and error absorption, so fault injection needs trace-level observability and answer checks.
+
+\vspace{1em}
+
+\noindent\textbf{Keywords:} intelligent agents; multi-agent systems; agent-oriented architectures; Large Language Models (LLMs); reliability benchmarking; fault injection; observability
+
+\vspace{1.5em}
+
+{\noindent\textbf{Data Availability:} The AgentProbe toolkit, benchmark tasks, experimental scripts, and all experimental results are available as open-source software at\\\url{https://github.com/chhayankjain/agentprobe-toolkit}.}
+
+\end{document}

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Research material moved under `research/`: the benchmark scripts and every result batch (`research/experiments/`), the paper source (`research/paper/`), the sample target agent (`research/samples/`) and the observability stack (`research/observability/`). The README now focuses on testing your own agent; the benchmark, taxonomy and reproduction steps moved to `research/README.md`. Run experiment scripts as `python research/experiments/<script>.py`.
+
 ### Added
 - Case study (`docs/case-studies/agents-from-scratch.md`) and example (`examples/third_party_agent/`): fault tests on a third-party LangGraph agent without editing its code; found the unhandled tool exception reported upstream as langchain-ai/agents-from-scratch#70
 - `examples/real_model_agent/`: fault tests on a real LLM agent (LangChain `create_agent` on local Ollama). Recovery is checked on the call log (right order, right arguments, confirmation before the receipt), not on wording. Includes `run_matrix.py` and the saved evidence for its results table across two models, two prompts and two tool-error messages. Live tests are marked `integration`; CI compiles the example and runs its offline call-log checks

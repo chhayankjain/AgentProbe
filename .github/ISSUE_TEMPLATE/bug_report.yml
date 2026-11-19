@@ -21,7 +21,7 @@ body:
       description: Minimal steps to reproduce the behavior.
       placeholder: |
         1. Install with `pip install -e ".[ollama]"`
-        2. Run `python experiments/run_benchmarks.py --frameworks langgraph --tasks tool_use --baseline-only`
+        2. Run `python research/experiments/run_benchmarks.py --frameworks langgraph --tasks tool_use --baseline-only`
         3. See error...
     validations:
       required: true

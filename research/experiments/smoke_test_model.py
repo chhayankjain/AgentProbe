@@ -1,8 +1,8 @@
 """Quick smoke test: verify a model can call tools via each framework.
 
 Usage:
-    .venv/bin/python experiments/smoke_test_model.py --model mistral:7b
-    .venv/bin/python experiments/smoke_test_model.py --model qwen2.5:7b
+    .venv/bin/python research/experiments/smoke_test_model.py --model mistral:7b
+    .venv/bin/python research/experiments/smoke_test_model.py --model qwen2.5:7b
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 
 from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
 from agentprobe.llm import add_llm_args, autogen_agent_kwargs, autogen_llm_config, build_chat_model, spec_from_args

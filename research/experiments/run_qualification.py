@@ -21,8 +21,8 @@ No full matrix rerun. This is a small, targeted validation.
 
 Usage::
 
-    .venv/bin/python experiments/run_qualification.py
-    .venv/bin/python experiments/run_qualification.py --frameworks langgraph autogen
+    .venv/bin/python research/experiments/run_qualification.py
+    .venv/bin/python research/experiments/run_qualification.py --frameworks langgraph autogen
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME

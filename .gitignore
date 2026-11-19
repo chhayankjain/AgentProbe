@@ -34,8 +34,8 @@ htmlcov/
 *.ipynb_metadata/
 
 # Experiments & results
-experiments/results/*.parquet
-!experiments/results/.gitkeep
+research/experiments/results/*.parquet
+!research/experiments/results/.gitkeep
 
 # Secrets / API keys
 .env
@@ -66,12 +66,17 @@ grafana_data/
 otel-collector-data/
 
 # LaTeX build artifacts
-paper/*.aux
-paper/*.log
-paper/*.out
-paper/*.pdf
-paper/*.bbl
-paper/*.blg
-paper/*.fls
-paper/*.fdb_latexmk
-paper/*.synctex.gz
+research/paper/*.aux
+research/paper/*.log
+research/paper/*.out
+research/paper/*.pdf
+research/paper/*.bbl
+research/paper/*.blg
+research/paper/*.fls
+research/paper/*.fdb_latexmk
+research/paper/*.synctex.gz
+
+# Peer-review material (reviewer comments, response letters) — local only
+research/paper/review*/
+research/paper/*response*
+research/paper/*reviewer*

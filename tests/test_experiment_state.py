@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "experiments"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "research" / "experiments"))
 from run_experiment_v2 import ExperimentState
 
 

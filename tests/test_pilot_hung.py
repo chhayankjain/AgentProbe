@@ -7,11 +7,14 @@ even if the first trial succeeded.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from experiments.run_experiment_v2 import (
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "research" / "experiments"))
+from run_experiment_v2 import (
     ConditionOutcome,
     EnhancedRunRecord,
     run_pilot,
@@ -123,7 +126,7 @@ def _hung_injection() -> ConditionOutcome:
     )
 
 
-@patch("experiments.run_experiment_v2.run_single_condition")
+@patch("run_experiment_v2.run_single_condition")
 def test_pilot_rejects_hung_baseline(mock_run):
     """Pilot must abort immediately on first hung baseline — only 1 condition called."""
     mock_run.return_value = _hung_baseline()
@@ -145,7 +148,7 @@ def test_pilot_rejects_hung_baseline(mock_run):
     )
 
 
-@patch("experiments.run_experiment_v2.run_single_condition")
+@patch("run_experiment_v2.run_single_condition")
 def test_pilot_rejects_hung_injection(mock_run):
     """Pilot must abort immediately when injection hangs — only 2 conditions called."""
     mock_run.side_effect = [
@@ -167,7 +170,7 @@ def test_pilot_rejects_hung_injection(mock_run):
     )
 
 
-@patch("experiments.run_experiment_v2.run_single_condition")
+@patch("run_experiment_v2.run_single_condition")
 def test_pilot_passes_when_nothing_hung(mock_run):
     """Pilot should pass when all conditions complete without hanging."""
     # 3 frameworks × (baseline + injection) = 6 calls

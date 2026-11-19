@@ -1,10 +1,10 @@
 """Analyze cross-model Phase 2 results for the paper.
 
 Usage:
-    .venv/bin/python experiments/analyze_cross_model.py \
-        --batches experiments/results_v2/20261111_113514 \
-                  experiments/results_v2/20261111_233435 \
-                  experiments/results_v2/20261112_040156 \
+    .venv/bin/python research/experiments/analyze_cross_model.py \
+        --batches research/experiments/results_v2/20261111_113514 \
+                  research/experiments/results_v2/20261111_233435 \
+                  research/experiments/results_v2/20261112_040156 \
         --models llama3.1 mistral:7b qwen2.5:7b
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ from pathlib import Path
 
 import ast
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 
 
 def extract_inner_output(record: dict) -> str:

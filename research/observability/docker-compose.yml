@@ -1,14 +1,14 @@
 # AgentProbe observability stack
 # Starts: Prometheus, Grafana, Jaeger (all-in-one)
 #
-# Usage:
-#   docker compose up -d
+# Usage (from the repository root):
+#   docker compose -f research/observability/docker-compose.yml up -d
 #   # Then run benchmarks — metrics exported to :8000/metrics
 #   # Grafana: http://localhost:3000  (admin/admin)
 #   # Jaeger:  http://localhost:16686
 #   # Prometheus: http://localhost:9090
 
-version: "3.9"
+name: agentprobe  # keep the stack name independent of this folder
 
 services:
   prometheus:
@@ -38,7 +38,7 @@ services:
       - prometheus
 
   jaeger:
-    image: jaegertracing/all-in-one:1.61
+    image: jaegertracing/all-in-one:1.61.0
     ports:
       - "16686:16686"   # Jaeger UI
       - "4317:4317"     # OTLP gRPC receiver

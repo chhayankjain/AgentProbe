@@ -15,13 +15,13 @@ Improvements over v1:
 Usage::
 
     # Pilot (2 runs per condition, single framework)
-    .venv/bin/python experiments/run_experiment_v2.py --pilot
+    .venv/bin/python research/experiments/run_experiment_v2.py --pilot
 
     # Full matrix
-    .venv/bin/python experiments/run_experiment_v2.py --n-runs 30
+    .venv/bin/python research/experiments/run_experiment_v2.py --n-runs 30
 
     # Resume interrupted experiment
-    .venv/bin/python experiments/run_experiment_v2.py --resume experiments/results_v2/20261110_143022
+    .venv/bin/python research/experiments/run_experiment_v2.py --resume research/experiments/results_v2/20261110_143022
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 
 from rich.console import Console
 from rich.table import Table

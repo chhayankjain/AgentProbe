@@ -10,7 +10,7 @@ The research path uses four library layers plus the experiment harness below. On
 
 ```mermaid
 flowchart TB
-    subgraph EXP["experiments/  (paper harness; scripts included in sdist)"]
+    subgraph EXP["research/experiments/  (paper harness; scripts included in sdist)"]
         direction LR
         RUNv2["run_experiment_v2.py<br/>Phase 2 matrix + checkpoints"]
         QUAL["run_qualification.py<br/>p=1.0 trace-linked validation"]
@@ -170,7 +170,7 @@ How a batch directory is produced and consumed. File names are exact.
 flowchart LR
     CLI["run_experiment_v2.py<br/>--frameworks --model --seed<br/>[--resume BATCH] [--pilot]"]
 
-    subgraph BATCH["experiments/results_v2/{YYYYMMDD_HHMMSS}/"]
+    subgraph BATCH["research/experiments/results_v2/{YYYYMMDD_HHMMSS}/"]
         direction TB
         COND["{framework}_{task}_{fault}.json / .csv<br/>one EnhancedRunRecord per trial"]
         CKPT["checkpoint.json<br/>structured (framework, task, fault) triples<br/>validated on --resume"]
@@ -192,8 +192,8 @@ flowchart LR
     SUMM --> AR["analyze_results.py"]
     SRCMAP["paper_source_map.json<br/>table cell → batch dir"] -.authoritative mapping.-> XM & FIG
 
-    FIG --> PLOTS["experiments/plots/*.pdf"]
-    PLOTS -->|symlink paper/plots| TEX["paper/main.tex<br/>graphicspath"]
+    FIG --> PLOTS["research/experiments/plots/*.pdf"]
+    PLOTS -->|symlink research/paper/plots| TEX["research/paper/main.tex<br/>graphicspath"]
     XM & AR --> TABLES["paper tables"]
 ```
 
@@ -201,7 +201,7 @@ The Qwen2.5 column in the paper combines two batches (LangGraph/LangChain from o
 
 ## 5. Observability stack
 
-What `docker compose up -d` starts and how spans and metrics reach it.
+What `docker compose -f research/observability/docker-compose.yml up -d` starts and how spans and metrics reach it.
 
 ```mermaid
 flowchart LR
@@ -270,7 +270,7 @@ All adapters accept the same tools (calculator, web_search) and the same LLM con
 
 `LangChainToolAgent` is built on `langchain.agents.create_agent`, which compiles to a LangGraph graph internally. The two adapters therefore share an execution path, which is why the paper reports identical LangGraph/LangChain failure patterns. `AutoGenToolAgent` targets `pyautogen 0.1.14` and installs a one-time monkey-patch that converts the legacy `functions` request format to `tools` and the `tool_calls` response back to `function_call`, because Ollama silently ignores the legacy format (the Phase 1 "tool bypass" finding).
 
-**Adding a new framework:** write a class that satisfies `BaseAgent` (it is a structural `Protocol`, no subclassing needed), wrap your tools with `ToolFailureInjector`, and register the class in `build_agent()` in `experiments/run_experiment_v2.py`.
+**Adding a new framework:** write a class that satisfies `BaseAgent` (it is a structural `Protocol`, no subclassing needed), wrap your tools with `ToolFailureInjector`, and register the class in `build_agent()` in `research/experiments/run_experiment_v2.py`.
 
 ### `agentprobe/injector/` — fault injectors
 

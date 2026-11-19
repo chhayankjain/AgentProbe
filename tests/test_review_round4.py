@@ -15,7 +15,7 @@ from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, RunRes
 from agentprobe.errors import ParallelToolCallsUnsupported
 from agentprobe.llm import LLMSpec
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "experiments"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "research" / "experiments"))
 
 
 def _result(**overrides):
