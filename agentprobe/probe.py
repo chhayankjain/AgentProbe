@@ -49,6 +49,7 @@ import datetime as _dt
 import decimal
 import enum
 import functools
+import hashlib
 import inspect
 import math
 import pathlib
@@ -339,12 +340,22 @@ class CallRecord:
     #: the snapshots in ``args``/``kwargs``. Never serialized.
     raw_args: tuple[Any, ...] = field(default=(), repr=False, compare=False)
     raw_kwargs: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    #: Exact, immutable copies of the arguments taken when the call started, used
+    #: by ``assert_called_with``. Unlike ``args``/``kwargs`` (a report snapshot that
+    #: shortens bytes and long reprs), they keep types and full contents. Values
+    #: that can't be copied exactly are opaque and never compare equal. Never
+    #: serialized.
+    exact_args: tuple[Any, ...] = field(default=(), repr=False, compare=False)
+    exact_kwargs: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    #: The tool's signature, when known, so positional and keyword forms of the
+    #: same argument match. Never serialized.
+    signature: inspect.Signature | None = field(default=None, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             f.name: getattr(self, f.name)
             for f in dataclasses.fields(self)
-            if f.name not in {"raw_args", "raw_kwargs"}
+            if f.name not in _UNSERIALIZED_CALL_FIELDS
         }
 
 
@@ -419,6 +430,172 @@ def _short(value: Any, limit: int = 200) -> str:
     except Exception as exc:  # noqa: BLE001 - repr of arbitrary user objects
         text = f"<unrepresentable {type(value).__name__}: {type(exc).__name__}>"
     return text if len(text) <= limit else text[: limit - 3] + "..."
+
+
+_UNSERIALIZED_CALL_FIELDS = frozenset(
+    {"raw_args", "raw_kwargs", "exact_args", "exact_kwargs", "signature"}
+)
+
+
+class _Opaque:
+    """Stands in for a value that can't be copied exactly. Equal only to itself,
+    so a recorded opaque value never matches an expectation."""
+
+    __slots__ = ("type_name",)
+
+    def __init__(self, value: Any) -> None:
+        self.type_name = f"{type(value).__module__}.{type(value).__qualname__}"
+
+    def __repr__(self) -> str:
+        return f"<opaque {self.type_name}>"
+
+
+#: Immutable values compared as they are, with Python's own equality.
+_EXACT_SCALARS = (
+    type(None),
+    bool,
+    int,
+    float,
+    complex,
+    str,
+    _dt.datetime,
+    _dt.date,
+    _dt.time,
+    _dt.timedelta,
+    decimal.Decimal,
+    uuid.UUID,
+    pathlib.PurePath,
+    range,
+)
+
+
+def _exact(value: Any, _depth: int = 0) -> Any:
+    """An immutable copy of *value* that compares like the original did when copied.
+
+    Containers become tagged tuples, so a list never equals a tuple and dict keys
+    keep their types, as with Python's ``==``. Bytes keep their length and a
+    SHA-256 of the full content. Enums, dataclasses and pydantic models keep their
+    class. Anything else becomes ``_Opaque``.
+    """
+    if _depth > 50:
+        return _Opaque(value)
+    if isinstance(value, enum.Enum):
+        return value
+    if isinstance(value, _EXACT_SCALARS):
+        return value
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        raw = bytes(value)
+        return ("bytes", len(raw), hashlib.sha256(raw).digest())
+    if isinstance(value, tuple):
+        return ("tuple", tuple(_exact(v, _depth + 1) for v in value))
+    if isinstance(value, list):
+        return ("list", tuple(_exact(v, _depth + 1) for v in value))
+    if isinstance(value, (set, frozenset)):
+        return ("set", frozenset(_exact(v, _depth + 1) for v in value))
+    if isinstance(value, dict):
+        return (
+            "dict",
+            frozenset((_exact(k, _depth + 1), _exact(v, _depth + 1)) for k, v in value.items()),
+        )
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        fields = tuple(
+            (f.name, _exact(getattr(value, f.name), _depth + 1))
+            for f in dataclasses.fields(value)
+            if f.compare
+        )
+        return ("dataclass", type(value), fields)
+    if hasattr(type(value), "model_fields") and callable(getattr(value, "model_dump", None)):
+        try:
+            return ("model", type(value), _exact(value.model_dump(), _depth + 1))
+        except Exception:  # noqa: BLE001 - arbitrary user models
+            return _Opaque(value)
+    return _Opaque(value)
+
+
+def _exact_or_opaque(value: Any) -> Any:
+    try:
+        return _exact(value)
+    except Exception:  # noqa: BLE001 - e.g. a dict key that is unhashable after copying
+        return _Opaque(value)
+
+
+def _has_opaque(frozen: Any) -> bool:
+    if isinstance(frozen, _Opaque):
+        return True
+    if isinstance(frozen, (tuple, frozenset)):
+        return any(_has_opaque(v) for v in frozen)
+    return False
+
+
+def _signature_of(tool: Any) -> inspect.Signature | None:
+    """Parameters of a wrapped tool, so ``f("42")`` and ``f(order_id="42")`` match."""
+    try:
+        from langchain_core.tools import BaseTool
+    except ImportError:  # pragma: no cover
+        BaseTool = None  # type: ignore[assignment,misc]  # noqa: N806
+    try:
+        if BaseTool is not None and isinstance(tool, BaseTool):
+            names = list(tool.args)
+            return inspect.Signature(
+                [inspect.Parameter(n, inspect.Parameter.POSITIONAL_OR_KEYWORD) for n in names]
+            )
+        return inspect.signature(tool)
+    except Exception:  # noqa: BLE001 - builtins, odd callables, schema errors
+        return None
+
+
+def _normalize_call(
+    sig: inspect.Signature | None, args: tuple[Any, ...], kwargs: dict[str, Any]
+) -> tuple[tuple[Any, ...], dict[str, Any]] | None:
+    """Positional values that have no name, and every named value, per *sig*.
+
+    Without a signature the call is returned as given. Returns ``None`` when the
+    arguments don't fit the signature.
+    """
+    if sig is None:
+        return tuple(args), dict(kwargs)
+    try:
+        bound = sig.bind_partial(*args, **kwargs)
+    except TypeError:
+        return None
+    positional: list[Any] = []
+    named: dict[str, Any] = {}
+    for pname, value in bound.arguments.items():
+        kind = sig.parameters[pname].kind
+        if kind is inspect.Parameter.POSITIONAL_ONLY:
+            positional.append(value)
+        elif kind is inspect.Parameter.VAR_POSITIONAL:
+            positional.extend(value)
+        elif kind is inspect.Parameter.VAR_KEYWORD:
+            named.update(value)
+        else:
+            named[pname] = value
+    return tuple(positional), named
+
+
+def _match_call(call: CallRecord, args: tuple[Any, ...], kwargs: dict[str, Any]) -> bool | None:
+    """True if *call* matches, False if it doesn't, None if it can't be decided."""
+    actual = _normalize_call(call.signature, call.exact_args, call.exact_kwargs)
+    expected = _normalize_call(call.signature, args, kwargs)
+    if actual is None or expected is None:
+        actual = (tuple(call.exact_args), dict(call.exact_kwargs))
+        expected = (tuple(args), dict(kwargs))
+    (a_pos, a_named), (e_pos, e_named) = actual, expected
+    undecided = False
+    if len(a_pos) != len(e_pos):
+        return False
+    pairs = list(zip(a_pos, e_pos))
+    for k, v in e_named.items():
+        if k not in a_named:
+            return False
+        pairs.append((a_named[k], v))
+    for a, e in pairs:
+        if a != e:
+            if _has_opaque(a):
+                undecided = True
+            else:
+                return False
+    return None if undecided else True
 
 
 def _jsonable(value: Any, _depth: int = 0) -> Any:
@@ -650,23 +827,48 @@ class ProbeResult:
         return self
 
     def assert_called_with(self, tool: str, /, *args: Any, **kwargs: Any) -> ProbeResult:
-        """Some call had these positional arguments and at least these keyword arguments.
+        """Some call to *tool* had these arguments.
+
+        Unlike ``unittest.mock``'s ``assert_called_with``, any call can match (not
+        only the last), and arguments you leave out aren't checked. When the tool's
+        signature is known, positional and keyword forms of an argument match each
+        other; extra positional arguments (``*args``) must match exactly. Values are
+        compared exactly, with Python's ``==`` on copies taken when the call
+        started. An argument that couldn't be copied exactly (an arbitrary object)
+        leaves the assertion ``unassessed``, never passed.
 
         All keywords describe the tool call, including keywords named ``tool`` or
         ``required``. The assertion is required.
         """
-        expected_args, expected_kwargs = _jsonable(args), _jsonable(kwargs)
+        expected_args = tuple(_exact_or_opaque(v) for v in args)
+        expected_kwargs = {k: _exact_or_opaque(v) for k, v in kwargs.items()}
+        unsupported = [
+            v.type_name for v in (*expected_args, *expected_kwargs.values()) if _has_opaque(v)
+        ]
+        if unsupported:
+            raise ProbeError(
+                f"assert_called_with can't compare {unsupported[0]} exactly; pass built-in "
+                "values (str, numbers, bytes, lists, tuples, dicts, sets), enums, "
+                "dates, dataclasses or pydantic models"
+            )
         calls = self._calls_to(tool)
         name = (
-            f"tool {tool!r} called with args={_short(expected_args)}, "
-            f"kwargs={_short(expected_kwargs)}"
+            f"tool {tool!r} called with args={_short(_jsonable(list(args)))}, "
+            f"kwargs={_short(_jsonable(kwargs))}"
         )
+        undecided: list[CallRecord] = []
         for call in calls:
-            if call.args == expected_args and all(
-                k in call.kwargs and call.kwargs[k] == v for k, v in expected_kwargs.items()
-            ):
+            verdict = _match_call(call, expected_args, expected_kwargs)
+            if verdict:
                 self._record(name, "pass", f"matched call #{call.index}", True)
                 return self
+            if verdict is None:
+                undecided.append(call)
+        if undecided:
+            ids = ", ".join(f"#{c.index}" for c in undecided)
+            message = f"call(s) {ids} had arguments that can't be compared exactly"
+            self._record(name, "unassessed", message, True)
+            return self
         status = "unassessed" if self.still_running else "fail"
         return self._record_call_check(name, status, "no matching invocation", calls, True)
 
@@ -895,6 +1097,7 @@ class Probe:
         self._calls: list[CallRecord] = []
         self._late_calls: list[CallRecord] = []
         self._per_tool: dict[str, int] = {}
+        self._signatures: dict[str, inspect.Signature | None] = {}
         self._known_tools: list[str] = []
         self._next_index = 0
         self._seq = 0
@@ -1004,10 +1207,14 @@ class Probe:
             return type(tools)(wrapped) if isinstance(tools, tuple) else wrapped
         return self._wrap_one(tools)
 
-    def _register(self, name: str) -> None:
+    def _register(self, name: str, tool: Any = None) -> None:
+        sig = _signature_of(tool) if tool is not None else None
         with self._lock:
             if name not in self._known_tools:
                 self._known_tools.append(name)
+                self._signatures[name] = sig
+            elif self._signatures.get(name) != sig:
+                self._signatures[name] = None  # two tools share a name: don't guess
 
     def _wrap_one(self, tool: Any, name: str | None = None) -> Any:
         try:
@@ -1023,7 +1230,7 @@ class Probe:
                 raise ProbeError(
                     f"cannot determine a name for {tool!r}; pass a dict {{name: tool}}"
                 )
-            self._register(tool_name)
+            self._register(tool_name, tool)
             return self._wrap_callable(tool, tool_name)
         raise ProbeError(
             f"don't know how to wrap {type(tool).__name__}; pass a function or a LangChain tool"
@@ -1048,7 +1255,7 @@ class Probe:
         from langchain_core.tools import BaseTool, StructuredTool
 
         name = tool.name
-        self._register(name)
+        self._register(name, tool)
         clone = tool.model_copy()
         key = id(clone)  # identity of this wrapped tool, for delegation detection
         inner_run = clone._run
@@ -1082,7 +1289,11 @@ class Probe:
 
     def _begin(self, name: str, args: tuple, kwargs: dict) -> tuple[CallRecord, _Action | None]:
         """Record the call at entry (pending) and decide its fault, atomically."""
+        public_kwargs = _public_kwargs(kwargs)
+        exact_args = tuple(_exact_or_opaque(v) for v in args)
+        exact_kwargs = {k: _exact_or_opaque(v) for k, v in public_kwargs.items()}
         with self._lock:
+            sig = self._signatures.get(name)
             self._seq += 1
             if not self._active:
                 rec = CallRecord(
@@ -1093,6 +1304,9 @@ class Probe:
                     kwargs=_jsonable(_public_kwargs(kwargs)),
                     raw_args=tuple(args),
                     raw_kwargs=_public_kwargs(kwargs),
+                    exact_args=exact_args,
+                    exact_kwargs=exact_kwargs,
+                    signature=sig,
                     started_seq=self._seq,
                     after_probe_end=True,
                 )
@@ -1119,6 +1333,9 @@ class Probe:
                 kwargs=_jsonable(_public_kwargs(kwargs)),
                 raw_args=tuple(args),
                 raw_kwargs=_public_kwargs(kwargs),
+                exact_args=exact_args,
+                exact_kwargs=exact_kwargs,
+                signature=sig,
                 injected=action is not None,
                 fault=rule_hit.description if rule_hit else None,
                 rule_id=rule_hit.rule_id if rule_hit else None,

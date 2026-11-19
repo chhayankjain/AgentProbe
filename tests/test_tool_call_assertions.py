@@ -1,5 +1,10 @@
 """Tool-call assertions use the frozen evidence seen at invocation."""
 
+import dataclasses
+import datetime
+import decimal
+import enum
+import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
@@ -113,3 +118,149 @@ def test_counts_require_nonnegative_integers(invalid):
         for assertion in (result.assert_called_times, result.assert_called_at_most):
             with pytest.raises(ProbeError):
                 assertion("lookup", invalid)
+
+
+# ---- exact argument comparison (lossy report snapshots must never match) ----------
+
+
+class _LongRepr:
+    def __init__(self, tail: str) -> None:
+        self.tail = tail
+
+    def __repr__(self) -> str:
+        return "LongRepr(" + "x" * 300 + self.tail + ")"
+
+
+class _Color(enum.Enum):
+    RED = "red"
+
+
+@dataclasses.dataclass
+class _Order:
+    order_id: str
+    items: list
+
+
+def _one_call(*args, **kwargs):
+    with probe(enforce=False) as p:
+        tool = p.wrap({"t": lambda *a, **k: None})["t"]
+        result = p.run(lambda: tool(*args, **kwargs))
+    return result
+
+
+@pytest.mark.parametrize(
+    ("actual", "expected"),
+    [
+        (b"a" * 32 + b"X", b"a" * 32 + b"Y"),
+        ({1: "a"}, {"1": "a"}),
+        ((1, 2), [1, 2]),
+        ([1, 2], (1, 2)),
+        (datetime.date(2026, 1, 1), "2026-01-01"),
+        (_Color.RED, "red"),
+        (decimal.Decimal("1.5"), "1.5"),
+        ({1, 2}, [1, 2]),
+        (_Order("42", [1]), _Order("42", [2])),
+        ({"nested": {"k": b"a" * 40 + b"1"}}, {"nested": {"k": b"a" * 40 + b"2"}}),
+    ],
+)
+def test_called_with_never_matches_a_value_that_only_looks_the_same(actual, expected):
+    result = _one_call(actual)
+    with pytest.raises(AssertionError):
+        result.assert_called_with("t", expected)
+    assert result.assertions[-1].status == "fail"
+
+
+@pytest.mark.parametrize(
+    ("actual", "expected"),
+    [
+        (b"a" * 100, b"a" * 100),
+        (b"abc", bytearray(b"abc")),
+        ({3, 1, 2}, {2, 3, 1}),
+        ({1: "a", "1": "b"}, {"1": "b", 1: "a"}),
+        (_Color.RED, _Color.RED),
+        (_Order("42", [1, 2]), _Order("42", [1, 2])),
+        (datetime.datetime(2026, 1, 1, 9), datetime.datetime(2026, 1, 1, 9)),
+        (1, 1.0),
+    ],
+)
+def test_called_with_matches_equal_values(actual, expected):
+    _one_call(actual).assert_called_with("t", expected)
+
+
+def test_called_with_compares_the_value_at_call_time():
+    order = _Order("42", [1])
+    with probe(enforce=False) as p:
+        tool = p.wrap({"t": lambda o: None})["t"]
+        result = p.run(lambda: tool(order))
+    order.items.append(2)
+    result.assert_called_with("t", _Order("42", [1]))
+
+
+def test_called_with_rejects_an_expectation_it_cannot_compare():
+    result = _one_call("x")
+    with pytest.raises(ProbeError, match="can't compare"):
+        result.assert_called_with("t", _LongRepr("A"))
+
+
+def test_an_argument_that_cannot_be_compared_is_unassessed_not_passed():
+    with pytest.raises(ProbeGateError):
+        with probe() as p:
+            tool = p.wrap({"t": lambda o: None})["t"]
+            result = p.run(lambda: tool(_LongRepr("A")))
+            with pytest.raises(AssertionError):
+                result.assert_called_with("t", "LongRepr")
+            assert result.assertions[-1].status == "unassessed"
+            assert "can't be compared exactly" in result.assertions[-1].message
+
+
+def test_exact_copies_stay_out_of_reports():
+    result = _one_call(b"a" * 64, _LongRepr("A"), key={1, 2})
+    data = result.to_dict()
+    json.dumps(data)
+    call = data["observed"]["calls"][0]
+    assert not {"exact_args", "exact_kwargs", "signature"} & set(call)
+
+
+# ---- positional and keyword forms of the same argument ----------------------------
+
+
+def payment_status(order_id: str, currency: str = "USD") -> str:
+    return "paid"
+
+
+def test_positional_and_keyword_forms_match_by_parameter_name():
+    with probe(enforce=False) as p:
+        tool = p.wrap(payment_status)
+        result = p.run(lambda: (tool(order_id="42"), tool("43", "EUR")))
+    result.assert_called_with("payment_status", "42")
+    result.assert_called_with("payment_status", order_id="43", currency="EUR")
+    result.assert_called_with("payment_status", "43", currency="EUR")
+    with pytest.raises(AssertionError):
+        result.assert_called_with("payment_status", "42", currency="EUR")
+
+
+def test_langchain_tool_arguments_match_in_either_form():
+    from langchain_core.tools import tool as lc_tool
+
+    @lc_tool
+    def lookup(order_id: str) -> str:
+        """Look up an order."""
+        return "paid"
+
+    with probe(enforce=False) as p:
+        (wrapped,) = p.wrap([lookup])
+        result = p.run(lambda: wrapped.invoke({"order_id": "42"}))
+    result.assert_called_with("lookup", "42")
+    result.assert_called_with("lookup", order_id="42")
+    with pytest.raises(AssertionError):
+        result.assert_called_with("lookup", "43")
+
+
+def test_tools_sharing_a_name_fall_back_to_the_arguments_as_passed():
+    with probe(enforce=False) as p:
+        first = p.wrap({"t": lambda order_id: None})["t"]
+        p.wrap({"t": lambda other, extra: None})
+        result = p.run(lambda: first(order_id="42"))
+    result.assert_called_with("t", order_id="42")
+    with pytest.raises(AssertionError):
+        result.assert_called_with("t", "42")
