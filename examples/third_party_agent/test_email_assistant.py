@@ -16,7 +16,8 @@ results/validation-2026-11-18.md. "Pass" here means the run completes without an
 unhandled exception; it doesn't check what the agent did next.
 
 Faults use the exception types the fix handles (``TimeoutError``,
-``ToolException``), because AgentProbe's own fault classes don't subclass them.
+``ToolException``), passed with ``with_=``. Since #114 the built-in ``"timeout"``
+fault is also a ``TimeoutError``; ``ToolException`` still has to be passed.
 """
 
 from __future__ import annotations

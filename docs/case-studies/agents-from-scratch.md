@@ -44,9 +44,11 @@ own errors and return a message, so the gap matters most for tools that raise.
 
 We then ran the example's tests against the original code and against the proposed fix, three runs
 each on the same local model ([validation record](../../examples/third_party_agent/results/validation-2026-11-18.md)).
-The tests inject `TimeoutError` and LangChain's `ToolException`, the exception types the fix handles:
-AgentProbe's own fault classes don't subclass them, so code that handles real timeouts wouldn't
-catch them (tracked in AgentProbe [#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114)).
+The tests inject `TimeoutError` and LangChain's `ToolException`, the exception types the fix handles.
+When we ran them, AgentProbe's built-in faults subclassed neither, so code that handles real timeouts
+wouldn't have caught them. Since [#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114)
+(on `main`, in the next release), the built-in `"timeout"` fault is a `TimeoutError`; a framework's
+own error type, such as `ToolException`, still needs `with_=`.
 
 Each cell says whether the run **completed without an unhandled exception**. The tests check that the
 fault fired and that no exception escaped; they don't check whether the meeting was rescheduled, the
@@ -86,6 +88,7 @@ own model.
   the pattern in the example; a first-class helper is a candidate for v1.5.
 - Graphs that end on a tool call give `result.answer == ""`; checks need the call log. Better answer
   extraction for such graphs is another v1.5 candidate.
-- Injected faults should be catchable the way real failures are: an injected timeout should be a
-  `TimeoutError` ([#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114)). Until then, pass the
-  exception your code handles with `with_=`.
+- Injected faults should be catchable the way real failures are. Fixed for timeouts in
+  [#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114): the built-in `"timeout"` fault is now a
+  `TimeoutError` (on `main`, in the next release). For any other exception your code handles, such as
+  `ToolException` or an HTTP client's errors, pass it with `with_=`.
