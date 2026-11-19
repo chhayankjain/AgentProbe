@@ -14,8 +14,8 @@ Outputs a JSON diagnostic artifact for comparison.
 
 Usage::
 
-    .venv/bin/python experiments/autogen_diagnostic.py --model llama3.1
-    .venv/bin/python experiments/autogen_diagnostic.py --model qwen2.5:7b
+    .venv/bin/python research/experiments/autogen_diagnostic.py --model llama3.1
+    .venv/bin/python research/experiments/autogen_diagnostic.py --model qwen2.5:7b
 """
 
 from __future__ import annotations

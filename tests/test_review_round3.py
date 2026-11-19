@@ -21,7 +21,7 @@ from agentprobe.injector.tool_failure import (
 )
 from agentprobe.llm import LLMSpec, autogen_llm_config, is_llm_backend_error
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "experiments"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "research" / "experiments"))
 
 httpx = pytest.importorskip("httpx")
 

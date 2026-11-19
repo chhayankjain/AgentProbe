@@ -7,13 +7,13 @@ Loads Phase 2 batch data directly and computes metrics, then produces:
 
 Usage::
 
-    .venv/bin/python experiments/generate_paper_figures.py
+    .venv/bin/python research/experiments/generate_paper_figures.py
 
     # Or with explicit batch dirs:
-    .venv/bin/python experiments/generate_paper_figures.py \
-        --batches experiments/results_v2/20261111_113514 \
-                  experiments/results_v2/20261111_233435 \
-                  experiments/results_v2/20261112_040156
+    .venv/bin/python research/experiments/generate_paper_figures.py \
+        --batches research/experiments/results_v2/20261111_113514 \
+                  research/experiments/results_v2/20261111_233435 \
+                  research/experiments/results_v2/20261112_040156
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 # Allow importing from project root
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 
 import matplotlib
 
@@ -31,7 +31,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from experiments.analyze_cross_model import (
+from analyze_cross_model import (  # sibling script in this folder
     analyze_batch,
     load_batch,
 )
@@ -46,7 +46,7 @@ DEFAULT_BATCHES = [
     ("Qwen2.5 7B", "20261112_040156"),
 ]
 
-# Write to experiments/plots/ — the directory LaTeX reads via paper/plots symlink
+# Write to research/experiments/plots/ — the directory LaTeX reads via paper/plots symlink
 FIGURES_DIR = Path(__file__).parent / "plots"
 
 # Style

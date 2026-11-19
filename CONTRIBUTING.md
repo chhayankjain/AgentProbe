@@ -49,7 +49,7 @@ Experiments require [Ollama](https://ollama.ai) running locally:
 ```bash
 pip install -e ".[ollama]"
 ollama pull llama3.1
-python experiments/run_experiment_v2.py --frameworks langgraph --model llama3.1 --seed 42
+python research/experiments/run_experiment_v2.py --frameworks langgraph --model llama3.1 --seed 42
 ```
 
 ## Reporting Issues

@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "experiments"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "research" / "experiments"))
 
 from run_qualification import (
     BASELINE_CONFIG,

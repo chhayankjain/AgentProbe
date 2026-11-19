@@ -5,25 +5,25 @@ Runs the full benchmark matrix:
   - Tasks: tool_use, rag, multi_agent
   - Failure types: none (baseline), timeout, malformed_output, rate_limit, api_error
 
-Results are saved to experiments/results/ as CSV and JSON.
+Results are saved to research/experiments/results/ as CSV and JSON.
 
 Usage::
 
     # Baseline only (no failures)
-    python experiments/run_benchmarks.py --frameworks langgraph --tasks tool_use --baseline-only
+    python research/experiments/run_benchmarks.py --frameworks langgraph --tasks tool_use --baseline-only
 
     # Full matrix with Ollama/Llama 3.1
-    python experiments/run_benchmarks.py --provider ollama --model llama3.1
+    python research/experiments/run_benchmarks.py --provider ollama --model llama3.1
 
     # Hosted OpenAI-compatible backend (LangGraph/LangChain; needs langchain-openai)
-    GROQ_API_KEY=... python experiments/run_benchmarks.py --provider groq \
+    GROQ_API_KEY=... python research/experiments/run_benchmarks.py --provider groq \
         --model llama-3.3-70b-versatile --rpm 25 --frameworks langgraph
 
     # Quick smoke test (5 runs per config)
-    python experiments/run_benchmarks.py --n-runs 5 --frameworks langgraph --tasks tool_use
+    python research/experiments/run_benchmarks.py --n-runs 5 --frameworks langgraph --tasks tool_use
 
     # Save results for paper
-    python experiments/run_benchmarks.py --n-runs 50 --save-results
+    python research/experiments/run_benchmarks.py --n-runs 50 --save-results
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any
 
 # Ensure agentprobe package is importable when running from repo root
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 
 from rich.console import Console
 from rich.table import Table

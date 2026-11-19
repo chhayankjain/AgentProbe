@@ -21,7 +21,7 @@ from agentprobe.llm import (
     mark_llm_call_error,
 )
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "experiments"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "research" / "experiments"))
 
 FakeRateLimitError = type("RateLimitError", (Exception,), {"__module__": "openai"})
 

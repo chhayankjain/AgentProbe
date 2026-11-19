@@ -48,7 +48,7 @@ def run_demo(
     from agentprobe.agents.langgraph_agent import LangGraphToolAgent
 
     # 1. Tracing. Console export off so the demo output stays readable; point
-    #    otlp_endpoint at Jaeger (docker compose up) to see the spans.
+    #    otlp_endpoint at Jaeger (research/observability/docker-compose.yml) to see the spans.
     tracer = AgentProbeTracer(service_name="agentprobe-demo", console=False)
 
     # 2. A seeded fault injector: the same seed always faults the same calls.

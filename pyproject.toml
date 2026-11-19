@@ -105,7 +105,7 @@ include = [
     "RELEASE.md",
     "ROADMAP.md",
     "SECURITY.md",
-    "experiments/*.py",
+    "research/experiments/*.py",
     "README.md",
     "LICENSE",
     "CHANGELOG.md",

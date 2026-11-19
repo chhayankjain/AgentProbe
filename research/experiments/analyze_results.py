@@ -1,6 +1,6 @@
 """Statistical analysis of AgentProbe benchmark results.
 
-Loads per-run CSV files from experiments/results/ for raw latency data,
+Loads per-run CSV files from research/experiments/results/ for raw latency data,
 and combined_summary.json for aggregate counts.  Produces:
   - Pairwise statistical comparisons between frameworks
   - Confidence intervals for all metrics
@@ -9,8 +9,8 @@ and combined_summary.json for aggregate counts.  Produces:
 
 Usage::
 
-    .venv/bin/python experiments/analyze_results.py
-    .venv/bin/python experiments/analyze_results.py --results experiments/results/combined_summary.json
+    .venv/bin/python research/experiments/analyze_results.py
+    .venv/bin/python research/experiments/analyze_results.py --results research/experiments/results/combined_summary.json
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 
 from agentprobe.benchmark.statistics import (
     build_comparison_report,
