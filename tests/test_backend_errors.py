@@ -10,7 +10,7 @@ import pytest
 
 from agentprobe.benchmark.metrics import MetricsCalculator
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, RunResult
-from agentprobe.injector.tool_failure import ToolCallRateLimited
+from agentprobe.injector.tool_failure import ToolCallRateLimited, ToolCallTimeout
 from agentprobe.llm import mark_llm_call_error
 from agentprobe.observer.classifier import FailureCategory, FailureClassifier
 
@@ -37,12 +37,13 @@ class FlakyBackendAgent:
 class InjectedFaultAgent:
     framework = "mock"
 
-    def __init__(self) -> None:
+    def __init__(self, fault_type: type[Exception]) -> None:
+        self.fault_type = fault_type
         self.invocations = 0
 
     def invoke(self, input: dict) -> dict:
         self.invocations += 1
-        raise ToolCallRateLimited(retry_after=1.0)
+        raise self.fault_type()
 
 
 def _cfg(**kw: object) -> BenchmarkConfig:
@@ -73,13 +74,14 @@ class TestRunnerBackendErrors:
         # Dispatches: initial + 1 retry; recovery is never attempted for backend errors.
         assert agent.invocations == 2
 
-    def test_injected_429_still_counts_as_agent_failure(self):
-        """The injected ToolCallRateLimited must take the normal failure path."""
-        agent = InjectedFaultAgent()
+    @pytest.mark.parametrize("fault_type", [ToolCallRateLimited, ToolCallTimeout])
+    def test_injected_tool_fault_still_counts_as_agent_failure(self, fault_type):
+        agent = InjectedFaultAgent(fault_type)
         results = BenchmarkRunner(agent=agent, config=_cfg(backend_error_retries=5)).run()
         r = results[0]
         assert r.status == "completed" and not r.success
         assert r.failure_category == "tool_call"
+        assert r.exception_type == fault_type.__name__
         assert r.backend_retries == 0
         assert agent.invocations == 2  # initial + one recovery attempt, no backend retries
 

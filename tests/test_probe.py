@@ -13,6 +13,7 @@ import pytest
 
 from agentprobe.injector.tool_failure import (
     ToolCallAPIError,
+    ToolCallError,
     ToolCallRateLimited,
     ToolCallTimeout,
 )
@@ -64,6 +65,24 @@ def broken_agent(tools: dict) -> Any:
 
 
 class TestScenarios:
+    def test_agent_can_retry_a_named_timeout_with_its_standard_handler(self):
+        with probe() as p:
+            check = p.wrap(payment_status)
+            p.on(check).fail_first(1, with_="timeout")
+
+            def agent(order_id):
+                try:
+                    return check(order_id)
+                except TimeoutError as exc:
+                    assert isinstance(exc, ToolCallError)
+                    return check(order_id)
+
+            result = p.run(agent, "42")
+            result.assert_answer_contains("confirmed")
+        first, retry = result.calls
+        assert first.injected and first.exception_type == "ToolCallTimeout"
+        assert retry.outcome == "returned" and not retry.injected
+
     def test_fail_first_then_recover(self):
         with probe() as p:
             t = p.wrap({"payment_status": payment_status})
