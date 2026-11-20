@@ -77,7 +77,7 @@ jobs:
           path: site
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Create the Pages project (first run only)
         run: |
           npx --yes "$WRANGLER" pages project list | grep -qw "$CLOUDFLARE_PROJECT" \
