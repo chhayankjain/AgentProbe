@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [1.5.0] - 2026-11-20
+
+A lighter install and sturdier assertions: `pip install agentprobe-toolkit` now pulls in no other packages, answers can be checked with patterns or functions instead of exact wording, and tool calls can be checked by arguments, order and count.
+
+> **Upgrading from 1.4:** if you use the benchmark runner, framework adapters, fault injectors, tracer or `python -m agentprobe.demo`, install **`agentprobe-toolkit[research]`**. Without it they raise an ImportError naming the extra. `agentprobe.testing` (`probe()`, scenarios, assertions, reports) needs no extra, and import paths are unchanged. An `https://` OTLP endpoint now uses TLS; `http://` and scheme-less endpoints stay plaintext.
 
 ### Security
 - Docs site: Material for MkDocs 9.7.7 fixes a DOM cross-site scripting issue in search suggestions (GHSA-xvg9-69gf-fjrf, CVE-2026-73295); the site was built with 9.7.6 for about a day. The `agentprobe-toolkit` package itself was not affected

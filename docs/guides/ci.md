@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install "agentprobe-toolkit>=1.4" pytest
+      - run: pip install "agentprobe-toolkit>=1.5" pytest
       # Point this at the folder with your fault tests. Tests marked `integration`
       # (real models) are left for the nightly run below.
       - run: pytest tests/ -m "not integration" --junitxml=agentprobe-results.xml
@@ -72,7 +72,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install "agentprobe-toolkit>=1.4" pytest
+      - run: pip install "agentprobe-toolkit>=1.5" pytest
       - run: pytest tests/ -m integration --junitxml=agentprobe-integration.xml
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}  # or your provider's key

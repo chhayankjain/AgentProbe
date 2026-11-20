@@ -8,7 +8,7 @@ The built-in faults cover the failures tools hit most: timeouts, rate limits, se
 
 | Fault (`with_=`) | Raises | Also an instance of |
 |---|---|---|
-| `"timeout"` (default) | `ToolCallTimeout` | `ToolCallError`; `TimeoutError` from the next release |
+| `"timeout"` (default) | `ToolCallTimeout` | `ToolCallError`, `TimeoutError` (since 1.5) |
 | `"rate_limit"` | `ToolCallRateLimited` (HTTP 429, `retry_after`) | `ToolCallError` |
 | `"api_error"` | `ToolCallAPIError` (HTTP 503) | `ToolCallError` |
 | `"malformed_output"` | `ToolCallMalformedOutput` | `ToolCallError` |
@@ -16,7 +16,7 @@ The built-in faults cover the failures tools hit most: timeouts, rate limits, se
 All four are importable from `agentprobe.testing`. To raise the exact exception your client raises instead, see [Inject the exceptions your code handles](real-exceptions.md).
 
 !!! note "Importing the fault classes"
-    From the next release they are importable from `agentprobe.testing`, which needs no other packages. In 1.4.0, import them from `agentprobe.injector.tool_failure`.
+    Since 1.5 they are importable from `agentprobe.testing`, which needs no other packages. In 1.4, import them from `agentprobe.injector.tool_failure`.
 
 
 ## A rate-limited search tool

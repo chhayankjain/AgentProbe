@@ -47,7 +47,7 @@ each on the same local model ([validation record](https://github.com/chhayankjai
 The tests inject `TimeoutError` and LangChain's `ToolException`, the exception types the fix handles.
 When we ran them, AgentProbe's built-in faults subclassed neither, so code that handles real timeouts
 wouldn't have caught them. Since [#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114)
-(on `main`, in the next release), the built-in `"timeout"` fault is a `TimeoutError`; a framework's
+(released in 1.5), the built-in `"timeout"` fault is a `TimeoutError`; a framework's
 own error type, such as `ToolException`, still needs `with_=`.
 
 Each cell says whether the run **completed without an unhandled exception**. The tests check that the
@@ -90,5 +90,5 @@ own model.
   extraction for such graphs is another v1.5 candidate.
 - Injected faults should be catchable the way real failures are. Fixed for timeouts in
   [#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114): the built-in `"timeout"` fault is now a
-  `TimeoutError` (on `main`, in the next release). For any other exception your code handles, such as
+  `TimeoutError` (since 1.5). For any other exception your code handles, such as
   `ToolException` or an HTTP client's errors, pass it with `with_=`.

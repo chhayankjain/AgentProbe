@@ -13,10 +13,10 @@ def answer(question, tools=TOOLS, *, broken=False): ...
 ## 2. Install
 
 ```bash
-pip install "agentprobe-toolkit>=1.4" pytest
+pip install "agentprobe-toolkit>=1.5" pytest
 ```
 
-This API needs AgentProbe 1.4 or later. No model or API key is needed for this tutorial.
+This tutorial needs AgentProbe 1.5 or later. No model or API key is needed for this tutorial.
 
 ## 3. Write the fault test
 
@@ -81,9 +81,7 @@ p.on("payment_status").always_fail(
 
 Useful checks on the result: `assert_answer_contains`, `assert_answer_not_contains`, `assert_no_crash`, `assert_within(seconds)`, `assert_called`, `assert_not_called`. `print(result)` shows what was observed, what you asserted, and what was inferred (retries and fallbacks).
 
-### Check the tool calls themselves (next release)
-
-> **Not in 1.4.0.** These four assertions are on `main` and ship in the next release. To try them now, install from GitHub instead of PyPI: `pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit.git" pytest`
+### Check the tool calls themselves
 
 This test checks which tools the agent invoked after a transient failure.
 

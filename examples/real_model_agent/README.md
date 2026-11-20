@@ -6,7 +6,7 @@ The [tutorial](../your_agent/README.md) uses a scripted agent so it runs anywher
 
 ```bash
 ollama pull qwen2.5:7b
-pip install "agentprobe-toolkit>=1.4" "langchain>=1.5" langchain-ollama pytest
+pip install "agentprobe-toolkit>=1.5" "langchain>=1.5" langchain-ollama pytest
 pytest examples/real_model_agent -v -s
 ```
 
