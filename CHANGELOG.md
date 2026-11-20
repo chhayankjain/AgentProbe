@@ -7,7 +7,8 @@
 
 ### Changed
 - Research material moved under `research/`: the benchmark scripts and every result batch (`research/experiments/`), the paper source (`research/paper/`), the sample target agent (`research/samples/`) and the observability stack (`research/observability/`). The README now focuses on testing your own agent; the benchmark, taxonomy and reproduction steps moved to `research/README.md`. Run experiment scripts as `python research/experiments/<script>.py`.
-- Type checking is now enforced: `mypy --strict` passes on the whole package and CI fails on any new error (it was advisory, with 55 known errors). Fixes along the way: precise types for the orchestration injector's node and router functions, `cast` instead of stale `type: ignore` comments in the injectors, and `AgentMetrics` labels that are always strings
+- Type checking is now enforced: `mypy --strict` passes on the whole package and CI fails on any new error (it was advisory, with 55 known errors). `tests/test_public_types.py` checks the types users see
+- `MetricsCalculator` labels (`framework`, `task`, `failure_type`) are always strings: a label present with the value `None` now falls back to the default (`unknown`/`none`) like a missing one, and other values are converted with `str()`. Before, `None` was passed through to `AgentMetrics`
 
 ### Added
 - Docs site at https://agentprobe-toolkit.pages.dev/ (MkDocs on Cloudflare Pages, deployed from `main`; the earlier GitHub Pages address redirects there): getting started, task guides (retries, timeouts and rate limits, wrong data, LangGraph tool errors, real exception types, CI), scenario and assertion reference, and `llms.txt`. The guides' code examples run in the test suite (`tests/test_docs_examples.py`)
@@ -16,6 +17,7 @@
 - `examples/real_model_agent/`: fault tests on a real LLM agent (LangChain `create_agent` on local Ollama). Recovery is checked on the call log (right order, right arguments, confirmation before the receipt), not on wording. Includes `run_matrix.py` and the saved evidence for its results table across two models, two prompts and two tool-error messages. Live tests are marked `integration`; CI compiles the example and runs its offline call-log checks
 
 ### Fixed
+- Async injector APIs had the wrong static types: `ToolFailureInjector.call_async()` was typed as returning a coroutine although it returns the awaited result, so `await injector.call_async(tool) + 1` failed type checking. `call_async` and both injectors' `wrap_async` now take `Callable[..., Awaitable[T]]` and return `T` / `Callable[..., Coroutine[Any, Any, T]]`
 - The injected `ToolCallTimeout` can be caught with Python's `TimeoutError` as well as `ToolCallError`, allowing agents to exercise their usual timeout handler (#114).
 
 ## [1.4.0] - 2026-11-18

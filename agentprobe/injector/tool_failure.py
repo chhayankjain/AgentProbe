@@ -42,7 +42,7 @@ import asyncio
 import functools
 import random
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, TypeVar, cast
@@ -186,14 +186,17 @@ class ToolFailureInjector:
 
         return wrapper
 
-    def wrap_async(self, fn: Callable[..., T]) -> Callable[..., T]:
-        """Wrap an async tool function with failure injection."""
+    def wrap_async(self, fn: Callable[..., Awaitable[T]]) -> Callable[..., Coroutine[Any, Any, T]]:
+        """Wrap an async tool function with failure injection.
+
+        Awaiting the wrapper gives the tool's result (or an injected substitute).
+        """
 
         @functools.wraps(fn)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             return cast(T, await self._execute_async(fn, fn.__name__, *args, **kwargs))
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     def call(
         self, fn: Callable[..., T], *args: Any, tool_name: str | None = None, **kwargs: Any
@@ -209,9 +212,14 @@ class ToolFailureInjector:
         return cast(T, self._execute_sync(fn, tool_name or fn.__name__, *args, **kwargs))
 
     async def call_async(
-        self, fn: Callable[..., T], *args: Any, tool_name: str | None = None, **kwargs: Any
+        self,
+        fn: Callable[..., Awaitable[T]],
+        *args: Any,
+        tool_name: str | None = None,
+        **kwargs: Any,
     ) -> T:
-        """Directly invoke an async function with failure injection."""
+        """Directly invoke an async function with failure injection; returns its
+        awaited result (or an injected substitute)."""
         return cast(T, await self._execute_async(fn, tool_name or fn.__name__, *args, **kwargs))
 
     # ------------------------------------------------------------------
