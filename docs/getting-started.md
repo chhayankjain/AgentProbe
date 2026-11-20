@@ -93,7 +93,7 @@ AgentProbe gate FAILED: scenarios 0/1 required exercised, assertions 0/0 require
 
 ## Before you wire in real tools
 
-- **Real tools really run.** A call that gets a fault never reaches your tool, but every other call does. If a tool sends email, charges a card or writes to a database, point it at a sandbox or a test double.
+- **Real tools really run.** Exception and substituted-return faults (`fail_*`, `always_fail`, `returns`) bypass your tool. Every other call runs it, including calls delayed by `slow()`. If a tool sends email, charges a card or writes to a database, point it at a sandbox or a test double.
 - **Reports are not redacted yet.** Summaries and `to_dict()` include tool arguments and answers verbatim. Keep secrets out of fault-test inputs ([#102](https://github.com/chhayankjain/agentprobe-toolkit/issues/102)).
 
 ## Try the demo

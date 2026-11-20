@@ -1,34 +1,49 @@
-# AgentProbe
+<p align="center">
+  <img src="https://raw.githubusercontent.com/chhayankjain/agentprobe-toolkit/main/docs/assets/logo.svg" alt="" width="72">
+</p>
 
-[![CI](https://github.com/chhayankjain/agentprobe-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/chhayankjain/agentprobe-toolkit/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/chhayankjain/agentprobe-toolkit/actions/workflows/codeql.yml/badge.svg)](https://github.com/chhayankjain/agentprobe-toolkit/actions/workflows/codeql.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/agentprobe-toolkit.svg)](https://pypi.org/project/agentprobe-toolkit/)
-[![GitHub release](https://img.shields.io/github/v/release/chhayankjain/agentprobe-toolkit)](https://github.com/chhayankjain/agentprobe-toolkit/releases)
-[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://agentprobe-toolkit.pages.dev/)
+<h1 align="center">AgentProbe</h1>
 
-**Test how your LLM agent handles tool failures, in pytest.**
+<p align="center">
+  <strong>Fault-injection testing for tool-using LLM agents, in pytest.</strong>
+</p>
 
-Your agent's tools will time out, hit rate limits, and return garbage. AgentProbe wraps the tools your agent already uses, breaks them on purpose and deterministically, and checks what your agent did about it. The test fails unless every fault you declared **actually fired**, so an agent that skips the tool or answers from a cache can't look resilient. The examples and the demo run without a model or API key.
+<p align="center">
+  <a href="https://pypi.org/project/agentprobe-toolkit/"><img src="https://img.shields.io/pypi/v/agentprobe-toolkit.svg" alt="PyPI"></a>
+  <a href="https://pypi.org/project/agentprobe-toolkit/"><img src="https://img.shields.io/pypi/pyversions/agentprobe-toolkit.svg" alt="Python versions"></a>
+  <a href="https://github.com/chhayankjain/agentprobe-toolkit/actions/workflows/ci.yml"><img src="https://github.com/chhayankjain/agentprobe-toolkit/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://agentprobe-toolkit.pages.dev/"><img src="https://img.shields.io/badge/docs-agentprobe--toolkit.pages.dev-4f46e5.svg" alt="Documentation"></a>
+  <a href="https://github.com/chhayankjain/agentprobe-toolkit/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
+</p>
 
-[Docs](https://agentprobe-toolkit.pages.dev/) · [Install](#install) · [Your first fault test](#your-first-fault-test) · [What a failure looks like](#what-a-failure-looks-like) · [Scenarios](#what-you-can-break) · [Assertions](#what-you-can-check) · [CI](#run-it-in-ci) · [Tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md) · [For researchers](#for-researchers-the-benchmark-and-the-paper)
+<p align="center">
+  <a href="https://agentprobe-toolkit.pages.dev/"><strong>Documentation</strong></a> ·
+  <a href="https://agentprobe-toolkit.pages.dev/getting-started/">Getting started</a> ·
+  <a href="https://agentprobe-toolkit.pages.dev/guides/retries/">Guides</a> ·
+  <a href="https://agentprobe-toolkit.pages.dev/reference/scenarios/">Reference</a> ·
+  <a href="https://github.com/chhayankjain/agentprobe-toolkit/blob/main/CHANGELOG.md">Changelog</a>
+</p>
 
 ---
 
-## Install
+Tools fail in production: they time out, hit rate limits and return bad data. AgentProbe wraps the tools your agent already uses, makes them fail on purpose and deterministically, and checks what the agent did about it.
+
+- **Deterministic scenarios.** Fail specified tool calls predictably, without relying on random outages. Live-model responses and external tools can still vary.
+- **Evidence-based.** A test fails unless every fault you declared actually fired. An agent that skips the tool or answers from a cache cannot pass by accident.
+- **Non-invasive.** Your agent and tools run unchanged; AgentProbe steps in only at the tool boundary, on copies of your tools.
+- **Just pytest.** No model, API key or service is needed for scripted agents, so fault tests run in any CI.
+
+## Installation
 
 ```bash
 pip install "agentprobe-toolkit>=1.4" pytest
 ```
 
-The testing API on this page (`agentprobe.testing`) needs version 1.4 or later.
+The package installs as `agentprobe-toolkit` and imports as `agentprobe`. Requires Python 3.11+.
 
-You install `agentprobe-toolkit` and import `agentprobe`, the same way `pip install scikit-learn` gives you `import sklearn`. Python 3.11+.
+## Quick start
 
-## Your first fault test
-
-Say `answer(question, tools)` is your agent and `TOOLS` maps tool names to the functions it calls. This test checks that when the payment service is down, the agent admits it instead of claiming success:
+Given an agent `answer(question, tools)` and a dict `TOOLS` of the functions it calls, this test checks that the agent admits a payment-service outage instead of claiming success:
 
 ```python
 from agentprobe.testing import probe
@@ -38,137 +53,90 @@ from my_agent import TOOLS, answer
 
 def test_admits_failure_when_payment_service_is_down():
     with probe() as p:
-        tools = p.wrap(TOOLS)                                   # probed copies; your tools are untouched
-        p.on("payment_status").always_fail(with_="timeout")     # break one tool, every call
+        tools = p.wrap(TOOLS)  # probed copies; your tools are untouched
+        p.on("payment_status").always_fail(with_="timeout")
+
         result = p.run(lambda q: answer(q, tools), "Did order 42 go through?")
+
         result.assert_no_crash()
-        result.assert_answer_not_contains("is confirmed")       # never claim unverified success
-        result.assert_answer_contains("couldn't confirm")       # say so instead
-        result.assert_not_called("send_receipt")                # no receipt for an unconfirmed payment
+        result.assert_answer_not_contains("is confirmed")
+        result.assert_answer_contains("couldn't confirm")
+        result.assert_not_called("send_receipt")
 ```
 
-Run it with `pytest`. Nothing is mocked except the fault: your agent runs for real, with real tools, and AgentProbe only steps in at the tool boundary.
-
-## What a failure looks like
-
-Point the same test at an agent that swallows the error and reports success anyway, and pytest shows you exactly what happened:
+Run it with `pytest`. If the agent swallows the error and reports success, the failure shows what happened, what was asserted and what was inferred:
 
 ```text
 AssertionError: answer does not contain 'is confirmed': answer was 'Order 42 is confirmed and paid; receipt sent for order 42.'
 
 Observed
+  final answer: 'Order 42 is confirmed and paid; receipt sent for order 42.'
+  elapsed: 0.00s
   1. payment_status('42') raised ToolCallTimeout: Tool call timed out (injected by AgentProbe)  [injected: payment_status: fail every call with timeout]
   2. send_receipt('42') returned 'receipt sent for order 42'
   scenarios:
     [exercised] payment_status: fail every call with timeout (required; injected 1/open-ended, 1 call(s) to payment_status)
 Asserted
+  [pass] no unhandled exception: none raised
   [fail] answer does not contain 'is confirmed': answer was 'Order 42 is confirmed and paid; receipt sent for order 42.'
 Inferred (heuristics over the call log)
+  retries: none
   fallbacks: [('payment_status', 'send_receipt')]
 ```
 
-And an agent that never calls the tool (a cache, a hard-coded answer) fails even if every assertion would pass:
+If the agent never calls `payment_status` at all (a cache, a hard-coded answer), the test still fails: AgentProbe's gate reports the scenario as *not exercised*, even when every assertion passes.
 
-```text
-AgentProbe gate FAILED: scenarios 0/1 required exercised, assertions 0/0 required passed
-  - scenario 'payment_status: fail every call with timeout' not exercised: the agent never called 'payment_status' (tools called: none). It may have bypassed the tool or used a cached answer.
-```
+The example imports your own agent. For a complete runnable example with no model or API key, follow [Getting started](https://agentprobe-toolkit.pages.dev/getting-started/).
 
-## What you can break
+## Features
 
-Scenarios are declared per tool with `p.on("tool_name")` and are deterministic: the same calls fail on every run.
+**Fault scenarios**, declared per tool and applied in order:
 
-| Scenario | Use it to test |
+| Scenario | Simulates |
 |---|---|
-| `fail_first(n)` | Recovery: the first *n* calls fail, then the tool works |
-| `fail_times(n).then_succeed()` | The same, spelled out |
-| `always_fail()` | Outage: every call fails. Does the agent give up honestly? |
-| `returns(value, times=1)` | Wrong, stale or incomplete data instead of an exception |
-| `slow(ms=..., times=1)` | Latency, together with `p.run(..., timeout=...)` |
-| `with_probability(p, seed=...)` | Random, seeded faults for experiments |
+| `fail_first(n)`, `fail_times(n).then_succeed()` | Transient failures, to test retries and recovery |
+| `always_fail()` | An outage, to test that the agent gives up honestly |
+| `returns(value)` | Wrong, stale or incomplete data |
+| `slow(ms=...)` | Latency, combined with a deadline: `p.run(..., timeout=...)` |
+| `with_probability(p, seed=...)` | Random, reproducible faults for experiments |
 
-Faults: `"timeout"`, `"rate_limit"`, `"api_error"`, `"malformed_output"`, or any exception class or instance via `with_=`. Rules for one tool apply in order, so `fail_first(1).returns("stale", times=2)` fails call 1, returns stale data for calls 2 and 3, then lets calls through.
+Built-in faults are `"timeout"`, `"rate_limit"`, `"api_error"` and `"malformed_output"`; pass any exception class or instance with `with_=` to match what your code really handles.
 
-## What you can check
+**Assertions** on the answer (`assert_answer_contains`, `assert_answer_not_contains`), on the run (`assert_no_crash`, `assert_within`) and on tool calls (`assert_called`, `assert_not_called`). Argument, order and call-count assertions are on `main` for the next release. Every result separates what was **observed**, what was **asserted** and what was **inferred**, and exports versioned JSON with `result.to_dict()`.
 
-| Assertion | Passes when |
+See the [scenario](https://agentprobe-toolkit.pages.dev/reference/scenarios/) and [assertion](https://agentprobe-toolkit.pages.dev/reference/assertions/) reference for details.
+
+## Integrations
+
+| Works with | How |
 |---|---|
-| `assert_answer_contains(text)` | The agent produced an answer containing *text* |
-| `assert_answer_not_contains(text)` | The agent produced an answer **without** *text*. A crash or `None` never passes |
-| `assert_no_crash()` | No exception escaped the agent |
-| `assert_within(seconds)` | The run finished in time |
-| `assert_called(tool)` / `assert_not_called(tool)` | The tool was or wasn't called; in-flight calls count |
-| `assert_scenarios_exercised()` | Every required fault fired (also enforced automatically when the `with` block ends) |
+| Plain Python functions, sync or `async` | `p.wrap(TOOLS)` with a dict, list or single function |
+| LangChain tools (`@tool`, `StructuredTool`, `BaseTool`) | Wrapped as copies with the same name and schema |
+| LangGraph | Pass the wrapped tools to your graph ([guide](https://agentprobe-toolkit.pages.dev/guides/langgraph-tool-errors/)) |
+| Any agent callable or object with `invoke()` | `p.run(agent, input)`, or `await p.arun(...)` for async agents |
 
-Coming in the next release, and on `main` now: `assert_called_with(tool, *args, **kwargs)`, `assert_call_order([...])`, `assert_called_times(tool, n)` and `assert_called_at_most(tool, n)` check the arguments, order and number of tool calls ([tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md#check-the-tool-calls-themselves-next-release)).
+How wrapping, concurrency, deadlines and cleanup work is documented in [How probing works](https://agentprobe-toolkit.pages.dev/instrumentation/).
 
-The result keeps what was **observed** (every tool call with arguments, outcome and injected fault), what you **asserted** (pass, fail or unassessed) and what is **inferred** (`result.retries`, `result.fallbacks`) apart. `print(result.summary())` shows all three; `result.to_dict()` is versioned, JSON-safe output for CI artifacts.
+## Learn more
 
-## Works with your stack
+- [**Guides**](https://agentprobe-toolkit.pages.dev/guides/retries/): retries, timeouts and rate limits, wrong data, LangGraph tool errors, real exception types, CI.
+- [**Tutorial**](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md): add a fault test to an existing agent and run it in CI, in ten minutes.
+- [**Real-model example**](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/real_model_agent/README.md): the same tests on a LangChain agent with a local Ollama model.
+- [**Case study**](https://agentprobe-toolkit.pages.dev/case-studies/agents-from-scratch/): fault tests that found an unhandled tool exception in a third-party LangGraph agent.
+- **Demo:** `python -m agentprobe.demo` runs a scripted LangGraph agent under seeded faults, with no model or API key.
 
-- **Plain functions**, sync or `async`: pass a list, tuple or `{name: function}` dict to `p.wrap(...)`.
-- **LangChain tools** (`@tool`, `StructuredTool`, `BaseTool` subclasses): wrapped as copies with the same schema.
-- **LangGraph**: pass the wrapped tools to your graph. The prebuilt ReAct agent re-raises tool exceptions by default; use `ToolNode(tools, handle_tool_errors=True)` if your agent should see the error and recover.
-- **Any agent callable** or object with `invoke()`: `p.run(agent, input)`.
-- **Async agents and async tests:** `await p.arun(agent, input, timeout=...)`. At the deadline the probe stops injecting and requests cancellation; an agent that ignores it is reported as still running, never as passed.
+## Before you test real tools
 
-What AgentProbe guarantees about your tools (never modified, cleanup on exceptions and cancellation, concurrency, agents that outlive their deadline) is in [docs/instrumentation.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/docs/instrumentation.md).
+- **Real tools run.** Exception and substituted-return faults bypass the original tool. Other calls, including calls delayed by `slow()`, execute it. Use sandboxes or test doubles for payments, email and other side effects.
+- **Reports are not redacted yet.** Tool arguments, results and answers appear verbatim in reports and JSON; keep secrets out of test inputs ([#102](https://github.com/chhayankjain/agentprobe-toolkit/issues/102)).
 
-### Good to know before you wire in real tools
+## Contributing
 
-- **Real tools really run.** A call that gets a fault (`fail_*`, `always_fail`, `returns`) never reaches your tool, but every other call does, including calls delayed by `slow()`. If a tool sends email, charges a card or writes to a database, point it at a sandbox or a test double in your fault tests.
-- **Reports are not redacted yet.** Summaries, assertion messages and `to_dict()` include tool arguments, return values and answers as they were. Keep secrets and customer data out of fault-test inputs, or don't upload the JSON as a CI artifact. Automatic redaction is planned ([#102](https://github.com/chhayankjain/agentprobe-toolkit/issues/102)).
+Contributions are welcome. [Good first issues](https://github.com/chhayankjain/agentprobe-toolkit/labels/good%20first%20issue) need no model or API key; setup and workflow are in [CONTRIBUTING.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/CONTRIBUTING.md), and the plan is in [ROADMAP.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ROADMAP.md). If you use AgentProbe on a real agent, feedback in [#68](https://github.com/chhayankjain/agentprobe-toolkit/issues/68) or [Discussions](https://github.com/chhayankjain/agentprobe-toolkit/discussions) is especially valuable.
 
-## Run it in CI
+## Research
 
-Fault tests are ordinary pytest tests, so any CI runs them. A ready-made GitHub Actions workflow is in [`examples/your_agent/ci.yml`](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/ci.yml):
-
-```yaml
-- run: pip install "agentprobe-toolkit>=1.4" pytest
-- run: pytest tests/ -m "not integration" --junitxml=agentprobe-results.xml
-```
-
-The [10-minute tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md) walks through a complete example agent, shows the same tests catching a deliberately broken version, and sets up CI. The [real-model example](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/real_model_agent/README.md) runs the same kind of tests on a LangChain agent with a local Ollama model, and shows what they caught across models and prompts. The [case study](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/docs/case-studies/agents-from-scratch.md) shows AgentProbe finding an unhandled tool exception in a LangGraph tutorial agent we don't own.
-
-## Try the demo (no model, no key)
-
-With AgentProbe installed as above:
-
-```bash
-python -m agentprobe.demo                      # rate-limit faults, p=0.3, 10 runs
-python -m agentprobe.demo --fault timeout --p 0.5 --runs 20
-python -m agentprobe.demo --json               # machine-readable report
-```
-
-The demo runs a small LangGraph agent on a scripted, deterministic model, injects seeded faults into its calculator tool, and prints the metrics, the per-call injection log with OpenTelemetry span ids, and each run's outcome.
-
-Task guides (retries, timeouts and rate limits, wrong data, LangGraph tool errors, CI) and the full reference are on the [docs site](https://agentprobe-toolkit.pages.dev/).
-
-## Get involved
-
-- **Have a real agent?** Try AgentProbe on it and tell us where it hurt ([#68](https://github.com/chhayankjain/agentprobe-toolkit/issues/68)). That's the most valuable contribution there is.
-- **Want to contribute code?** [Good first issues](https://github.com/chhayankjain/agentprobe-toolkit/labels/good%20first%20issue) are small and need no model or API key. Setup is in [CONTRIBUTING.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/CONTRIBUTING.md).
-- **Where it's going:** [ROADMAP.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ROADMAP.md). Next up: a pytest plugin, secret redaction in reports and a fault coverage report.
-- **Questions and ideas:** [Discussions](https://github.com/chhayankjain/agentprobe-toolkit/discussions).
-
----
-
-## For researchers: the benchmark and the paper
-
-AgentProbe began as the toolkit behind the paper *"AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents"* (submitted to MAKE, MDPI, 2026). The benchmark harness, failure taxonomy, every experiment batch, the paper source and the steps to reproduce its results are in [`research/`](https://github.com/chhayankjain/agentprobe-toolkit/tree/main/research).
-
-## Development
-
-```bash
-git clone https://github.com/chhayankjain/agentprobe-toolkit.git && cd agentprobe-toolkit
-pip install -e ".[dev,plotting]"                     # no model or API key needed
-pytest tests/ examples/your_agent -m "not slow and not integration"
-ruff check agentprobe/ tests/ examples/ && ruff format --check agentprobe/ tests/ examples/
-```
-
-See [CONTRIBUTING.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/CONTRIBUTING.md) for the workflow and [ARCHITECTURE.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/ARCHITECTURE.md) for how the code fits together.
-
-## Citation
+AgentProbe began as the toolkit behind the paper *AgentProbe: Systematic Fault Injection and Observability for Evaluating the Reliability of LLM-Based Intelligent Agents* (under review). The benchmark, failure taxonomy, experiment data and reproduction steps are in [`research/`](https://github.com/chhayankjain/agentprobe-toolkit/tree/main/research).
 
 ```bibtex
 @misc{jain2026agentprobe,
@@ -181,4 +149,4 @@ See [CONTRIBUTING.md](https://github.com/chhayankjain/agentprobe-toolkit/blob/ma
 
 ## License
 
-MIT — see [LICENSE](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/LICENSE).
+[MIT](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/LICENSE)
