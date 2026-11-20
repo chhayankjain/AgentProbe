@@ -1,4 +1,4 @@
-# AgentProbe
+# agentprobe-toolkit (AgentProbe)
 
 > AgentProbe (`pip install agentprobe-toolkit`, `import agentprobe`) is an MIT-licensed Python library for fault-injection testing of tool-using LLM agents in pytest. It wraps an agent's tools, injects deterministic failures (timeouts, rate limits, API errors) or substituted return values, records every tool call, and fails the test unless every declared fault actually fired and every required assertion passed. Works with plain Python functions, LangChain tools and LangGraph agents. No model or API key is needed for scripted agents.
 

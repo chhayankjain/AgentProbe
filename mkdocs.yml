@@ -1,4 +1,4 @@
-site_name: AgentProbe
+site_name: agentprobe-toolkit
 site_description: Test how your LLM agent handles tool failures, in pytest. Deterministic fault injection for tool-using agents.
 site_url: https://chhayankjain.github.io/agentprobe-toolkit/
 repo_url: https://github.com/chhayankjain/agentprobe-toolkit
