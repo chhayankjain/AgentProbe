@@ -74,7 +74,9 @@ from agentprobe import (
 )
 from agentprobe.agents.langgraph_agent import LangGraphToolAgent
 
-# 1. Set up tracing (console by default; OTLP endpoint optional)
+# 1. Set up tracing (console by default; OTLP endpoint optional).
+#    http:// sends spans in plaintext (a local collector); https:// uses TLS.
+#    Override with insecure=True/False or OTEL_EXPORTER_OTLP_INSECURE.
 tracer = AgentProbeTracer(service_name="my-experiment", otlp_endpoint="http://localhost:4317")
 
 # 2. Configure failure injection

@@ -28,6 +28,7 @@ import os
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
+from urllib.parse import urlparse
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
@@ -52,10 +53,39 @@ _GLOBAL_PROVIDER: TracerProvider | None = None
 _ATTACHED: dict[str, Any] = {"console": False, "otlp": set()}
 
 
+def otlp_insecure(endpoint: str, insecure: bool | None = None) -> bool:
+    """Whether the OTLP exporter for *endpoint* sends spans without TLS.
+
+    In order: an explicit *insecure* wins; an ``https://`` endpoint uses TLS;
+    the standard ``OTEL_EXPORTER_OTLP_TRACES_INSECURE`` or
+    ``OTEL_EXPORTER_OTLP_INSECURE`` variable decides if set; an ``http://``
+    endpoint is plaintext. An endpoint with no scheme (``localhost:4317``) stays
+    plaintext, as in AgentProbe 1.4 and earlier; write ``https://`` to use TLS.
+    Certificates come from the standard ``OTEL_EXPORTER_OTLP_CERTIFICATE`` (and
+    client certificate/key) variables.
+    """
+    if insecure is not None:
+        return insecure
+    scheme = urlparse(endpoint).scheme.lower()
+    if scheme == "https":
+        return False
+    env = os.getenv("OTEL_EXPORTER_OTLP_TRACES_INSECURE") or os.getenv(
+        "OTEL_EXPORTER_OTLP_INSECURE"
+    )
+    if env is not None and env.strip():
+        return env.strip().lower() == "true"
+    return True
+
+
+def _otlp_exporter(endpoint: str, insecure: bool | None) -> Any:
+    return OTLPSpanExporter(endpoint=endpoint, insecure=otlp_insecure(endpoint, insecure))
+
+
 def _build_provider(
     service_name: str,
     otlp_endpoint: str | None = None,
     console: bool = True,
+    insecure: bool | None = None,
 ) -> TracerProvider:
     resource = Resource(attributes={SERVICE_NAME: service_name})
     provider = TracerProvider(resource=resource)
@@ -64,7 +94,7 @@ def _build_provider(
         provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
 
     if otlp_endpoint and _OTLP_AVAILABLE:
-        otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
+        otlp_exporter = _otlp_exporter(otlp_endpoint, insecure)
         provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
     elif otlp_endpoint and not _OTLP_AVAILABLE:
         import warnings
@@ -94,9 +124,13 @@ class AgentProbeTracer:
     Args:
         service_name: Service name shown in trace UIs (Jaeger, Tempo, etc.).
             Only the first instance's name is used for the shared resource.
-        otlp_endpoint: gRPC endpoint for OTLP export (e.g. "http://localhost:4317").
+        otlp_endpoint: gRPC endpoint for OTLP export (e.g. "http://localhost:4317"
+            for a local collector, "https://collector.example.com:4317" for TLS).
             If None, only console export is active.
         console: Whether to print spans to stdout (useful for local dev).
+        insecure: Send OTLP spans without TLS. ``None`` (the default) decides
+            from the endpoint and the standard environment variables; see
+            :func:`otlp_insecure`.
     """
 
     def __init__(
@@ -104,6 +138,7 @@ class AgentProbeTracer:
         service_name: str = _DEFAULT_SERVICE,
         otlp_endpoint: str | None = None,
         console: bool = True,
+        insecure: bool | None = None,
     ) -> None:
         global _GLOBAL_PROVIDER
         endpoint = otlp_endpoint or os.getenv("AGENTPROBE_OTLP_ENDPOINT")
@@ -115,7 +150,7 @@ class AgentProbeTracer:
             # rather than create a provider that library spans would bypass.
             _GLOBAL_PROVIDER = existing
         if _GLOBAL_PROVIDER is None:
-            _GLOBAL_PROVIDER = _build_provider(service_name, endpoint, console_on)
+            _GLOBAL_PROVIDER = _build_provider(service_name, endpoint, console_on, insecure)
             trace.set_tracer_provider(_GLOBAL_PROVIDER)
             _ATTACHED["console"] = console_on
             if endpoint and _OTLP_AVAILABLE:
@@ -128,7 +163,7 @@ class AgentProbeTracer:
                 _ATTACHED["console"] = True
             if endpoint and _OTLP_AVAILABLE and endpoint not in _ATTACHED["otlp"]:
                 _GLOBAL_PROVIDER.add_span_processor(
-                    BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True))
+                    BatchSpanProcessor(_otlp_exporter(endpoint, insecure))
                 )
                 _ATTACHED["otlp"].add(endpoint)
 

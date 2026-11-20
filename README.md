@@ -114,7 +114,7 @@ The example imports your own agent. For a complete runnable example with no mode
 
 Built-in faults are `"timeout"`, `"rate_limit"`, `"api_error"` and `"malformed_output"`; pass any exception class or instance with `with_=` to match what your code really handles.
 
-**Assertions** on the answer (`assert_answer_contains`, `assert_answer_not_contains`), on the run (`assert_no_crash`, `assert_within`) and on tool calls (`assert_called`, `assert_not_called`). Argument, order and call-count assertions are on `main` for the next release. Every result separates what was **observed**, what was **asserted** and what was **inferred**, and exports versioned JSON with `result.to_dict()`.
+**Assertions** on the answer (`assert_answer_contains`, `assert_answer_not_contains`), on the run (`assert_no_crash`, `assert_within`) and on tool calls (`assert_called`, `assert_not_called`). On `main` for the next release: regex and predicate answer checks (`assert_answer_matches`, `assert_answer(check)`) that tolerate varied wording, and argument, order and call-count assertions. Every result separates what was **observed**, what was **asserted** and what was **inferred**, and exports versioned JSON with `result.to_dict()`.
 
 See the [scenario](https://agentprobe-toolkit.pages.dev/reference/scenarios/) and [assertion](https://agentprobe-toolkit.pages.dev/reference/assertions/) reference for details.
 

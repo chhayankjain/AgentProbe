@@ -54,6 +54,7 @@ import inspect
 import math
 import pathlib
 import random
+import re
 import threading
 import time
 import uuid
@@ -424,6 +425,18 @@ def _evidence(rule: _Rule, calls_to_tool: int) -> ScenarioEvidence:
     )
 
 
+def _compile(pattern: str | re.Pattern[str], flags: int) -> re.Pattern[str]:
+    """Compile *pattern*, raising ProbeError (not re.error) for an invalid one."""
+    if isinstance(pattern, re.Pattern):
+        if flags and pattern.flags & flags != flags:
+            raise ProbeError("pass flags inside re.compile(), not with a compiled pattern")
+        return pattern
+    try:
+        return re.compile(pattern, flags)
+    except re.error as exc:
+        raise ProbeError(f"invalid regular expression {pattern!r}: {exc}") from None
+
+
 def _short(value: Any, limit: int = 200) -> str:
     try:
         text = repr(value)
@@ -763,6 +776,83 @@ class ProbeResult:
             self._record(name, "fail", f"answer was {self.answer!r}", required)
         else:
             self._record(name, "pass", "absent", required)
+        return self
+
+    def assert_answer_matches(
+        self, pattern: str | re.Pattern[str], *, flags: int = 0, required: bool = True
+    ) -> ProbeResult:
+        """The agent produced a final answer, and *pattern* matches somewhere in it.
+
+        Uses :func:`re.search`. Matching is case-sensitive unless you pass
+        ``flags=re.IGNORECASE`` (or write ``(?i)`` in the pattern). Useful when the
+        wording varies between models or prompts:
+        ``assert_answer_matches(r"could(n't| not) (confirm|verify)")``.
+        """
+        regex = _compile(pattern, flags)
+        name = f"answer matches {regex.pattern!r}"
+        if (reason := self._no_answer_reason()) is not None:
+            self._record(name, *reason, required)
+            return self
+        assert self.answer is not None
+        if (match := regex.search(self.answer)) is not None:
+            self._record(name, "pass", f"matched {match.group(0)!r}", required)
+        else:
+            self._record(name, "fail", f"answer was {self.answer!r}", required)
+        return self
+
+    def assert_answer_not_matches(
+        self, pattern: str | re.Pattern[str], *, flags: int = 0, required: bool = True
+    ) -> ProbeResult:
+        """The agent produced a final answer, and *pattern* matches nowhere in it.
+
+        Like :meth:`assert_answer_not_contains`, a crash or a ``None`` answer does
+        **not** pass.
+        """
+        regex = _compile(pattern, flags)
+        name = f"answer does not match {regex.pattern!r}"
+        if (reason := self._no_answer_reason()) is not None:
+            self._record(name, *reason, required)
+            return self
+        assert self.answer is not None
+        if (match := regex.search(self.answer)) is not None:
+            self._record(
+                name, "fail", f"matched {match.group(0)!r} in answer {self.answer!r}", required
+            )
+        else:
+            self._record(name, "pass", "no match", required)
+        return self
+
+    def assert_answer(
+        self,
+        check: Callable[[str], object],
+        description: str | None = None,
+        *,
+        required: bool = True,
+    ) -> ProbeResult:
+        """The agent produced a final answer, and ``check(answer)`` is truthy.
+
+        For checks that text matching can't express: parse a number, compare
+        JSON, call a classifier. *description* names the check in reports
+        (defaults to the function's name). If *check* raises, the assertion
+        fails with that exception, never passes.
+        """
+        label = description or getattr(check, "__name__", None) or repr(check)
+        name = f"answer satisfies {label}"
+        if (reason := self._no_answer_reason()) is not None:
+            self._record(name, *reason, required)
+            return self
+        assert self.answer is not None
+        error: str | None = None
+        try:
+            ok = bool(check(self.answer))
+        except Exception as exc:  # noqa: BLE001 - reported as the assertion's failure
+            ok, error = False, f"the check raised {type(exc).__name__}: {exc}"
+        if error is not None:
+            self._record(name, "fail", error, required)
+        elif ok:
+            self._record(name, "pass", "check returned a truthy value", required)
+        else:
+            self._record(name, "fail", f"answer was {self.answer!r}", required)
         return self
 
     def assert_no_crash(self, *, required: bool = True) -> ProbeResult:
