@@ -135,3 +135,44 @@ class TestMetricsCalculator:
         assert "failure_rate" in s
         assert "mttr" in s
         assert "p99" in s
+
+
+class TestMetricLabels:
+    """Labels on AgentMetrics are always strings (changed in the strict-typing PR).
+
+    Before, a missing label fell back to the default but a label present with the
+    value None was passed through, so AgentMetrics.framework could be None. Now
+    None also falls back to the default, and other values are converted to str.
+    """
+
+    def _labels(self, run, **explicit):
+        m = MetricsCalculator().compute([run], **explicit)
+        return m.framework, m.task, m.failure_type
+
+    def test_missing_labels_use_the_defaults(self):
+        assert self._labels({"success": True}) == ("unknown", "unknown", "none")
+
+    def test_none_labels_use_the_defaults(self):
+        run = {"success": True, "framework": None, "task": None, "failure_type": None}
+        assert self._labels(run) == ("unknown", "unknown", "none")
+
+    def test_labels_are_read_from_dicts_and_objects(self):
+        run = {"success": True, "framework": "langgraph", "task": "calc", "failure_type": "timeout"}
+        assert self._labels(run) == ("langgraph", "calc", "timeout")
+
+        class Run:
+            success = True
+            framework = "langchain"
+            task = "search"
+            failure_type = "rate_limit"
+
+        assert self._labels(Run()) == ("langchain", "search", "rate_limit")
+
+    def test_non_string_labels_become_strings(self):
+        run = {"success": True, "framework": 3, "task": "calc", "failure_type": "timeout"}
+        assert self._labels(run) == ("3", "calc", "timeout")
+
+    def test_explicit_labels_win(self):
+        run = {"success": True, "framework": "langgraph", "task": "calc", "failure_type": None}
+        labels = self._labels(run, framework="mine", task="t", failure_type="api_error")
+        assert labels == ("mine", "t", "api_error")

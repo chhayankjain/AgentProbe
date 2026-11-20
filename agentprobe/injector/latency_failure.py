@@ -31,7 +31,7 @@ import asyncio
 import functools
 import random
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, TypeVar, cast
@@ -133,14 +133,17 @@ class LatencyFailureInjector:
 
         return wrapper
 
-    def wrap_async(self, fn: Callable[..., T]) -> Callable[..., T]:
-        """Wrap an async function with latency injection."""
+    def wrap_async(self, fn: Callable[..., Awaitable[T]]) -> Callable[..., Coroutine[Any, Any, T]]:
+        """Wrap an async function with latency injection.
+
+        Awaiting the wrapper gives the function's result.
+        """
 
         @functools.wraps(fn)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             return cast(T, await self._execute_async(fn, *args, **kwargs))
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     # ------------------------------------------------------------------
     # Observation

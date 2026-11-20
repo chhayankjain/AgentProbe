@@ -20,7 +20,7 @@ ruff check agentprobe/ tests/ examples/
 ruff format --check agentprobe/ tests/ examples/
 
 # Type check (strict; CI fails on any error)
-mypy agentprobe/
+mypy agentprobe/ tests/test_public_types.py
 ```
 
 ## Where to start

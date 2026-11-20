@@ -84,7 +84,8 @@ jobs:
           pip install -e ".[dev,plotting]"
 
       - name: Run mypy (strict, blocking)
-        run: mypy agentprobe/
+        # tests/test_public_types.py checks the types users see (assert_type)
+        run: mypy agentprobe/ tests/test_public_types.py
 
   build:
     name: Package build check
