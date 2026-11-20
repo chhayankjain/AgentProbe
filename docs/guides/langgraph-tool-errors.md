@@ -27,12 +27,19 @@ def payment_status(order_id: str) -> str:
 
 
 def build_agent(tools, handle_tool_errors=None):
-    model = ScriptedToolCallingModel(tool_name="payment_status", tool_args={"order_id": "42"})
-    node = ToolNode(tools) if handle_tool_errors is None else ToolNode(
-        tools, handle_tool_errors=handle_tool_errors
-    )
+    model = ScriptedToolCallingModel(
+        tool_name="payment_status", tool_args={"order_id": "42"}
+    ).bind_tools(tools)
+    if handle_tool_errors is None:
+        node = ToolNode(tools)  # LangGraph's default error handling
+    else:
+        node = ToolNode(tools, handle_tool_errors=handle_tool_errors)
+
+    def call_model(state):
+        return {"messages": [model.invoke(state["messages"])]}
+
     graph = StateGraph(MessagesState)
-    graph.add_node("agent", lambda s: {"messages": [model.bind_tools(tools).invoke(s["messages"])]})
+    graph.add_node("agent", call_model)
     graph.add_node("tools", node)
     graph.add_edge(START, "agent")
     graph.add_conditional_edges("agent", tools_condition)

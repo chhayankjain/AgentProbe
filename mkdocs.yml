@@ -8,24 +8,39 @@ copyright: MIT License
 
 theme:
   name: material
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  font:
+    text: Inter
+    code: JetBrains Mono
   features:
     - content.code.copy
+    - navigation.tabs
     - navigation.sections
+    - navigation.top
     - navigation.footer
+    - navigation.instant
+    - toc.follow
     - search.suggest
+    - search.highlight
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
+      primary: white
+      accent: indigo
       toggle:
         icon: material/weather-night
-        name: Dark mode
+        name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
+      primary: black
+      accent: indigo
       toggle:
         icon: material/weather-sunny
-        name: Light mode
+        name: Switch to light mode
+
+extra_css:
+  - stylesheets/extra.css
 
 markdown_extensions:
   - admonition

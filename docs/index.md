@@ -1,11 +1,14 @@
 ---
 title: Test how your LLM agent handles tool failures
+hide:
+  - navigation
 description: AgentProbe is a Python library for fault-injection testing of tool-using LLM agents in pytest. Break tools deterministically and check what the agent did.
 ---
 
-# AgentProbe
+# Test how your LLM agent handles tool failures
 
-**Test how your LLM agent handles tool failures, in pytest.**
+AgentProbe is a pytest library for fault-injection testing of tool-using LLM agents.
+{ .lead }
 
 Your agent's tools will time out, hit rate limits and return bad data. AgentProbe wraps the tools your agent already uses, breaks them on purpose and deterministically, and checks what your agent did about it.
 
@@ -23,12 +26,12 @@ from my_agent import TOOLS, answer
 
 def test_admits_failure_when_payment_service_is_down():
     with probe() as p:
-        tools = p.wrap(TOOLS)                                # probed copies; your tools are untouched
-        p.on("payment_status").always_fail(with_="timeout")  # break one tool, every call
+        tools = p.wrap(TOOLS)  # probed copies; originals untouched
+        p.on("payment_status").always_fail(with_="timeout")
         result = p.run(lambda q: answer(q, tools), "Did order 42 go through?")
         result.assert_no_crash()
-        result.assert_answer_not_contains("is confirmed")    # never claim unverified success
-        result.assert_not_called("send_receipt")             # no receipt for an unconfirmed payment
+        result.assert_answer_not_contains("is confirmed")  # no false success
+        result.assert_not_called("send_receipt")  # no receipt if unconfirmed
 ```
 
 Nothing is mocked except the fault: your agent runs for real, with real tools, and AgentProbe only steps in at the tool boundary. No model or API key is needed for the examples.
