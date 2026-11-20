@@ -834,7 +834,9 @@ class ProbeResult:
         For checks that text matching can't express: parse a number, compare
         JSON, call a classifier. *description* names the check in reports
         (defaults to the function's name). If *check* raises, the assertion
-        fails with that exception, never passes.
+        fails with that exception, never passes. *check* must be synchronous:
+        if it returns an awaitable (an ``async def`` function, for example), the
+        assertion fails instead of treating the unawaited coroutine as true.
         """
         label = description or getattr(check, "__name__", None) or repr(check)
         name = f"answer satisfies {label}"
@@ -843,10 +845,23 @@ class ProbeResult:
             return self
         assert self.answer is not None
         error: str | None = None
+        ok = False
         try:
-            ok = bool(check(self.answer))
+            value = check(self.answer)
         except Exception as exc:  # noqa: BLE001 - reported as the assertion's failure
-            ok, error = False, f"the check raised {type(exc).__name__}: {exc}"
+            error = f"the check raised {type(exc).__name__}: {exc}"
+        else:
+            if inspect.isawaitable(value):
+                # An async check returns a coroutine, which is always truthy; it
+                # was never run, so it must not count as a pass.
+                if inspect.iscoroutine(value):
+                    value.close()  # never awaited: close it to avoid a warning
+                error = (
+                    "the check returned an awaitable, so it never ran; "
+                    "pass a synchronous function (await your async check yourself)"
+                )
+            else:
+                ok = bool(value)
         if error is not None:
             self._record(name, "fail", error, required)
         elif ok:

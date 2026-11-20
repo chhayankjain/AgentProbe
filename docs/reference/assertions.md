@@ -14,7 +14,7 @@ description: Reference for AgentProbe assertions and ProbeResult - answer checks
 | `assert_answer_not_contains(text, *, case_sensitive=False)` | The agent produced an answer **without** *text*. A crash or `None` never passes |
 | `assert_answer_matches(pattern, *, flags=0)` | A regular expression matches somewhere in the answer (`re.search`; case-sensitive unless `flags=re.IGNORECASE` or `(?i)`). *Next release* |
 | `assert_answer_not_matches(pattern, *, flags=0)` | The pattern matches nowhere in the answer. A crash or `None` never passes. *Next release* |
-| `assert_answer(check, description=None)` | `check(answer)` returns a truthy value. If `check` raises, the assertion fails. *Next release* |
+| `assert_answer(check, description=None)` | `check(answer)` returns a truthy value. If `check` raises, or returns an awaitable (an `async def` check), the assertion fails. *Next release* |
 | `assert_no_crash()` | No exception escaped the agent |
 | `assert_within(seconds)` | The run finished in time |
 | `assert_scenarios_exercised()` | Every required scenario fired (also enforced when the block ends) |

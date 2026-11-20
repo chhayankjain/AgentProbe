@@ -50,7 +50,8 @@ except ImportError:
 
 _DEFAULT_SERVICE = "agentprobe"
 _GLOBAL_PROVIDER: TracerProvider | None = None
-_ATTACHED: dict[str, Any] = {"console": False, "otlp": set()}
+#: "otlp" maps each attached endpoint to whether its exporter is plaintext.
+_ATTACHED: dict[str, Any] = {"console": False, "otlp": {}}
 
 
 def otlp_insecure(endpoint: str, insecure: bool | None = None) -> bool:
@@ -75,6 +76,10 @@ def otlp_insecure(endpoint: str, insecure: bool | None = None) -> bool:
     if env is not None and env.strip():
         return env.strip().lower() == "true"
     return True
+
+
+def _tls_label(insecure: bool) -> str:
+    return "without TLS (plaintext)" if insecure else "with TLS"
 
 
 def _otlp_exporter(endpoint: str, insecure: bool | None) -> Any:
@@ -154,18 +159,30 @@ class AgentProbeTracer:
             trace.set_tracer_provider(_GLOBAL_PROVIDER)
             _ATTACHED["console"] = console_on
             if endpoint and _OTLP_AVAILABLE:
-                _ATTACHED["otlp"].add(endpoint)
+                _ATTACHED["otlp"][endpoint] = otlp_insecure(endpoint, insecure)
             self.owns_provider = True
         else:
             self.owns_provider = False
             if console_on and not _ATTACHED["console"]:
                 _GLOBAL_PROVIDER.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
                 _ATTACHED["console"] = True
-            if endpoint and _OTLP_AVAILABLE and endpoint not in _ATTACHED["otlp"]:
-                _GLOBAL_PROVIDER.add_span_processor(
-                    BatchSpanProcessor(_otlp_exporter(endpoint, insecure))
-                )
-                _ATTACHED["otlp"].add(endpoint)
+            if endpoint and _OTLP_AVAILABLE:
+                wanted = otlp_insecure(endpoint, insecure)
+                attached = _ATTACHED["otlp"].get(endpoint)
+                if attached is None:
+                    _GLOBAL_PROVIDER.add_span_processor(
+                        BatchSpanProcessor(_otlp_exporter(endpoint, insecure))
+                    )
+                    _ATTACHED["otlp"][endpoint] = wanted
+                elif attached != wanted:
+                    # Adding a second exporter would leave the first one sending,
+                    # and OpenTelemetry can't remove a span processor: refuse.
+                    raise ValueError(
+                        f"an OTLP exporter for {endpoint!r} is already attached "
+                        f"{_tls_label(attached)}, but this tracer requests "
+                        f"{'plaintext' if wanted else 'TLS'}. Use one setting per "
+                        "endpoint within a process."
+                    )
 
         self._provider = _GLOBAL_PROVIDER
         self._tracer: Tracer = self._provider.get_tracer(service_name)
