@@ -16,8 +16,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install "agentprobe-toolkit>=1.4" pytest
-      # Point this at the folder with your fault tests.
-      - run: pytest tests/ --junitxml=agentprobe-results.xml
+      # Point this at the folder with your fault tests. Tests marked `integration`
+      # (real models) are left for a nightly or manual run.
+      - run: pytest tests/ -m "not integration" --junitxml=agentprobe-results.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:

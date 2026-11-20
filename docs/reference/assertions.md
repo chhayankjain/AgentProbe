@@ -31,7 +31,7 @@ Calls still in flight count. Calls that start after the probe closed never count
 
 `assert_called_with` differs from `unittest.mock`: it matches any call, not only the last. When the tool's signature is known, `tool("42")` and `tool(order_id="42")` match each other. Values are compared exactly against a copy taken when the call started; only built-in values (`None`, `bool`, numbers, `str`, bytes, dates and times, `Decimal`, `UUID`, paths, enum members, and lists, tuples, dicts and sets of these) can be compared. Any other argument makes the assertion *unassessed*, never passed. Details in [How probing works](../instrumentation.md#tool-call-assertions-compare-exact-copies).
 
-Every assertion except `assert_called_with` takes `required=True`; a non-required assertion is recorded but doesn't fail the gate.
+Every assertion except `assert_called_with` and `assert_scenarios_exercised` takes `required=True` (pass `required=False` to record an assertion without letting it fail the gate). `assert_called_with` is always required, because every keyword you pass is matched against the tool call; `assert_scenarios_exercised` checks the required scenarios, which the gate enforces anyway.
 
 ## Pass, fail and unassessed
 
@@ -52,7 +52,7 @@ An assertion that can't be decided is **unassessed**, never passed: for example 
 | `assertions` | Every assertion made, with status and message |
 | `retries`, `fallbacks` | **Inferred** from the call log: a tool called again after it raised; a different tool called after one raised |
 
-Each `CallRecord` has the tool name, arguments (`args`, `kwargs`, a JSON-safe snapshot), `outcome` (`"returned"` or `"raised"`), `value` or `exception_type`, `injected` and `fault`, and timing.
+Each `CallRecord` has the tool name, arguments (`args`, `kwargs`, a JSON-safe snapshot), `status`, `outcome`, `value` or `exception_type`, `injected` and `fault`, and timing. A call is recorded when it **starts**, with `status="pending"` and `outcome=None`; when it finishes, `status` becomes `"completed"` and `outcome` `"returned"` or `"raised"`. A call still running at the deadline stays pending in the result, so check `outcome` before reading `value`.
 
 ## Reports
 
