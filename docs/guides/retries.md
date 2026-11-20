@@ -67,8 +67,8 @@ The scenario plans two failures. If the agent stopped after one call, the scenar
 
 ## Counting calls
 
-!!! note "Next release"
-    `assert_called_times`, `assert_called_at_most`, `assert_call_order` and `assert_called_with` are on `main` and ship in the next release. To use them now, install from GitHub: `pip install "agentprobe-toolkit @ git+https://github.com/chhayankjain/agentprobe-toolkit.git"`.
+!!! note "Since 1.5"
+    `assert_called_times`, `assert_called_at_most`, `assert_call_order` and `assert_called_with` need AgentProbe 1.5 or later.
 
 ```python
 def test_retries_exactly_once():

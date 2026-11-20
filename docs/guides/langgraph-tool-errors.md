@@ -8,7 +8,7 @@ By default, LangGraph's `ToolNode` only turns argument-validation errors into me
 
 ## A small graph
 
-This graph uses AgentProbe's scripted chat model, so it runs offline. In your tests, build your graph as usual, with your own model. The scripted model needs LangChain, which a LangGraph project already has; otherwise install `agentprobe-toolkit[langchain]`. (`ToolCallTimeout` is importable from `agentprobe.testing` from the next release; in 1.4.0, from `agentprobe.injector.tool_failure`.)
+This graph uses AgentProbe's scripted chat model, so it runs offline. In your tests, build your graph as usual, with your own model. The scripted model needs LangChain, which a LangGraph project already has; otherwise install `agentprobe-toolkit[langchain]`. (`ToolCallTimeout` is importable from `agentprobe.testing` since 1.5; in 1.4, from `agentprobe.injector.tool_failure`.)
 
 ```python
 from langchain_core.tools import tool

@@ -15,7 +15,7 @@ Your agent's tools will time out, hit rate limits and return bad data. AgentProb
 A test fails unless every fault you declared **actually fired**. An agent that skips the tool or answers from a cache can't pass a fault test by accident.
 
 ```bash
-pip install "agentprobe-toolkit>=1.4" pytest
+pip install "agentprobe-toolkit>=1.5" pytest
 ```
 
 ```py

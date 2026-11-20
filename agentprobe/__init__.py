@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from agentprobe.probe import Probe, ProbeGateError, ProbeResult
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 #: Names loaded on first use, so ``import agentprobe`` stays dependency-free.
 #: A missing dependency raises ImportError naming the extra to install.

@@ -11,7 +11,7 @@ Use Python 3.11 to 3.13 (the upstream project's supported range) and a local Oll
 
 ```bash
 git clone https://github.com/langchain-ai/agents-from-scratch && git -C agents-from-scratch checkout 603fc7a
-pip install -e ./agents-from-scratch "agentprobe-toolkit>=1.4" langchain-ollama pytest
+pip install -e ./agents-from-scratch "agentprobe-toolkit>=1.5" langchain-ollama pytest
 ollama pull qwen2.5:7b
 
 AGENTS_FROM_SCRATCH_DIR=./agents-from-scratch pytest examples/third_party_agent -v -s

@@ -48,13 +48,13 @@ Each call raises a fresh exception: a shallow copy of an instance, or a new inst
 
 | Your code catches | Pass |
 |---|---|
-| `TimeoutError` | `with_=TimeoutError("timed out")`, or `"timeout"` from the next release |
+| `TimeoutError` | `with_=TimeoutError("timed out")`, or `"timeout"` (since 1.5) |
 | `ConnectionError` | `with_=ConnectionError("connection refused")` |
 | LangChain `ToolException` | `with_=ToolException("service unavailable")` |
 | `httpx` timeouts | `with_=httpx.ReadTimeout("read timed out")` |
 | your own error type | `with_=PaymentGatewayError(...)` |
 
-!!! note "Next release"
-    From the next release, the built-in `"timeout"` fault is also a `TimeoutError`, so `except TimeoutError` catches it without `with_=` ([#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114)). The other built-in faults are subclasses of `ToolCallError` only.
+!!! note "Since 1.5"
+    Since 1.5, the built-in `"timeout"` fault is also a `TimeoutError`, so `except TimeoutError` catches it without `with_=` ([#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114)). The other built-in faults are subclasses of `ToolCallError` only.
 
 For bad data rather than an exception, use [`returns(...)`](wrong-data.md).

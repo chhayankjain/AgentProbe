@@ -12,9 +12,9 @@ description: Reference for AgentProbe assertions and ProbeResult - answer checks
 |---|---|
 | `assert_answer_contains(text, *, case_sensitive=False)` | The agent produced an answer containing *text* |
 | `assert_answer_not_contains(text, *, case_sensitive=False)` | The agent produced an answer **without** *text*. A crash or `None` never passes |
-| `assert_answer_matches(pattern, *, flags=0)` | A regular expression matches somewhere in the answer (`re.search`; case-sensitive unless `flags=re.IGNORECASE` or `(?i)`). *Next release* |
-| `assert_answer_not_matches(pattern, *, flags=0)` | The pattern matches nowhere in the answer. A crash or `None` never passes. *Next release* |
-| `assert_answer(check, description=None)` | `check(answer)` returns a truthy value. If `check` raises, or returns an awaitable (an `async def` check), the assertion fails. *Next release* |
+| `assert_answer_matches(pattern, *, flags=0)` | A regular expression matches somewhere in the answer (`re.search`; case-sensitive unless `flags=re.IGNORECASE` or `(?i)`). *Since 1.5* |
+| `assert_answer_not_matches(pattern, *, flags=0)` | The pattern matches nowhere in the answer. A crash or `None` never passes. *Since 1.5* |
+| `assert_answer(check, description=None)` | `check(answer)` returns a truthy value. If `check` raises, or returns an awaitable (an `async def` check), the assertion fails. *Since 1.5* |
 | `assert_no_crash()` | No exception escaped the agent |
 | `assert_within(seconds)` | The run finished in time |
 | `assert_scenarios_exercised()` | Every required scenario fired (also enforced when the block ends) |
@@ -34,10 +34,10 @@ For recovery behaviour, the tool-call assertions below are sturdier still: they 
 |---|---|---|
 | `assert_called(tool)` | The tool was called at least once | 1.4 |
 | `assert_not_called(tool)` | The tool was never called | 1.4 |
-| `assert_called_with(tool, *args, **kwargs)` | **Any** call had these arguments; arguments you leave out aren't checked | next release |
-| `assert_call_order([...])` | The tools were called in this order, other calls allowed between | next release |
-| `assert_called_times(tool, n)` | Exactly *n* calls started | next release |
-| `assert_called_at_most(tool, n)` | At most *n* calls started | next release |
+| `assert_called_with(tool, *args, **kwargs)` | **Any** call had these arguments; arguments you leave out aren't checked | 1.5 |
+| `assert_call_order([...])` | The tools were called in this order, other calls allowed between | 1.5 |
+| `assert_called_times(tool, n)` | Exactly *n* calls started | 1.5 |
+| `assert_called_at_most(tool, n)` | At most *n* calls started | 1.5 |
 
 Calls still in flight count. Calls that start after the probe closed never count.
 
