@@ -125,7 +125,7 @@ Fault tests are ordinary pytest tests, so any CI runs them. A ready-made GitHub 
 
 ```yaml
 - run: pip install "agentprobe-toolkit>=1.4" pytest
-- run: pytest tests/ --junitxml=agentprobe-results.xml
+- run: pytest tests/ -m "not integration" --junitxml=agentprobe-results.xml
 ```
 
 The [10-minute tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md) walks through a complete example agent, shows the same tests catching a deliberately broken version, and sets up CI. The [real-model example](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/real_model_agent/README.md) runs the same kind of tests on a LangChain agent with a local Ollama model, and shows what they caught across models and prompts. The [case study](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/docs/case-studies/agents-from-scratch.md) shows AgentProbe finding an unhandled tool exception in a LangGraph tutorial agent we don't own.
