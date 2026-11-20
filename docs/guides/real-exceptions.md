@@ -42,7 +42,7 @@ def test_tool_exception_class():
         result.assert_answer_contains("unavailable")
 ```
 
-Each call raises a fresh exception: a shallow copy of an instance, or a new instance of a class, created with the message "<ClassName> injected by AgentProbe".
+Each call raises a fresh exception. An instance is copied exactly as you built it (same type, arguments, message and attributes; its `__init__` is not run again). A class is instantiated with the message "<ClassName> injected by AgentProbe". An instance that can't be copied this way is rejected when you declare the scenario; pass the class instead.
 
 ## Common choices
 

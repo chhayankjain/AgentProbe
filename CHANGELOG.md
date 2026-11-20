@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+Fixes for ways a fault test could pass, or inject the wrong fault, without saying so.
+
+### Fixed
+- `p.run()` and `p.arun()` on a probe that was never entered (no `with probe() as p:`) ran the agent with no faults and no gate, so the test could pass without testing anything. They now raise `ProbeError`
+- `with_=<exception instance>` re-ran the exception's `__init__` on every injection: built-in faults such as `ToolCallAPIError(503)` were raised with a doubled message ("HTTP Tool API returned HTTP 503"), and an exception whose `__init__` takes other arguments raised `TypeError` instead of the configured fault. The instance is now copied exactly (type, arguments, attributes, cause and notes) without calling `__init__`; one that can't be copied is rejected with `ProbeError` when the scenario is declared
+- Objects with an `async def __call__` were wrapped as sync tools: the call log recorded a coroutine instead of the result, and `slow()` blocked the event loop. They are now wrapped as async tools
+- A blank answer (`""` or whitespace) counted as an answer, so `assert_answer_not_contains`, `assert_answer_not_matches` and `assert_answer` could pass when the agent said nothing. It now fails like `None`; `result.answer` still reports what the agent returned
+- An agent still running at its deadline kept the test process from exiting until it finished, because worker threads were joined at exit. `p.run(timeout=...)`, `p.arun()` with a sync agent and the benchmark runner now use daemon threads
+
 ## [1.5.0] - 2026-11-20
 
 A lighter install and sturdier assertions: `pip install agentprobe-toolkit` now pulls in no other packages, answers can be checked with patterns or functions instead of exact wording, and tool calls can be checked by arguments, order and count.

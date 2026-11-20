@@ -64,6 +64,7 @@ from typing import Any
 
 from agentprobe._otel import get_tracer
 from agentprobe._text import message_text
+from agentprobe._threads import start_daemon
 from agentprobe.faults import (
     ToolCallAPIError,
     ToolCallError,
@@ -133,6 +134,33 @@ _FAULTS: dict[str, Callable[[], ToolCallError]] = {
 }
 
 
+def _clone_exception(exc: BaseException) -> BaseException:
+    """A fresh copy of *exc* for each injection, exactly as configured.
+
+    ``copy.copy`` rebuilds an exception by calling ``type(exc)(*exc.args)``, which
+    re-runs ``__init__``: a message an ``__init__`` already formatted is formatted
+    again, and an ``__init__`` with other parameters raises ``TypeError``. This
+    creates the instance without ``__init__`` and copies its arguments and
+    attributes instead. A fresh copy keeps tracebacks from one injection out of
+    the next.
+    """
+    cls = type(exc)
+    try:
+        new = cls.__new__(cls, *exc.args)
+    except Exception as err:  # noqa: BLE001
+        raise ProbeError(
+            f"cannot copy the exception {exc!r} for injection ({type(err).__name__}: {err}); "
+            f"pass the class, a fault name, or an instance of a simpler exception type"
+        ) from None
+    new.args = exc.args
+    state = getattr(exc, "__dict__", None)
+    if state:
+        new.__dict__.update(state)
+    new.__cause__ = exc.__cause__
+    new.__suppress_context__ = exc.__suppress_context__
+    return new
+
+
 def _fault_factory(
     with_: str | type[BaseException] | BaseException,
 ) -> Callable[[], BaseException]:
@@ -144,7 +172,8 @@ def _fault_factory(
                 f"Unknown fault {with_!r}; use one of {sorted(_FAULTS)} or an exception"
             ) from None
     if isinstance(with_, BaseException):
-        return lambda: copy.copy(with_)
+        _clone_exception(with_)  # fail at declaration, not mid-run, if it can't be copied
+        return lambda: _clone_exception(with_)
     if isinstance(with_, type) and issubclass(with_, BaseException):
         return lambda: with_(f"{with_.__name__} injected by AgentProbe")
     raise ProbeError(f"with_ must be a fault name, an exception class or instance, not {with_!r}")
@@ -739,6 +768,8 @@ class ProbeResult:
             )
         if self.answer is None:
             return ("fail", "no answer: the agent returned None")
+        if not self.answer.strip():
+            return ("fail", f"no answer: the agent returned a blank answer ({self.answer!r})")
         return None
 
     def assert_answer_contains(
@@ -1359,7 +1390,7 @@ class Probe:
         )
 
     def _wrap_callable(self, fn: Callable[..., Any], name: str) -> Callable[..., Any]:
-        if inspect.iscoroutinefunction(fn):
+        if _is_async_callable(fn):
 
             @functools.wraps(fn)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -1570,6 +1601,12 @@ class Probe:
     def _check_runnable(self) -> None:
         if self._closed:
             raise ProbeError("this probe is closed; use a new probe for a new test")
+        if not self._active:
+            raise ProbeError(
+                "this probe has not been entered; use `with probe() as p:` (or "
+                "`async with`) and call p.run(...) inside it. Outside the block no "
+                "fault is injected and nothing is checked"
+            )
 
     def run(
         self,
@@ -1629,9 +1666,7 @@ class Probe:
         else:
             budget = _finite_number("timeout", timeout, low=0.0)
             ctx = contextvars.copy_context()
-            pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            future = pool.submit(ctx.run, target)
-            pool.shutdown(wait=False)
+            future = start_daemon(functools.partial(ctx.run, target))
             done, _ = concurrent.futures.wait([future], timeout=budget)
             if done:
                 # The agent finished in time. Whatever it raised (including its own
@@ -1700,7 +1735,10 @@ class Probe:
                 result = call(*call_args, **kwargs)
                 thread_done.set()  # no thread involved
             else:
-                result = await asyncio.to_thread(run_sync)
+                ctx = contextvars.copy_context()
+                result = await asyncio.wrap_future(
+                    start_daemon(functools.partial(ctx.run, run_sync))
+                )
             while inspect.isawaitable(result):  # returned coroutines stay under the deadline
                 result = await result
             return result
