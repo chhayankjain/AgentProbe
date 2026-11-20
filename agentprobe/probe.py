@@ -57,6 +57,7 @@ import random
 import re
 import threading
 import time
+import types
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -64,6 +65,7 @@ from typing import Any
 
 from agentprobe._otel import get_tracer
 from agentprobe._text import message_text
+from agentprobe._threads import start_daemon
 from agentprobe.faults import (
     ToolCallAPIError,
     ToolCallError,
@@ -133,6 +135,90 @@ _FAULTS: dict[str, Callable[[], ToolCallError]] = {
 }
 
 
+_MISSING = object()
+
+
+def _field_names(cls: type) -> list[str]:
+    """Attributes stored outside the instance dict: ``__slots__`` entries and the
+    fields built-in exceptions keep in C (``OSError.filename``,
+    ``UnicodeError.encoding``, ``ImportError.name``, ...)."""
+    names: dict[str, None] = {}
+    for klass in cls.__mro__:
+        for name, attr in vars(klass).items():
+            if name.startswith("__") or name in {"args"}:
+                continue
+            if isinstance(attr, (types.MemberDescriptorType, types.GetSetDescriptorType)):
+                names[name] = None
+    return list(names)
+
+
+def _same(a: Any, b: Any) -> bool:
+    if a is b:
+        return True
+    try:
+        return bool(type(a) is type(b) and a == b)
+    except Exception:  # noqa: BLE001 - values that can't be compared don't match
+        return False
+
+
+def _clone_exception(exc: BaseException) -> BaseException:
+    """A fresh copy of *exc* for each injection, or ``ProbeError`` if one can't be made.
+
+    ``copy.copy`` rebuilds an exception by calling ``type(exc)(*exc.args)``, which
+    re-runs ``__init__``: a message an ``__init__`` already formatted is formatted
+    again, and an ``__init__`` with other parameters raises ``TypeError``. This
+    creates the instance without ``__init__`` and copies its arguments, instance
+    dict, ``__slots__`` and built-in exception fields (shallowly), plus
+    ``__cause__``. The copy is then compared with the original field by field;
+    anything that differs is reported instead of injecting a different exception.
+    A fresh copy keeps tracebacks from one injection out of the next.
+    """
+    cls = type(exc)
+    hint = "pass the exception class or a fault name instead, or a simpler instance"
+    try:
+        new = cls.__new__(cls, *exc.args)
+    except Exception as err:  # noqa: BLE001
+        raise ProbeError(
+            f"cannot copy the exception {exc!r} for injection ({type(err).__name__}: {err}); {hint}"
+        ) from None
+    new.args = exc.args
+    state = getattr(exc, "__dict__", None)
+    if state:
+        new.__dict__.update(state)
+    fields = _field_names(cls)
+    for name in fields:
+        value = getattr(exc, name, _MISSING)
+        if value is _MISSING or _same(getattr(new, name, _MISSING), value):
+            continue
+        try:
+            setattr(new, name, value)
+        except (AttributeError, TypeError):
+            pass  # read-only; the check below reports it if it differs
+    new.__cause__ = exc.__cause__
+    new.__suppress_context__ = exc.__suppress_context__
+
+    differs = [
+        name
+        for name in fields
+        if not _same(getattr(new, name, _MISSING), getattr(exc, name, _MISSING))
+    ]
+    if not _same(new.args, exc.args):
+        differs.append("args")
+    if not _same(getattr(new, "__dict__", None), state):
+        differs.append("__dict__")
+    try:
+        if str(new) != str(exc):
+            differs.append("message")
+    except Exception:  # noqa: BLE001
+        differs.append("message")
+    if differs:
+        raise ProbeError(
+            f"cannot copy the exception {exc!r} exactly for injection "
+            f"(would differ in: {', '.join(differs)}); {hint}"
+        )
+    return new
+
+
 def _fault_factory(
     with_: str | type[BaseException] | BaseException,
 ) -> Callable[[], BaseException]:
@@ -144,7 +230,8 @@ def _fault_factory(
                 f"Unknown fault {with_!r}; use one of {sorted(_FAULTS)} or an exception"
             ) from None
     if isinstance(with_, BaseException):
-        return lambda: copy.copy(with_)
+        _clone_exception(with_)  # fail at declaration, not mid-run, if it can't be copied
+        return lambda: _clone_exception(with_)
     if isinstance(with_, type) and issubclass(with_, BaseException):
         return lambda: with_(f"{with_.__name__} injected by AgentProbe")
     raise ProbeError(f"with_ must be a fault name, an exception class or instance, not {with_!r}")
@@ -739,6 +826,8 @@ class ProbeResult:
             )
         if self.answer is None:
             return ("fail", "no answer: the agent returned None")
+        if not self.answer.strip():
+            return ("fail", f"no answer: the agent returned a blank answer ({self.answer!r})")
         return None
 
     def assert_answer_contains(
@@ -1359,7 +1448,7 @@ class Probe:
         )
 
     def _wrap_callable(self, fn: Callable[..., Any], name: str) -> Callable[..., Any]:
-        if inspect.iscoroutinefunction(fn):
+        if _is_async_callable(fn):
 
             @functools.wraps(fn)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -1570,6 +1659,12 @@ class Probe:
     def _check_runnable(self) -> None:
         if self._closed:
             raise ProbeError("this probe is closed; use a new probe for a new test")
+        if not self._active:
+            raise ProbeError(
+                "this probe has not been entered; use `with probe() as p:` (or "
+                "`async with`) and call p.run(...) inside it. Outside the block no "
+                "fault is injected and nothing is checked"
+            )
 
     def run(
         self,
@@ -1629,9 +1724,7 @@ class Probe:
         else:
             budget = _finite_number("timeout", timeout, low=0.0)
             ctx = contextvars.copy_context()
-            pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            future = pool.submit(ctx.run, target)
-            pool.shutdown(wait=False)
+            future = start_daemon(functools.partial(ctx.run, target))
             done, _ = concurrent.futures.wait([future], timeout=budget)
             if done:
                 # The agent finished in time. Whatever it raised (including its own
@@ -1700,7 +1793,10 @@ class Probe:
                 result = call(*call_args, **kwargs)
                 thread_done.set()  # no thread involved
             else:
-                result = await asyncio.to_thread(run_sync)
+                ctx = contextvars.copy_context()
+                result = await asyncio.wrap_future(
+                    start_daemon(functools.partial(ctx.run, run_sync))
+                )
             while inspect.isawaitable(result):  # returned coroutines stay under the deadline
                 result = await result
             return result

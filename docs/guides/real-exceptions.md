@@ -42,7 +42,7 @@ def test_tool_exception_class():
         result.assert_answer_contains("unavailable")
 ```
 
-Each call raises a fresh exception: a shallow copy of an instance, or a new instance of a class, created with the message "<ClassName> injected by AgentProbe".
+Each call raises a fresh exception. A class is instantiated with the message "<ClassName> injected by AgentProbe". An instance is copied without running its `__init__` again: its type, `args`, instance attributes, `__slots__`, the fields built-in exceptions keep separately (such as `errno` and `filename` on `OSError`, `name` and `path` on `ImportError`, or the codec fields on `UnicodeDecodeError`) and `__cause__`. Attribute values are shared, not deep-copied. When you declare the scenario, AgentProbe checks the copy against your instance, field by field and by message, and raises `ProbeError` if anything would differ; pass the class instead.
 
 ## Common choices
 

@@ -2,13 +2,17 @@
 
 How `agentprobe.testing.probe()` touches your tools, and what it guarantees. Tracked in issue #95.
 
+## Run agents inside the `with` block
+
+`p.run()` and `p.arun()` raise `ProbeError` unless the probe has been entered with `with probe() as p:` (or `async with`). Outside the block no fault would be injected and nothing checked, so a test could pass without testing anything. You can declare scenarios and wrap tools before entering.
+
 ## Your tools are never modified
 
 `p.wrap(tools)` returns **new objects**:
 
 | You pass | You get back |
 |---|---|
-| a plain function (sync or async) | a new function with the same name, signature and docstring (`__wrapped__` points to yours) |
+| a plain function (sync or async), or an object with an `async def __call__` | a new function with the same name, signature and docstring (`__wrapped__` points to yours) |
 | a LangChain `BaseTool` | a shallow copy (`model_copy()`) whose `_run` (and `_arun`, if the tool has its own async implementation) is wrapped |
 | a list, tuple or `{name: tool}` dict | the same container type, with each tool wrapped |
 
@@ -85,7 +89,7 @@ When the tool's signature is known (a plain function, or a LangChain tool's argu
 
 ## Agents that are still running
 
-`p.run(agent, input, timeout=seconds)` runs the agent in a worker thread. Python cannot force-stop a thread, so an agent can outlive its deadline. When that happens:
+`p.run(agent, input, timeout=seconds)` runs the agent in a worker thread. Python cannot force-stop a thread, so an agent can outlive its deadline. AgentProbe's worker is a daemon thread, so it does not keep your test process alive after a hung agent. Threads or executors your agent starts itself can still delay exit, and daemon work still running at interpreter exit is stopped abruptly, without cleanup. When an agent outlives its deadline:
 
 1. The result has `deadline_exceeded=True` and `still_running=True`, and no final answer. The result is a frozen snapshot: nothing that happens later changes it.
 2. Assertions that need an answer are `unassessed`, as is `assert_not_called` for a tool not called *yet*. A required unassessed assertion fails the gate.

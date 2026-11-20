@@ -11,9 +11,9 @@ description: Reference for AgentProbe assertions and ProbeResult - answer checks
 | Assertion | Passes when |
 |---|---|
 | `assert_answer_contains(text, *, case_sensitive=False)` | The agent produced an answer containing *text* |
-| `assert_answer_not_contains(text, *, case_sensitive=False)` | The agent produced an answer **without** *text*. A crash or `None` never passes |
+| `assert_answer_not_contains(text, *, case_sensitive=False)` | The agent produced an answer **without** *text*. A crash, `None` or a blank answer never passes |
 | `assert_answer_matches(pattern, *, flags=0)` | A regular expression matches somewhere in the answer (`re.search`; case-sensitive unless `flags=re.IGNORECASE` or `(?i)`). *Since 1.5* |
-| `assert_answer_not_matches(pattern, *, flags=0)` | The pattern matches nowhere in the answer. A crash or `None` never passes. *Since 1.5* |
+| `assert_answer_not_matches(pattern, *, flags=0)` | The pattern matches nowhere in the answer. A crash, `None` or a blank answer never passes. *Since 1.5* |
 | `assert_answer(check, description=None)` | `check(answer)` returns a truthy value. If `check` raises, or returns an awaitable (an `async def` check), the assertion fails. *Since 1.5* |
 | `assert_no_crash()` | No exception escaped the agent |
 | `assert_within(seconds)` | The run finished in time |

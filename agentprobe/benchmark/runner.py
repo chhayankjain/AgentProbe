@@ -30,7 +30,6 @@ Usage::
 
 from __future__ import annotations
 
-import concurrent.futures
 import csv
 import json
 import time
@@ -43,6 +42,7 @@ from opentelemetry import context as otel_context
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 
+from agentprobe._threads import start_daemon
 from agentprobe.benchmark.metrics import _percentile
 from agentprobe.errors import HarnessLimitation
 from agentprobe.llm import is_llm_backend_error
@@ -444,9 +444,7 @@ class BenchmarkRunner:
             finally:
                 otel_context.detach(token)
 
-        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        future = pool.submit(_worker)
-        pool.shutdown(wait=False)
+        future = start_daemon(_worker)
 
         try:
             return future.result(timeout=timeout)
