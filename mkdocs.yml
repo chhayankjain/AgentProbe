@@ -1,0 +1,62 @@
+site_name: AgentProbe
+site_description: Test how your LLM agent handles tool failures, in pytest. Deterministic fault injection for tool-using agents.
+site_url: https://chhayankjain.github.io/agentprobe-toolkit/
+repo_url: https://github.com/chhayankjain/agentprobe-toolkit
+repo_name: agentprobe-toolkit
+edit_uri: edit/main/docs/
+copyright: MIT License
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.footer
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Guides:
+      - Test that your agent retries: guides/retries.md
+      - Simulate timeouts and rate limits: guides/timeouts-and-rate-limits.md
+      - Test wrong or stale tool data: guides/wrong-data.md
+      - LangGraph tool errors: guides/langgraph-tool-errors.md
+      - Inject the exceptions your code handles: guides/real-exceptions.md
+      - Run fault tests in CI: guides/ci.md
+  - Reference:
+      - Scenarios: reference/scenarios.md
+      - Assertions and results: reference/assertions.md
+      - How probing works: instrumentation.md
+  - Case study: case-studies/agents-from-scratch.md
+  - Research: research.md
+
+validation:
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn

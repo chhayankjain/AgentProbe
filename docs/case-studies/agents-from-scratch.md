@@ -13,7 +13,7 @@ model-free reproduction; a fix with regression tests is proposed in
 
 1. **Ran it as-is.** We imported the assistant's own graph, prompts and tools, and swapped in a local
    Ollama model (Qwen 2.5 7B) so no API key or paid inference was needed. The harness replaces three
-   module globals; no upstream file is edited. See [`examples/third_party_agent`](../../examples/third_party_agent/).
+   module globals; no upstream file is edited. See [`examples/third_party_agent`](https://github.com/chhayankjain/agentprobe-toolkit/tree/main/examples/third_party_agent).
 2. **Wrapped its tools with AgentProbe.** `p.wrap(...)` worked on their `@tool` functions and on
    their pydantic `@tool` classes without changes.
 3. **Broke one tool at a time,** three runs per scenario, on the dataset's own meeting-request email.
@@ -43,7 +43,7 @@ own errors and return a message, so the gap matters most for tools that raise.
 ## Before and after the proposed fix
 
 We then ran the example's tests against the original code and against the proposed fix, three runs
-each on the same local model ([validation record](../../examples/third_party_agent/results/validation-2026-11-18.md)).
+each on the same local model ([validation record](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/third_party_agent/results/validation-2026-11-18.md)).
 The tests inject `TimeoutError` and LangChain's `ToolException`, the exception types the fix handles.
 When we ran them, AgentProbe's built-in faults subclassed neither, so code that handles real timeouts
 wouldn't have caught them. Since [#114](https://github.com/chhayankjain/agentprobe-toolkit/issues/114)
