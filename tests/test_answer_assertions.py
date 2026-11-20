@@ -107,3 +107,46 @@ def test_a_required_failure_reaches_the_gate():
                 result.assert_answer_not_matches(r"confirmed")
             except AssertionError:
                 pass  # caught inside the block; the gate must still fail
+
+
+class _AsyncCallable:
+    async def __call__(self, answer: str) -> bool:
+        return True
+
+
+class _Awaitable:
+    def __await__(self):
+        yield
+        return True
+
+
+async def _async_check(answer: str) -> bool:
+    return True  # would "pass" if the coroutine's truthiness were used
+
+
+@pytest.mark.parametrize(
+    "check",
+    [
+        _async_check,
+        _AsyncCallable(),
+        lambda answer: _async_check(answer),  # sync function returning a coroutine
+        lambda answer: _Awaitable(),  # sync function returning another awaitable
+    ],
+    ids=["async-function", "async-callable-object", "returns-coroutine", "returns-awaitable"],
+)
+def test_awaitable_checks_fail_instead_of_passing_unrun(check, recwarn):
+    r = _result("anything")
+    with pytest.raises(AssertionError, match="returned an awaitable, so it never ran"):
+        r.assert_answer(check, "async check")
+    assert r.assertions[-1].status == "fail"
+    assert not [w for w in recwarn if issubclass(w.category, RuntimeWarning)]
+
+
+def test_an_awaitable_check_fails_the_gate():
+    with pytest.raises(AssertionError):
+        with probe() as p:
+            result = p.run(lambda: "Order 42 is paid.")
+            try:
+                result.assert_answer(_async_check)
+            except AssertionError:
+                pass  # caught inside the block; the gate must still fail
