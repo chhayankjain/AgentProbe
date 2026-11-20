@@ -150,3 +150,29 @@ def test_an_awaitable_check_fails_the_gate():
                 result.assert_answer(_async_check)
             except AssertionError:
                 pass  # caught inside the block; the gate must still fail
+
+
+class _NoTruthValue:
+    """Like a multi-element NumPy array: bool() raises."""
+
+    def __bool__(self) -> bool:
+        raise ValueError("The truth value of an array with more than one element is ambiguous")
+
+
+def test_a_result_without_a_truth_value_fails_and_is_recorded():
+    r = _result("anything")
+    with pytest.raises(AssertionError, match="has no truth value \\(ValueError"):
+        r.assert_answer(lambda a: _NoTruthValue(), "ambiguous result")
+    assert r.assertions[-1].status == "fail"
+
+
+def test_a_result_without_a_truth_value_fails_the_gate_when_caught():
+    with pytest.raises(AssertionError):
+        with probe() as p:
+            result = p.run(lambda: "Order 42 is paid.")
+            try:
+                result.assert_answer(lambda a: _NoTruthValue(), "ambiguous result")
+            except AssertionError:
+                pass  # caught inside the block; the gate must still fail
+    assert len(result.assertions) == 1 and result.assertions[0].status == "fail"
+    assert not result.gate().passed

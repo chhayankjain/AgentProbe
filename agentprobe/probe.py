@@ -861,7 +861,13 @@ class ProbeResult:
                     "pass a synchronous function (await your async check yourself)"
                 )
             else:
-                ok = bool(value)
+                try:
+                    ok = bool(value)
+                except Exception as exc:  # noqa: BLE001 - e.g. a multi-element NumPy array
+                    error = (
+                        f"the check's result has no truth value "
+                        f"({type(exc).__name__}: {exc}); return True or False"
+                    )
         if error is not None:
             self._record(name, "fail", error, required)
         elif ok:
