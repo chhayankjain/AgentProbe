@@ -61,15 +61,15 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from agentprobe.agents.base import message_text
-from agentprobe.injector.tool_failure import (
+from agentprobe._otel import get_tracer
+from agentprobe._text import message_text
+from agentprobe.faults import (
     ToolCallAPIError,
     ToolCallError,
     ToolCallMalformedOutput,
     ToolCallRateLimited,
     ToolCallTimeout,
 )
-from agentprobe.observer.tracer import get_tracer
 
 SCHEMA_VERSION = "1.2"
 

@@ -106,19 +106,27 @@ jobs:
       - name: Check metadata and README rendering
         run: twine check --strict dist/*
 
-      - name: Smoke-test the wheel in a clean venv
+      - name: Smoke-test the wheel (no extras, then [research]) in clean venvs
         run: |
-          python -m venv /tmp/smoke
-          /tmp/smoke/bin/pip install --quiet dist/*.whl
-          /tmp/smoke/bin/python - <<'PY'
+          python -m venv /tmp/core
+          /tmp/core/bin/pip install --quiet dist/*.whl pytest
+          /tmp/core/bin/python - <<'PY'
+          import sys
           from importlib.resources import files
           import agentprobe
-          from agentprobe import ToolFailureInjector, AgentProbeTracer
           from agentprobe.testing import probe
           assert files("agentprobe").joinpath("py.typed").is_file()
-          print("agentprobe", agentprobe.__version__)
+          optional = {"langchain", "langchain_core", "langgraph", "opentelemetry", "grpc",
+                      "prometheus_client", "pydantic", "rich", "numpy", "scipy"}
+          loaded = optional & {m.split(".")[0] for m in sys.modules}
+          assert not loaded, f"core install imported optional packages: {loaded}"
+          print("core install OK:", agentprobe.__version__)
           PY
-          /tmp/smoke/bin/python -m agentprobe.demo --runs 2 --p 0
+          (cd examples/your_agent && /tmp/core/bin/python -m pytest -q -p no:cacheprovider)
+          python -m venv /tmp/research
+          /tmp/research/bin/pip install --quiet "$(ls dist/*.whl)[research]"
+          /tmp/research/bin/python -c "from agentprobe import ToolFailureInjector, AgentProbeTracer, BenchmarkRunner"
+          /tmp/research/bin/python -m agentprobe.demo --runs 2 --p 0
 
   sdist-tests:
     name: Test suite from the source distribution

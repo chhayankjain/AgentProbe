@@ -20,7 +20,7 @@ flowchart TB
 
     subgraph PKG["agentprobe/  (PyPI: agentprobe-toolkit)"]
         direction TB
-        PROBE["testing.py / probe.py<br/>existing tools · deterministic scenarios<br/>evidence snapshots · assertion gates"]
+        PROBE["testing.py / probe.py / faults.py<br/>no required dependencies<br/>existing tools · deterministic scenarios<br/>evidence snapshots · assertion gates"]
         subgraph BENCH["benchmark/"]
             RUNNER["BenchmarkRunner<br/>N runs · timeout thread · 1 retry"]
             METRICS["MetricsCalculator<br/>failure/recovery rate · MTTR · P50/P90/P99"]

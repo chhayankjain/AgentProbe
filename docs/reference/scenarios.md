@@ -36,7 +36,7 @@ Every method also takes `required=True`. A required scenario must be **exercised
 | `"api_error"` | `ToolCallAPIError` (`status_code=503`) |
 | `"malformed_output"` | `ToolCallMalformedOutput` |
 
-All are subclasses of `ToolCallError` in `agentprobe.injector.tool_failure`. From the next release `ToolCallTimeout` is also a `TimeoutError`. See [Inject the exceptions your code handles](../guides/real-exceptions.md) for passing your own types.
+All are subclasses of `ToolCallError`, importable from `agentprobe.testing` (from the next release; in 1.4.0, from `agentprobe.injector.tool_failure`). From the next release `ToolCallTimeout` is also a `TimeoutError`. See [Inject the exceptions your code handles](../guides/real-exceptions.md) for passing your own types.
 
 ## Order and counting
 

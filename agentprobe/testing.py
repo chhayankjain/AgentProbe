@@ -28,6 +28,13 @@ plugin with markers and reports is planned for v1.5.
 
 from __future__ import annotations
 
+from agentprobe.faults import (
+    ToolCallAPIError,
+    ToolCallError,
+    ToolCallMalformedOutput,
+    ToolCallRateLimited,
+    ToolCallTimeout,
+)
 from agentprobe.probe import (
     SCHEMA_VERSION,
     AssertionRecord,
@@ -60,4 +67,10 @@ __all__ = [
     "AssertionRecord",
     "GateReport",
     "SCHEMA_VERSION",
+    # The built-in faults, for agents and tests that catch them
+    "ToolCallError",
+    "ToolCallTimeout",
+    "ToolCallRateLimited",
+    "ToolCallAPIError",
+    "ToolCallMalformedOutput",
 ]

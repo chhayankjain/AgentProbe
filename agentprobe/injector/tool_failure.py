@@ -61,33 +61,15 @@ _tracer = get_tracer(__name__)
 # ---------------------------------------------------------------------------
 
 
-class ToolCallError(Exception):
-    """Base class for injected tool call errors."""
-
-
-class ToolCallTimeout(ToolCallError, TimeoutError):
-    """Raised when a tool call exceeds its timeout deadline."""
-
-
-class ToolCallMalformedOutput(ToolCallError):
-    """Raised when a tool returns unparseable or corrupt output."""
-
-
-class ToolCallRateLimited(ToolCallError):
-    """Raised to simulate HTTP 429 rate-limit responses."""
-
-    def __init__(self, retry_after: float = 60.0) -> None:
-        self.retry_after = retry_after
-        super().__init__(f"Rate limit exceeded. Retry-After: {retry_after}s (HTTP 429)")
-
-
-class ToolCallAPIError(ToolCallError):
-    """Raised to simulate HTTP 5xx server-side API errors."""
-
-    def __init__(self, status_code: int = 500) -> None:
-        self.status_code = status_code
-        super().__init__(f"Tool API returned HTTP {status_code}")
-
+# Defined in agentprobe.faults (no dependencies) so that agentprobe.testing works
+# without OpenTelemetry; re-exported here so existing imports keep working.
+from agentprobe.faults import (  # noqa: E402
+    ToolCallAPIError as ToolCallAPIError,
+    ToolCallError as ToolCallError,
+    ToolCallMalformedOutput as ToolCallMalformedOutput,
+    ToolCallRateLimited as ToolCallRateLimited,
+    ToolCallTimeout as ToolCallTimeout,
+)
 
 # ---------------------------------------------------------------------------
 # Enums and config

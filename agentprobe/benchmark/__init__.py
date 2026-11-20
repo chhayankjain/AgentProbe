@@ -9,30 +9,35 @@ Usage::
     metrics = MetricsCalculator().compute(results)
 """
 
-from agentprobe.benchmark.grader import BatchGradeResult, GradeResult, ResponseGrader
-from agentprobe.benchmark.metrics import AgentMetrics, MetricsCalculator
-from agentprobe.benchmark.runner import (
-    PAPER_PROMPTS,
-    BenchmarkConfig,
-    BenchmarkRunner,
-    RunResult,
-    paper_task_fn,
-)
-from agentprobe.benchmark.statistics import (
-    FrameworkData,
-    HypothesisTestResult,
-    PairwiseComparison,
-    StatisticalReport,
-    build_comparison_report,
-    cohens_d,
-    cohens_h,
-    compare_distributions,
-    compare_multiple_groups,
-    compare_proportions,
-    mean_ci,
-    proportion_ci,
-)
-from agentprobe.benchmark.tasks import corpus_task_fn, get_task
+from agentprobe._extras import missing_extra
+
+try:
+    from agentprobe.benchmark.grader import BatchGradeResult, GradeResult, ResponseGrader
+    from agentprobe.benchmark.metrics import AgentMetrics, MetricsCalculator
+    from agentprobe.benchmark.runner import (
+        PAPER_PROMPTS,
+        BenchmarkConfig,
+        BenchmarkRunner,
+        RunResult,
+        paper_task_fn,
+    )
+    from agentprobe.benchmark.statistics import (
+        FrameworkData,
+        HypothesisTestResult,
+        PairwiseComparison,
+        StatisticalReport,
+        build_comparison_report,
+        cohens_d,
+        cohens_h,
+        compare_distributions,
+        compare_multiple_groups,
+        compare_proportions,
+        mean_ci,
+        proportion_ci,
+    )
+    from agentprobe.benchmark.tasks import corpus_task_fn, get_task
+except ModuleNotFoundError as exc:  # an optional dependency is not installed
+    raise missing_extra(exc, "agentprobe.benchmark", "research") from exc
 
 __all__ = [
     # Runner
