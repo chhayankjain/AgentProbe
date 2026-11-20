@@ -80,3 +80,6 @@ research/paper/*.synctex.gz
 research/paper/review*/
 research/paper/*response*
 research/paper/*reviewer*
+
+# Docs site build output (mkdocs build)
+/site/

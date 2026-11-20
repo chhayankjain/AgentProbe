@@ -52,6 +52,18 @@ ollama pull llama3.1
 python research/experiments/run_experiment_v2.py --frameworks langgraph --model llama3.1 --seed 42
 ```
 
+## Docs site
+
+The docs site (https://chhayankjain.github.io/agentprobe-toolkit/) is built with MkDocs from `docs/` and `mkdocs.yml`, and deployed from `main` by `.github/workflows/docs.yml`. To preview it:
+
+```bash
+pip install -e ".[docs]"
+mkdocs serve        # http://127.0.0.1:8000
+mkdocs build --strict
+```
+
+Code blocks fenced as ```` ```python ```` in `docs/getting-started.md` and `docs/guides/` are **run by the test suite** (`tests/test_docs_examples.py`): each page's blocks execute in order and every `test_*` function they define is called. Keep them self-contained. Fence illustrative fragments (code that imports your own agent, for example) as ```` ```py ````; they render the same and are not run.
+
 ## Reporting Issues
 
 - Use the [bug report template](https://github.com/chhayankjain/agentprobe-toolkit/issues/new?template=bug_report.yml) for bugs

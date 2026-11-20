@@ -55,6 +55,11 @@ dev = [
     "ruff>=0.7.0",
     "mypy>=1.11.0",
 ]
+# Docs site (mkdocs.yml). Pinned: MkDocs 2.0 drops the plugin and theme system.
+docs = [
+    "mkdocs==1.6.1",
+    "mkdocs-material==9.7.6",
+]
 plotting = [
     "matplotlib>=3.8.0",
     "pandas>=2.0.0",
@@ -81,6 +86,7 @@ autogen = [
 
 [project.urls]
 Homepage = "https://github.com/chhayankjain/agentprobe-toolkit"
+Documentation = "https://chhayankjain.github.io/agentprobe-toolkit/"
 Repository = "https://github.com/chhayankjain/agentprobe-toolkit"
 Issues = "https://github.com/chhayankjain/agentprobe-toolkit/issues"
 Changelog = "https://github.com/chhayankjain/agentprobe-toolkit/blob/main/CHANGELOG.md"
