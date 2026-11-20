@@ -57,6 +57,7 @@ import random
 import re
 import threading
 import time
+import types
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -134,30 +135,87 @@ _FAULTS: dict[str, Callable[[], ToolCallError]] = {
 }
 
 
+_MISSING = object()
+
+
+def _field_names(cls: type) -> list[str]:
+    """Attributes stored outside the instance dict: ``__slots__`` entries and the
+    fields built-in exceptions keep in C (``OSError.filename``,
+    ``UnicodeError.encoding``, ``ImportError.name``, ...)."""
+    names: dict[str, None] = {}
+    for klass in cls.__mro__:
+        for name, attr in vars(klass).items():
+            if name.startswith("__") or name in {"args"}:
+                continue
+            if isinstance(attr, (types.MemberDescriptorType, types.GetSetDescriptorType)):
+                names[name] = None
+    return list(names)
+
+
+def _same(a: Any, b: Any) -> bool:
+    if a is b:
+        return True
+    try:
+        return bool(type(a) is type(b) and a == b)
+    except Exception:  # noqa: BLE001 - values that can't be compared don't match
+        return False
+
+
 def _clone_exception(exc: BaseException) -> BaseException:
-    """A fresh copy of *exc* for each injection, exactly as configured.
+    """A fresh copy of *exc* for each injection, or ``ProbeError`` if one can't be made.
 
     ``copy.copy`` rebuilds an exception by calling ``type(exc)(*exc.args)``, which
     re-runs ``__init__``: a message an ``__init__`` already formatted is formatted
     again, and an ``__init__`` with other parameters raises ``TypeError``. This
-    creates the instance without ``__init__`` and copies its arguments and
-    attributes instead. A fresh copy keeps tracebacks from one injection out of
-    the next.
+    creates the instance without ``__init__`` and copies its arguments, instance
+    dict, ``__slots__`` and built-in exception fields (shallowly), plus
+    ``__cause__``. The copy is then compared with the original field by field;
+    anything that differs is reported instead of injecting a different exception.
+    A fresh copy keeps tracebacks from one injection out of the next.
     """
     cls = type(exc)
+    hint = "pass the exception class or a fault name instead, or a simpler instance"
     try:
         new = cls.__new__(cls, *exc.args)
     except Exception as err:  # noqa: BLE001
         raise ProbeError(
-            f"cannot copy the exception {exc!r} for injection ({type(err).__name__}: {err}); "
-            f"pass the class, a fault name, or an instance of a simpler exception type"
+            f"cannot copy the exception {exc!r} for injection ({type(err).__name__}: {err}); {hint}"
         ) from None
     new.args = exc.args
     state = getattr(exc, "__dict__", None)
     if state:
         new.__dict__.update(state)
+    fields = _field_names(cls)
+    for name in fields:
+        value = getattr(exc, name, _MISSING)
+        if value is _MISSING or _same(getattr(new, name, _MISSING), value):
+            continue
+        try:
+            setattr(new, name, value)
+        except (AttributeError, TypeError):
+            pass  # read-only; the check below reports it if it differs
     new.__cause__ = exc.__cause__
     new.__suppress_context__ = exc.__suppress_context__
+
+    differs = [
+        name
+        for name in fields
+        if not _same(getattr(new, name, _MISSING), getattr(exc, name, _MISSING))
+    ]
+    if not _same(new.args, exc.args):
+        differs.append("args")
+    if not _same(getattr(new, "__dict__", None), state):
+        differs.append("__dict__")
+    try:
+        if str(new) != str(exc):
+            differs.append("message")
+    except Exception:  # noqa: BLE001
+        differs.append("message")
+    if differs:
+        raise ProbeError(
+            f"cannot copy the exception {exc!r} exactly for injection "
+            f"(would differ in: {', '.join(differs)}); {hint}"
+        )
     return new
 
 

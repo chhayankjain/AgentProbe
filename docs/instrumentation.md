@@ -89,7 +89,7 @@ When the tool's signature is known (a plain function, or a LangChain tool's argu
 
 ## Agents that are still running
 
-`p.run(agent, input, timeout=seconds)` runs the agent in a worker thread. Python cannot force-stop a thread, so an agent can outlive its deadline. The thread is a daemon thread, so a hung agent never keeps your test run from exiting. When that happens:
+`p.run(agent, input, timeout=seconds)` runs the agent in a worker thread. Python cannot force-stop a thread, so an agent can outlive its deadline. AgentProbe's worker is a daemon thread, so it does not keep your test process alive after a hung agent. Threads or executors your agent starts itself can still delay exit, and daemon work still running at interpreter exit is stopped abruptly, without cleanup. When an agent outlives its deadline:
 
 1. The result has `deadline_exceeded=True` and `still_running=True`, and no final answer. The result is a frozen snapshot: nothing that happens later changes it.
 2. Assertions that need an answer are `unassessed`, as is `assert_not_called` for a tool not called *yet*. A required unassessed assertion fails the gate.

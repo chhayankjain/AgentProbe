@@ -16,7 +16,8 @@ def start_daemon(
     ``ThreadPoolExecutor`` and ``asyncio.to_thread`` workers are joined when the
     interpreter exits, so an agent that hangs past its deadline would keep a test
     run alive until it finished. Python cannot stop a thread; a daemon thread at
-    least lets the process exit.
+    least lets the process exit. It does not cover threads the agent starts
+    itself, and daemon work still running at interpreter exit is stopped abruptly.
     """
     future: concurrent.futures.Future[Any] = concurrent.futures.Future()
 

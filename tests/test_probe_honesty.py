@@ -80,6 +80,15 @@ class NeedsTwo(Exception):
         super().__init__(message)
 
 
+class Slotted(Exception):
+    __slots__ = ("code",)
+
+
+class IdentityMessage(Exception):
+    def __str__(self) -> str:
+        return f"instance {id(self)}"  # differs for every copy
+
+
 def _injected(exc: BaseException, calls: int = 1) -> list[BaseException]:
     seen: list[BaseException] = []
 
@@ -132,6 +141,41 @@ class TestExceptionInstances:
         assert isinstance(e.__cause__, ValueError)
         assert e.__notes__ == ["from the payment client"]
 
+    def test_fields_outside_the_instance_dict_are_kept(self):
+        """Built-in exceptions keep some fields in C, and __slots__ bypass __dict__."""
+        (f,) = _injected(FileNotFoundError(2, "missing", "/tmp/file"))
+        assert (f.errno, f.strerror, f.filename) == (2, "missing", "/tmp/file")
+        assert str(f) == "[Errno 2] missing: '/tmp/file'"
+
+        (o,) = _injected(OSError(2, "missing", "a", None, "b"))
+        assert (o.filename, o.filename2) == ("a", "b")
+        assert str(o) == str(OSError(2, "missing", "a", None, "b"))
+
+        original = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        (u,) = _injected(original)
+        assert (u.encoding, u.object, u.start, u.end, u.reason) == (
+            "utf-8",
+            b"\xff",
+            0,
+            1,
+            "invalid start byte",
+        )
+        assert str(u) == str(original) != ""
+
+        (i,) = _injected(ImportError("no module", name="abc", path="/tmp/abc"))
+        assert (type(i), i.name, i.path, str(i)) == (ImportError, "abc", "/tmp/abc", "no module")
+
+        slotted = Slotted("slotted")
+        slotted.code = 7
+        (s,) = _injected(slotted)
+        assert type(s) is Slotted and s.code == 7
+
+    def test_instance_that_cannot_be_copied_exactly_is_rejected(self):
+        """A copy that would differ is refused when declared, never injected."""
+        with probe(enforce=False) as p:
+            with pytest.raises(ProbeError, match="would differ in: message"):
+                p.on("lookup").always_fail(with_=IdentityMessage("x"))
+
     def test_uncopyable_instance_rejected_at_declaration(self):
         with probe(enforce=False) as p:
             with pytest.raises(ProbeError, match="cannot copy the exception"):
@@ -163,35 +207,64 @@ class TestAsyncCallableObjects:
         assert call.outcome == "returned"
         assert call.value == "'shipped'"  # the awaited value, not a coroutine
 
-    def test_fault_injected_and_slow_does_not_block_the_loop(self):
+    def test_fault_injected_for_async_callable_object(self):
+        with probe(enforce=False) as p:
+            tools = p.wrap({"lookup": AsyncLookup()})
+            p.on("lookup").always_fail()
+
+            async def agent(q):
+                try:
+                    await tools["lookup"](q)
+                except Exception as e:  # noqa: BLE001
+                    return type(e).__name__
+                return "no fault"
+
+            r = p.run(agent, "42")
+        assert r.answer == "ToolCallTimeout"
+
+    def test_slow_lets_the_event_loop_run_during_the_delay(self):
+        """Another task must run in the *middle* of slow()'s delay.
+
+        A blocking sleep can only let the other task run before the delay starts
+        or after the tool body has run, never in between, so this checks ordering
+        rather than a tight timing threshold.
+        """
+        delay = 0.4
+        ticks: list[float] = []
+        marks: dict[str, float] = {}
+
+        class Recording:
+            async def __call__(self, order_id: str) -> str:
+                marks["body"] = time.perf_counter()
+                return "shipped"
+
         async def main():
             with probe(enforce=False) as p:
-                tools = p.wrap({"lookup": AsyncLookup()})
-                p.on("lookup").slow(ms=200, times=1).always_fail()
-                ticks = 0
+                tools = p.wrap({"lookup": Recording()})
+                p.on("lookup").slow(ms=delay * 1000)
 
                 async def ticker():
-                    nonlocal ticks
-                    for _ in range(10):
+                    while True:
+                        ticks.append(time.perf_counter())
                         await asyncio.sleep(0.01)
-                        ticks += 1
 
                 async def agent(q):
-                    t = asyncio.ensure_future(ticker())
-                    first = await tools["lookup"](q)  # slowed
-                    await t
+                    task = asyncio.ensure_future(ticker())
+                    marks["start"] = time.perf_counter()
                     try:
-                        await tools["lookup"](q)
-                    except Exception as e:  # noqa: BLE001
-                        return f"{first} then {type(e).__name__}"
-                    return "no fault"
+                        return await tools["lookup"](q)
+                    finally:
+                        task.cancel()
 
-                r = await p.arun(agent, "42")
-                return r, ticks
+                return await p.arun(agent, "42")
 
-        r, ticks = asyncio.run(main())
-        assert r.answer == "shipped then ToolCallTimeout"
-        assert ticks == 10  # the loop kept running during the 200 ms delay
+        r = asyncio.run(main())
+        assert r.answer == "shipped"
+        assert marks["body"] - marks["start"] >= delay * 0.9  # the delay really happened
+        midpoint = marks["start"] + delay / 2
+        assert any(midpoint < tick < marks["body"] for tick in ticks), (
+            "no other task ran during the second half of the delay"
+        )
 
 
 # ---------------------------------------------------------------------------
