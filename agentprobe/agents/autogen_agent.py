@@ -48,8 +48,14 @@ import threading
 import time
 from typing import Any
 
-from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
-from agentprobe.observer.tracer import get_tracer
+from agentprobe._extras import require
+
+try:
+    from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
+    from agentprobe.observer.tracer import get_tracer
+except ImportError:  # name the extra that covers every dependency, then re-raise
+    require("agentprobe.agents.autogen_agent", "research", "pydantic", "opentelemetry")
+    raise
 
 _tracer = get_tracer(__name__)
 

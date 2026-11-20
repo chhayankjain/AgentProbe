@@ -33,16 +33,29 @@ import time
 from collections.abc import Sequence
 from typing import Annotated, Any, TypedDict
 
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from langchain_core.tools import tool
-from langgraph.graph import END, StateGraph
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
+from agentprobe._extras import require
 
-from agentprobe.agents.base import message_text
-from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
-from agentprobe.llm import llm_call_boundary
-from agentprobe.observer.tracer import get_tracer
+try:
+    from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+    from langchain_core.tools import tool
+    from langgraph.graph import END, StateGraph
+    from langgraph.graph.message import add_messages
+    from langgraph.prebuilt import ToolNode
+
+    from agentprobe.agents.base import message_text
+    from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
+    from agentprobe.llm import llm_call_boundary
+    from agentprobe.observer.tracer import get_tracer
+except ImportError:  # name the extra that covers every dependency, then re-raise
+    require(
+        "agentprobe.agents.langgraph_agent",
+        "research",
+        "langchain_core",
+        "langgraph",
+        "pydantic",
+        "opentelemetry",
+    )
+    raise
 
 _tracer = get_tracer(__name__)
 

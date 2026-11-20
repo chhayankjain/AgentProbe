@@ -26,14 +26,27 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from langchain.agents import create_agent
-from langchain.agents.middleware import AgentMiddleware
-from langchain_core.tools import tool
+from agentprobe._extras import require
 
-from agentprobe.agents.base import message_text
-from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
-from agentprobe.llm import llm_call_boundary
-from agentprobe.observer.tracer import get_tracer
+try:
+    from langchain.agents import create_agent
+    from langchain.agents.middleware import AgentMiddleware
+    from langchain_core.tools import tool
+
+    from agentprobe.agents.base import message_text
+    from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureInjector
+    from agentprobe.llm import llm_call_boundary
+    from agentprobe.observer.tracer import get_tracer
+except ImportError:  # name the extra that covers every dependency, then re-raise
+    require(
+        "agentprobe.agents.langchain_agent",
+        "research",
+        "langchain",
+        "langchain_core",
+        "pydantic",
+        "opentelemetry",
+    )
+    raise
 
 _tracer = get_tracer(__name__)
 
