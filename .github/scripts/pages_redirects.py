@@ -21,7 +21,7 @@ PAGE = """<!doctype html>
 <title>Moved: {title}</title>
 <link rel="canonical" href="{url}">
 <meta http-equiv="refresh" content="0; url={url}">
-<script>location.replace({js_url} + location.hash);</script>
+<script>location.replace({js_url} + location.search + location.hash);</script>
 </head>
 <body>
 <p>The agentprobe-toolkit docs moved to <a href="{url}">{url}</a>.</p>
