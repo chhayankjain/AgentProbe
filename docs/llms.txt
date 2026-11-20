@@ -6,22 +6,22 @@ Core API: `from agentprobe.testing import probe`; `with probe() as p:`; `tools =
 
 ## Docs
 
-- [Getting started](https://chhayankjain.github.io/agentprobe-toolkit/getting-started/): install and a first fault test
-- [Test that your agent retries](https://chhayankjain.github.io/agentprobe-toolkit/guides/retries/)
-- [Simulate timeouts and rate limits](https://chhayankjain.github.io/agentprobe-toolkit/guides/timeouts-and-rate-limits/)
-- [Test wrong or stale tool data](https://chhayankjain.github.io/agentprobe-toolkit/guides/wrong-data/)
-- [LangGraph tool errors](https://chhayankjain.github.io/agentprobe-toolkit/guides/langgraph-tool-errors/): ToolNode re-raises tool exceptions by default
-- [Inject the exceptions your code handles](https://chhayankjain.github.io/agentprobe-toolkit/guides/real-exceptions/)
-- [Run fault tests in CI](https://chhayankjain.github.io/agentprobe-toolkit/guides/ci/)
+- [Getting started](https://agentprobe-toolkit.pages.dev/getting-started/): install and a first fault test
+- [Test that your agent retries](https://agentprobe-toolkit.pages.dev/guides/retries/)
+- [Simulate timeouts and rate limits](https://agentprobe-toolkit.pages.dev/guides/timeouts-and-rate-limits/)
+- [Test wrong or stale tool data](https://agentprobe-toolkit.pages.dev/guides/wrong-data/)
+- [LangGraph tool errors](https://agentprobe-toolkit.pages.dev/guides/langgraph-tool-errors/): ToolNode re-raises tool exceptions by default
+- [Inject the exceptions your code handles](https://agentprobe-toolkit.pages.dev/guides/real-exceptions/)
+- [Run fault tests in CI](https://agentprobe-toolkit.pages.dev/guides/ci/)
 
 ## Reference
 
-- [Scenarios](https://chhayankjain.github.io/agentprobe-toolkit/reference/scenarios/)
-- [Assertions and results](https://chhayankjain.github.io/agentprobe-toolkit/reference/assertions/)
-- [How probing works](https://chhayankjain.github.io/agentprobe-toolkit/instrumentation/): guarantees about wrapping, concurrency, deadlines and evidence
+- [Scenarios](https://agentprobe-toolkit.pages.dev/reference/scenarios/)
+- [Assertions and results](https://agentprobe-toolkit.pages.dev/reference/assertions/)
+- [How probing works](https://agentprobe-toolkit.pages.dev/instrumentation/): guarantees about wrapping, concurrency, deadlines and evidence
 
 ## Optional
 
 - [Source on GitHub](https://github.com/chhayankjain/agentprobe-toolkit)
-- [Case study: a third-party LangGraph agent](https://chhayankjain.github.io/agentprobe-toolkit/case-studies/agents-from-scratch/)
-- [Research: benchmark and paper](https://chhayankjain.github.io/agentprobe-toolkit/research/)
+- [Case study: a third-party LangGraph agent](https://agentprobe-toolkit.pages.dev/case-studies/agents-from-scratch/)
+- [Research: benchmark and paper](https://agentprobe-toolkit.pages.dev/research/)

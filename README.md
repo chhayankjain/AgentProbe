@@ -6,13 +6,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/agentprobe-toolkit.svg)](https://pypi.org/project/agentprobe-toolkit/)
 [![GitHub release](https://img.shields.io/github/v/release/chhayankjain/agentprobe-toolkit)](https://github.com/chhayankjain/agentprobe-toolkit/releases)
-[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://chhayankjain.github.io/agentprobe-toolkit/)
+[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://agentprobe-toolkit.pages.dev/)
 
 **Test how your LLM agent handles tool failures, in pytest.**
 
 Your agent's tools will time out, hit rate limits, and return garbage. AgentProbe wraps the tools your agent already uses, breaks them on purpose and deterministically, and checks what your agent did about it. The test fails unless every fault you declared **actually fired**, so an agent that skips the tool or answers from a cache can't look resilient. The examples and the demo run without a model or API key.
 
-[Docs](https://chhayankjain.github.io/agentprobe-toolkit/) · [Install](#install) · [Your first fault test](#your-first-fault-test) · [What a failure looks like](#what-a-failure-looks-like) · [Scenarios](#what-you-can-break) · [Assertions](#what-you-can-check) · [CI](#run-it-in-ci) · [Tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md) · [For researchers](#for-researchers-the-benchmark-and-the-paper)
+[Docs](https://agentprobe-toolkit.pages.dev/) · [Install](#install) · [Your first fault test](#your-first-fault-test) · [What a failure looks like](#what-a-failure-looks-like) · [Scenarios](#what-you-can-break) · [Assertions](#what-you-can-check) · [CI](#run-it-in-ci) · [Tutorial](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md) · [For researchers](#for-researchers-the-benchmark-and-the-paper)
 
 ---
 
@@ -142,7 +142,7 @@ python -m agentprobe.demo --json               # machine-readable report
 
 The demo runs a small LangGraph agent on a scripted, deterministic model, injects seeded faults into its calculator tool, and prints the metrics, the per-call injection log with OpenTelemetry span ids, and each run's outcome.
 
-Task guides (retries, timeouts and rate limits, wrong data, LangGraph tool errors, CI) and the full reference are on the [docs site](https://chhayankjain.github.io/agentprobe-toolkit/).
+Task guides (retries, timeouts and rate limits, wrong data, LangGraph tool errors, CI) and the full reference are on the [docs site](https://agentprobe-toolkit.pages.dev/).
 
 ## Get involved
 

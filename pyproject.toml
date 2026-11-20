@@ -86,7 +86,7 @@ autogen = [
 
 [project.urls]
 Homepage = "https://github.com/chhayankjain/agentprobe-toolkit"
-Documentation = "https://chhayankjain.github.io/agentprobe-toolkit/"
+Documentation = "https://agentprobe-toolkit.pages.dev/"
 Repository = "https://github.com/chhayankjain/agentprobe-toolkit"
 Issues = "https://github.com/chhayankjain/agentprobe-toolkit/issues"
 Changelog = "https://github.com/chhayankjain/agentprobe-toolkit/blob/main/CHANGELOG.md"

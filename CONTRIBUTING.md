@@ -54,7 +54,7 @@ python research/experiments/run_experiment_v2.py --frameworks langgraph --model 
 
 ## Docs site
 
-The docs site (https://chhayankjain.github.io/agentprobe-toolkit/) is built with MkDocs from `docs/` and `mkdocs.yml`, and deployed from `main` by `.github/workflows/docs.yml`. To preview it:
+The docs site (https://agentprobe-toolkit.pages.dev/) is built with MkDocs from `docs/` and `mkdocs.yml`, and deployed to Cloudflare Pages from `main` by `.github/workflows/docs.yml` (repository secrets `CLOUDFLARE_API_TOKEN`, with only *Cloudflare Pages: Edit*, and `CLOUDFLARE_ACCOUNT_ID`). The old GitHub Pages address serves redirects to it. Running the workflow by hand on a branch deploys a preview for that branch. To preview it locally:
 
 ```bash
 pip install -e ".[docs]"
