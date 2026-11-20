@@ -34,7 +34,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from agentprobe.observer.tracer import get_tracer
 
@@ -129,16 +129,16 @@ class LatencyFailureInjector:
 
         @functools.wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> T:
-            return self._execute_sync(fn, *args, **kwargs)  # type: ignore[return-value]
+            return cast(T, self._execute_sync(fn, *args, **kwargs))
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     def wrap_async(self, fn: Callable[..., T]) -> Callable[..., T]:
         """Wrap an async function with latency injection."""
 
         @functools.wraps(fn)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
-            return await self._execute_async(fn, *args, **kwargs)  # type: ignore[return-value]
+            return cast(T, await self._execute_async(fn, *args, **kwargs))
 
         return wrapper  # type: ignore[return-value]
 
@@ -208,7 +208,7 @@ class LatencyFailureInjector:
             case _:
                 return 0.0, False, False
 
-    def _execute_sync(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:
+    def _execute_sync(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         self._call_count += 1
         delay, was_spike, was_cold = self._compute_delay()
 
@@ -241,7 +241,7 @@ class LatencyFailureInjector:
                     )
                 )
 
-    async def _execute_async(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:
+    async def _execute_async(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         self._call_count += 1
         delay, was_spike, was_cold = self._compute_delay()
 

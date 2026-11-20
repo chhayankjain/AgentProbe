@@ -215,7 +215,7 @@ class BenchmarkRunner:
         self,
         agent: Any,
         config: BenchmarkConfig | None = None,
-        task_fn: Callable[[int, str], dict] | None = None,
+        task_fn: Callable[[int, str], dict[str, Any]] | None = None,
     ) -> None:
         self.agent = agent
         self.config = config or BenchmarkConfig()
@@ -414,7 +414,7 @@ class BenchmarkRunner:
                     recovery_injections=rec_injections,
                 )
 
-    def _invoke_with_timeout(self, task_input: dict) -> Any:
+    def _invoke_with_timeout(self, task_input: dict[str, Any]) -> Any:
         """Invoke agent with wall-clock timeout enforcement.
 
         Uses a thread so that the agent's injector RNG, injection logs,
@@ -459,7 +459,7 @@ class BenchmarkRunner:
             self._invocation_hung = True
             raise _HarnessTimeout(f"Agent invocation exceeded {timeout}s wall-clock timeout")
 
-    def _attempt_recovery(self, task_input: dict) -> tuple[bool, float, Any, str, int]:
+    def _attempt_recovery(self, task_input: dict[str, Any]) -> tuple[bool, float, Any, str, int]:
         """Try to invoke the agent again after a failure.
 
         Returns ``(recovered, latency_ms, output, recovery_status, backend_retries)``.

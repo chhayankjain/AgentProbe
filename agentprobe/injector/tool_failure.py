@@ -45,7 +45,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from opentelemetry.trace import Status, StatusCode
 
@@ -146,8 +146,8 @@ class InjectionResult:
     latency_ms: float = 0.0
     span_id: str | None = None
     call_index: int = 0
-    call_args: tuple = ()
-    call_kwargs: dict = field(default_factory=dict)
+    call_args: tuple[Any, ...] = ()
+    call_kwargs: dict[str, Any] = field(default_factory=dict)
     return_value: Any = None
 
 
@@ -182,16 +182,16 @@ class ToolFailureInjector:
 
         @functools.wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> T:
-            return self._execute_sync(fn, fn.__name__, *args, **kwargs)  # type: ignore[return-value]
+            return cast(T, self._execute_sync(fn, fn.__name__, *args, **kwargs))
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     def wrap_async(self, fn: Callable[..., T]) -> Callable[..., T]:
         """Wrap an async tool function with failure injection."""
 
         @functools.wraps(fn)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
-            return await self._execute_async(fn, fn.__name__, *args, **kwargs)  # type: ignore[return-value]
+            return cast(T, await self._execute_async(fn, fn.__name__, *args, **kwargs))
 
         return wrapper  # type: ignore[return-value]
 
@@ -206,13 +206,13 @@ class ToolFailureInjector:
             tool_name: Override the recorded tool name (defaults to ``fn.__name__``).
             **kwargs: Keyword arguments forwarded to *fn*.
         """
-        return self._execute_sync(fn, tool_name or fn.__name__, *args, **kwargs)  # type: ignore[return-value]
+        return cast(T, self._execute_sync(fn, tool_name or fn.__name__, *args, **kwargs))
 
     async def call_async(
         self, fn: Callable[..., T], *args: Any, tool_name: str | None = None, **kwargs: Any
     ) -> T:
         """Directly invoke an async function with failure injection."""
-        return await self._execute_async(fn, tool_name or fn.__name__, *args, **kwargs)  # type: ignore[return-value]
+        return cast(T, await self._execute_async(fn, tool_name or fn.__name__, *args, **kwargs))
 
     # ------------------------------------------------------------------
     # LangChain integration
@@ -286,7 +286,7 @@ class ToolFailureInjector:
             return False
         return self._rng.random() < self.config.failure_probability
 
-    def _execute_sync(self, fn: Callable, name: str, *args: Any, **kwargs: Any) -> Any:
+    def _execute_sync(self, fn: Callable[..., Any], name: str, *args: Any, **kwargs: Any) -> Any:
         self._call_count += 1
         idx = self._call_count
         inject = self._should_inject()
@@ -334,7 +334,9 @@ class ToolFailureInjector:
                     self._injected_count += 1
                 self._log.append(rec)
 
-    async def _execute_async(self, fn: Callable, name: str, *args: Any, **kwargs: Any) -> Any:
+    async def _execute_async(
+        self, fn: Callable[..., Any], name: str, *args: Any, **kwargs: Any
+    ) -> Any:
         self._call_count += 1
         idx = self._call_count
         inject = self._should_inject()

@@ -23,6 +23,7 @@ Usage::
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -284,7 +285,7 @@ def compare_distributions(
 
 
 def compare_multiple_groups(
-    groups: list[list[float] | np.ndarray],
+    groups: Sequence[Sequence[float] | np.ndarray],
     alpha: float = 0.05,
 ) -> HypothesisTestResult:
     """Kruskal-Wallis H-test for comparing 3+ independent groups.

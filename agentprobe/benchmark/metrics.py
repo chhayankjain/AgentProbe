@@ -138,12 +138,14 @@ class MetricsCalculator:
 
         # Infer labels from first run if not provided
         first = runs[0]
-        _g = lambda obj, key, default="": (
-            obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
-        )  # noqa: E731
-        fw = framework or _g(first, "framework", "unknown")
-        tk = task or _g(first, "task", "unknown")
-        ft = failure_type or _g(first, "failure_type", "none")
+
+        def _label(obj: Any, key: str, default: str) -> str:
+            value = obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
+            return default if value is None else str(value)
+
+        fw = framework or _label(first, "framework", "unknown")
+        tk = task or _label(first, "task", "unknown")
+        ft = failure_type or _label(first, "failure_type", "none")
 
         def _get(obj: Any, key: str, default: Any = None) -> Any:
             """Get attribute from object or dict."""

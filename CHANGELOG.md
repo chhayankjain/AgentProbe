@@ -7,6 +7,7 @@
 
 ### Changed
 - Research material moved under `research/`: the benchmark scripts and every result batch (`research/experiments/`), the paper source (`research/paper/`), the sample target agent (`research/samples/`) and the observability stack (`research/observability/`). The README now focuses on testing your own agent; the benchmark, taxonomy and reproduction steps moved to `research/README.md`. Run experiment scripts as `python research/experiments/<script>.py`.
+- Type checking is now enforced: `mypy --strict` passes on the whole package and CI fails on any new error (it was advisory, with 55 known errors). Fixes along the way: precise types for the orchestration injector's node and router functions, `cast` instead of stale `type: ignore` comments in the injectors, and `AgentMetrics` labels that are always strings
 
 ### Added
 - Docs site at https://agentprobe-toolkit.pages.dev/ (MkDocs on Cloudflare Pages, deployed from `main`; the earlier GitHub Pages address redirects there): getting started, task guides (retries, timeouts and rate limits, wrong data, LangGraph tool errors, real exception types, CI), scenario and assertion reference, and `llms.txt`. The guides' code examples run in the test suite (`tests/test_docs_examples.py`)

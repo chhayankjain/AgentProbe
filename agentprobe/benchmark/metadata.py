@@ -172,7 +172,7 @@ def _get_dependency_versions() -> dict[str, str]:
 
     # pyautogen uses a different import name
     try:
-        import autogen  # type: ignore[import-untyped]
+        import autogen
 
         deps["pyautogen"] = getattr(autogen, "__version__", "unknown")
     except ImportError:

@@ -43,7 +43,7 @@ _SYSTEM_PROMPT = (
 )
 
 
-class _LLMCallBoundaryMiddleware(AgentMiddleware):  # type: ignore[misc]
+class _LLMCallBoundaryMiddleware(AgentMiddleware):
     """Tags exceptions raised by the model call (not by tools) so the runner can
     tell provider failures apart from tool failures that share a transport."""
 
