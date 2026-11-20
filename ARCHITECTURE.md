@@ -208,7 +208,7 @@ flowchart LR
     subgraph HOST["host (benchmark process)"]
         TR["AgentProbeTracer<br/>TracerProvider + Resource(service.name)"]
         CON["ConsoleSpanExporter<br/>(SimpleSpanProcessor)<br/>off with AGENTPROBE_NO_CONSOLE_TRACE=1"]
-        OTLP["OTLPSpanExporter gRPC<br/>(BatchSpanProcessor)<br/>AGENTPROBE_OTLP_ENDPOINT"]
+        OTLP["OTLPSpanExporter gRPC<br/>(BatchSpanProcessor)<br/>AGENTPROBE_OTLP_ENDPOINT<br/>https:// → TLS · http:// → plaintext"]
         PE["PrometheusExporter<br/>start_http_server(8000)<br/>agentprobe_tool_call_total · _tool_failure_total<br/>_latency_seconds · _mttr_seconds · _failure_rate"]
     end
 
