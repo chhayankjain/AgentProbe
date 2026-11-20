@@ -123,7 +123,7 @@ def _print_report(
     probability: float,
     results: list[Any],
     metrics: Any,
-    summary: dict,
+    summary: dict[str, Any],
     agent: Any,
     expected_answer: str,
     n_correct: int,

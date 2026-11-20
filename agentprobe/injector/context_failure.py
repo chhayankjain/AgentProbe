@@ -191,7 +191,7 @@ class ContextFailureInjector:
                 rec.latency_ms = (time.perf_counter() - start) * 1000
                 self._log.append(rec)
 
-    def wrap_memory_retrieval(self, fn: Callable) -> Callable:
+    def wrap_memory_retrieval(self, fn: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator: wrap a memory retrieval function to corrupt its output."""
 
         @functools.wraps(fn)
@@ -324,7 +324,7 @@ _FAKE_USER_MESSAGES = [
 ]
 
 
-def _make_fake_message(role: str, index: int) -> dict[str, str]:
+def _make_fake_message(role: str, index: int) -> dict[str, str | bool]:
     """Create a plausible-looking but hallucinated chat message."""
     if role == "assistant":
         content = _FAKE_ASSISTANT_MESSAGES[index % len(_FAKE_ASSISTANT_MESSAGES)]

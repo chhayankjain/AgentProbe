@@ -143,7 +143,7 @@ class OrchestrationFailureInjector:
     # Node wrapping
     # ------------------------------------------------------------------
 
-    def wrap_node(self, fn: Callable, node_name: str = "") -> Callable:
+    def wrap_node(self, fn: Callable[..., Any], node_name: str = "") -> Callable[..., Any]:
         """Wrap a LangGraph node function with orchestration failure injection.
 
         The wrapped function accepts the LangGraph state dict and returns
@@ -157,7 +157,7 @@ class OrchestrationFailureInjector:
 
         return wrapper
 
-    def wrap_router(self, fn: Callable, node_name: str = "") -> Callable:
+    def wrap_router(self, fn: Callable[..., Any], node_name: str = "") -> Callable[..., Any]:
         """Wrap a LangGraph conditional edge router with wrong-branch injection."""
         name = node_name or fn.__name__
 
@@ -198,7 +198,9 @@ class OrchestrationFailureInjector:
             return False
         return self._rng.random() < self.config.failure_probability
 
-    def _execute_node(self, fn: Callable, name: str, state: dict[str, Any]) -> dict[str, Any]:
+    def _execute_node(
+        self, fn: Callable[[dict[str, Any]], dict[str, Any]], name: str, state: dict[str, Any]
+    ) -> dict[str, Any]:
         inject = self._should_inject()
         start = time.perf_counter()
 
@@ -234,7 +236,9 @@ class OrchestrationFailureInjector:
                 rec.latency_ms = (time.perf_counter() - start) * 1000
                 self._log.append(rec)
 
-    def _execute_router(self, fn: Callable, name: str, state: dict[str, Any]) -> str:
+    def _execute_router(
+        self, fn: Callable[[dict[str, Any]], str], name: str, state: dict[str, Any]
+    ) -> str:
         inject = self._should_inject()
         start = time.perf_counter()
 
@@ -264,7 +268,7 @@ class OrchestrationFailureInjector:
 
     def _inject_loop(
         self,
-        fn: Callable,
+        fn: Callable[[dict[str, Any]], dict[str, Any]],
         name: str,
         state: dict[str, Any],
         span: Any,
@@ -288,7 +292,7 @@ class OrchestrationFailureInjector:
 
     def _inject_state_corruption(
         self,
-        fn: Callable,
+        fn: Callable[[dict[str, Any]], dict[str, Any]],
         name: str,
         state: dict[str, Any],
         span: Any,

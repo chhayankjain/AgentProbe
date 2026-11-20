@@ -18,6 +18,9 @@ pytest tests/ examples/your_agent -v -m "not slow and not integration"
 # Run linter
 ruff check agentprobe/ tests/ examples/
 ruff format --check agentprobe/ tests/ examples/
+
+# Type check (strict; CI fails on any error)
+mypy agentprobe/
 ```
 
 ## Where to start

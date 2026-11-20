@@ -1409,7 +1409,9 @@ class Probe:
 
     # ---- the call path -------------------------------------------------------------
 
-    def _begin(self, name: str, args: tuple, kwargs: dict) -> tuple[CallRecord, _Action | None]:
+    def _begin(
+        self, name: str, args: tuple[Any, ...], kwargs: dict[str, Any]
+    ) -> tuple[CallRecord, _Action | None]:
         """Record the call at entry (pending) and decide its fault, atomically."""
         public_kwargs = _public_kwargs(kwargs)
         exact_args = tuple(_exact_or_opaque(v) for v in args)
@@ -1490,7 +1492,13 @@ class Probe:
                 rec.completed_after_close = True
 
     def _call(
-        self, name: str, fn: Callable[..., Any], args: tuple, kwargs: dict, *, key: int | None
+        self,
+        name: str,
+        fn: Callable[..., Any],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        *,
+        key: int | None,
     ) -> Any:
         rec, action = self._begin(name, args, kwargs)
         started = time.perf_counter()
@@ -1521,7 +1529,13 @@ class Probe:
                 _ACTIVE_WRAPPERS.reset(token)
 
     async def _acall(
-        self, name: str, fn: Callable[..., Any], args: tuple, kwargs: dict, *, key: int | None
+        self,
+        name: str,
+        fn: Callable[..., Any],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        *,
+        key: int | None,
     ) -> Any:
         rec, action = self._begin(name, args, kwargs)
         started = time.perf_counter()
@@ -1859,7 +1873,7 @@ def _tool_name(tool: Any) -> str:
     return str(name)
 
 
-def _public_kwargs(kwargs: dict) -> dict:
+def _public_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     """Drop framework plumbing (callbacks, run managers, config) from the log."""
     return {k: v for k, v in kwargs.items() if k not in {"run_manager", "callbacks", "config"}}
 

@@ -272,7 +272,7 @@ def _patch_openai_compat() -> None:
                 }
         return resp
 
-    openai.ChatCompletion.create = _patched_create
+    openai.ChatCompletion.create = _patched_create  # type: ignore[method-assign]  # legacy client shim
     _COMPAT_PATCHED = True
 
 
@@ -530,4 +530,4 @@ class AutoGenToolAgent:
 
         except ImportError:
             # Deferred — ImportError raised at invoke() time instead
-            return None, None  # type: ignore[return-value]
+            return None, None
