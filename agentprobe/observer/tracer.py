@@ -57,7 +57,9 @@ _ATTACHED: dict[str, Any] = {"console": False, "otlp": {}}
 def otlp_insecure(endpoint: str, insecure: bool | None = None) -> bool:
     """Whether the OTLP exporter for *endpoint* sends spans without TLS.
 
-    In order: an explicit *insecure* wins; an ``https://`` endpoint uses TLS;
+    In order: an ``https://`` endpoint uses TLS (OpenTelemetry's exporter always
+    does, so ``insecure=True`` with ``https://`` is rejected); otherwise an
+    explicit *insecure* wins;
     the standard ``OTEL_EXPORTER_OTLP_TRACES_INSECURE`` or
     ``OTEL_EXPORTER_OTLP_INSECURE`` variable decides if set; an ``http://``
     endpoint is plaintext. An endpoint with no scheme (``localhost:4317``) stays
@@ -65,11 +67,17 @@ def otlp_insecure(endpoint: str, insecure: bool | None = None) -> bool:
     Certificates come from the standard ``OTEL_EXPORTER_OTLP_CERTIFICATE`` (and
     client certificate/key) variables.
     """
-    if insecure is not None:
-        return insecure
     scheme = urlparse(endpoint).scheme.lower()
     if scheme == "https":
+        if insecure:
+            raise ValueError(
+                f"insecure=True contradicts the https:// endpoint {endpoint!r}: "
+                "OpenTelemetry always uses TLS for https://. Use an http:// endpoint "
+                "for plaintext, or drop insecure=True."
+            )
         return False
+    if insecure is not None:
+        return insecure
     env = os.getenv("OTEL_EXPORTER_OTLP_TRACES_INSECURE") or os.getenv(
         "OTEL_EXPORTER_OTLP_INSECURE"
     )

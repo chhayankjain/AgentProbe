@@ -27,9 +27,16 @@ def test_default_follows_the_endpoint(endpoint, expected):
     assert otlp_insecure(endpoint) is expected
 
 
-def test_explicit_choice_wins():
+def test_explicit_choice_wins_except_against_https():
     assert otlp_insecure("http://localhost:4317", insecure=False) is False
-    assert otlp_insecure("https://collector:4317", insecure=True) is True
+    assert otlp_insecure("localhost:4317", insecure=False) is False
+    assert otlp_insecure("https://collector:4317", insecure=False) is False
+
+
+def test_insecure_true_with_https_is_rejected():
+    """OpenTelemetry always uses TLS for https://, so plaintext can't be honoured."""
+    with pytest.raises(ValueError, match="contradicts the https:// endpoint"):
+        otlp_insecure("https://collector:4317", insecure=True)
 
 
 @pytest.mark.parametrize(
@@ -144,3 +151,49 @@ def test_different_endpoints_each_get_their_own_setting(isolated_provider):
     isolated_provider.AgentProbeTracer(otlp_endpoint="localhost:4329", insecure=True)
     isolated_provider.AgentProbeTracer(otlp_endpoint="https://collector:4317")
     assert [e["insecure"] for e in _FakeExporter.created] == [True, False]
+
+
+ENDPOINT_CASES = [
+    ("https://localhost:4329", None),
+    ("https://localhost:4329", False),
+    ("http://localhost:4329", None),
+    ("http://localhost:4329", True),
+    ("http://localhost:4329", False),
+    ("localhost:4329", None),
+    ("localhost:4329", True),
+    ("localhost:4329", False),
+]
+
+
+@pytest.mark.parametrize(("endpoint", "insecure"), ENDPOINT_CASES)
+def test_the_recorded_setting_matches_the_real_exporter(endpoint, insecure):
+    """Build OpenTelemetry's own exporter (no connection is made until export)
+    and check AgentProbe's decision is the transport it actually uses."""
+    if not tracer_module._OTLP_AVAILABLE:
+        pytest.skip("OTLP exporter not installed")
+    exporter = tracer_module._otlp_exporter(endpoint, insecure)
+    try:
+        if not hasattr(exporter, "_insecure"):
+            pytest.skip("this OpenTelemetry version doesn't expose the transport")
+        assert exporter._insecure is otlp_insecure(endpoint, insecure)
+    finally:
+        exporter.shutdown()
+
+
+def test_real_exporters_for_one_endpoint_never_conflict_falsely(monkeypatch):
+    """https:// with the default and with insecure=False is the same request."""
+    if not tracer_module._OTLP_AVAILABLE:
+        pytest.skip("OTLP exporter not installed")
+    from opentelemetry.sdk.trace import TracerProvider
+
+    provider = TracerProvider(shutdown_on_exit=False)
+    monkeypatch.setattr(tracer_module, "_GLOBAL_PROVIDER", provider)
+    monkeypatch.setattr(tracer_module, "_ATTACHED", {"console": True, "otlp": {}})
+    try:
+        tracer_module.AgentProbeTracer(otlp_endpoint="https://localhost:4329")
+        tracer_module.AgentProbeTracer(otlp_endpoint="https://localhost:4329", insecure=False)
+        with pytest.raises(ValueError, match="contradicts"):
+            tracer_module.AgentProbeTracer(otlp_endpoint="https://localhost:4329", insecure=True)
+        assert tracer_module._ATTACHED["otlp"] == {"https://localhost:4329": False}
+    finally:
+        provider.shutdown()
