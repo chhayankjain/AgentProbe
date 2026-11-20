@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 import pytest
 
 from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner, RunResult
@@ -18,6 +20,19 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Mock agents
 # ---------------------------------------------------------------------------
+
+
+#: Agents that "hang" wait on this instead of sleeping. Each test releases them
+#: when it ends, so abandoned worker threads finish at once instead of holding
+#: the interpreter open at exit (concurrent.futures joins its workers).
+_RELEASE = threading.Event()
+
+
+@pytest.fixture(autouse=True)
+def _release_hung_agents():
+    _RELEASE.clear()
+    yield
+    _RELEASE.set()
 
 
 class AlwaysSuccessAgent:
@@ -204,10 +219,9 @@ class TestTimeoutIsolation:
             framework = "mock"
 
             def invoke(self, input: dict) -> dict:
-                import time
 
                 call_count["n"] += 1
-                time.sleep(5)  # will exceed the 100ms deadline
+                _RELEASE.wait(5)  # will exceed the 100ms deadline
                 return {"output": "slow"}
 
         config = BenchmarkConfig(
@@ -261,7 +275,7 @@ class TestTimeoutIsolation:
             framework = "mock"
 
             def invoke(self, input: dict) -> dict:
-                time.sleep(60)
+                _RELEASE.wait(60)
                 return {"output": "never"}
 
         config = BenchmarkConfig(
@@ -344,10 +358,9 @@ class TestTimeoutIsolation:
             framework = "mock"
 
             def invoke(self, input: dict) -> dict:
-                import time
 
                 call_count["n"] += 1
-                time.sleep(5)
+                _RELEASE.wait(5)
                 return {"output": "slow"}
 
         config = BenchmarkConfig(
@@ -497,13 +510,12 @@ class TestTimeoutIsolation:
             framework = "mock"
 
             def invoke(self, input: dict) -> dict:
-                import time
 
                 call_count["n"] += 1
                 if call_count["n"] == 1:
                     raise RuntimeError("initial failure")
                 # Recovery attempt hangs
-                time.sleep(5)
+                _RELEASE.wait(5)
                 return {"output": "never"}
 
         config = BenchmarkConfig(
