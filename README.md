@@ -41,6 +41,16 @@ pip install "agentprobe-toolkit>=1.4" pytest
 
 The package installs as `agentprobe-toolkit` and imports as `agentprobe`. Requires Python 3.11+.
 
+`agentprobe.testing` has no required dependencies (from the next release). Optional extras add the rest:
+
+| Extra | Adds |
+|---|---|
+| `[langchain]` | LangChain and LangGraph, for the adapters and the scripted test model |
+| `[observability]` | OpenTelemetry tracing export and the Prometheus exporter |
+| `[research]` | The benchmark harness, injectors, statistics and `python -m agentprobe.demo` |
+
+Probe spans are emitted whenever OpenTelemetry is installed, with or without the extra.
+
 ## Quick start
 
 Given an agent `answer(question, tools)` and a dict `TOOLS` of the functions it calls, this test checks that the agent admits a payment-service outage instead of claiming success:
@@ -123,7 +133,7 @@ How wrapping, concurrency, deadlines and cleanup work is documented in [How prob
 - [**Tutorial**](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/your_agent/README.md): add a fault test to an existing agent and run it in CI, in ten minutes.
 - [**Real-model example**](https://github.com/chhayankjain/agentprobe-toolkit/blob/main/examples/real_model_agent/README.md): the same tests on a LangChain agent with a local Ollama model.
 - [**Case study**](https://agentprobe-toolkit.pages.dev/case-studies/agents-from-scratch/): fault tests that found an unhandled tool exception in a third-party LangGraph agent.
-- **Demo:** `python -m agentprobe.demo` runs a scripted LangGraph agent under seeded faults, with no model or API key.
+- **Demo:** `python -m agentprobe.demo` runs a scripted LangGraph agent under seeded faults, with no model or API key (install the `[research]` extra).
 
 ## Before you test real tools
 

@@ -1,6 +1,6 @@
 """AgentProbe quickstart: inject faults into an agent and measure it, with no model needed.
 
-    pip install agentprobe-toolkit
+    pip install "agentprobe-toolkit[research]"
     python examples/quickstart.py
 
 This uses the same building blocks as ``python -m agentprobe.demo``, spelled out

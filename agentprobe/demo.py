@@ -23,11 +23,16 @@ import sys
 from contextlib import redirect_stdout
 from typing import Any
 
-from agentprobe.benchmark.metrics import MetricsCalculator
-from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner
-from agentprobe.fake_llm import ScriptedToolCallingModel
-from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
-from agentprobe.observer.tracer import AgentProbeTracer
+from agentprobe._extras import missing_extra
+
+try:
+    from agentprobe.benchmark.metrics import MetricsCalculator
+    from agentprobe.benchmark.runner import BenchmarkConfig, BenchmarkRunner
+    from agentprobe.fake_llm import ScriptedToolCallingModel
+    from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
+    from agentprobe.observer.tracer import AgentProbeTracer
+except ModuleNotFoundError as exc:  # an optional dependency is not installed
+    raise missing_extra(exc, "The demo", "research") from exc
 
 FAULTS = {
     "timeout": ToolFailureType.TIMEOUT,

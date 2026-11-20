@@ -32,24 +32,42 @@ classifiers = [
     "Topic :: System :: Monitoring",
     "Typing :: Typed",
 ]
-dependencies = [
-    # The LangChain adapter uses ``langchain.agents.create_agent`` (LangChain 1.x).
-    "langgraph>=1.0.0",
-    "langchain>=1.0.0",
+# No required dependencies: `pip install agentprobe-toolkit` is enough for
+# agentprobe.testing (probe(), scenarios, assertions, reports). Everything else
+# is an extra. OpenTelemetry is optional: probe spans are emitted when it is
+# installed and skipped when it isn't.
+dependencies = []
+
+[project.optional-dependencies]
+# LangChain tools, LangGraph agents and the scripted model in agentprobe.fake_llm.
+# (Wrapping LangChain tools only needs langchain-core, which your agent already has.)
+langchain = [
     "langchain-core>=1.0.0",
+    "langchain>=1.0.0",
+    "langgraph>=1.0.0",
+]
+# Tracing and metrics export: AgentProbeTracer, OTLP and the Prometheus exporter.
+observability = [
     "opentelemetry-api>=1.27.0",
     "opentelemetry-sdk>=1.27.0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.27.0",
     "opentelemetry-exporter-prometheus>=0.48b0",
     "prometheus-client>=0.21.0",
+]
+# The research toolkit: benchmark runner, injectors, framework adapters, failure
+# classifier, statistics and `python -m agentprobe.demo`.
+research = [
+    "agentprobe-toolkit[langchain,observability]",
     "pydantic>=2.0.0",
     "rich>=13.0.0",
     "numpy>=1.26.0",
     "scipy>=1.12.0",
 ]
-
-[project.optional-dependencies]
+all = [
+    "agentprobe-toolkit[research]",
+]
 dev = [
+    "agentprobe-toolkit[research]",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "ruff>=0.7.0",
@@ -64,22 +82,28 @@ plotting = [
     "matplotlib>=3.8.0",
     "pandas>=2.0.0",
 ]
+# Model providers for the research adapters (agentprobe.llm).
 ollama = [
+    "agentprobe-toolkit[research]",
     "langchain-ollama>=0.2.0",
 ]
 openai = [
+    "agentprobe-toolkit[research]",
     "langchain-openai>=0.2.0",
 ]
 anthropic = [
+    "agentprobe-toolkit[research]",
     "langchain-anthropic>=0.2.0",
 ]
 google = [
+    "agentprobe-toolkit[research]",
     "langchain-google-genai>=2.0.0",
 ]
 # The AutoGen adapter targets the legacy pyautogen 0.1.14 API, which requires the
 # pre-1.0 openai client. This extra conflicts with ``langchain-openai`` (needs
 # openai>=1); install it in a separate environment.
 autogen = [
+    "agentprobe-toolkit[research]",
     "pyautogen==0.1.14",
     "openai<1.0",
 ]
@@ -139,6 +163,9 @@ ignore = [
     "N818",   # exception name should end with Error (internal naming convention)
     "E731",   # lambda assignment (used in metrics helper)
 ]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true  # keep explicit re-exports (`import X as X`) in one block
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]  # allow long lines in tests

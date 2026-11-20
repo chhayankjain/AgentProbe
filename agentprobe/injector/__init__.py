@@ -13,32 +13,37 @@ Usage::
     )
 """
 
-from agentprobe.injector.context_failure import (
-    ContextFailureConfig,
-    ContextFailureInjector,
-    ContextFailureType,
-)
-from agentprobe.injector.latency_failure import (
-    LatencyFailureConfig,
-    LatencyFailureInjector,
-    LatencyFailureType,
-)
-from agentprobe.injector.orchestration_failure import (
-    OrchestrationFailureConfig,
-    OrchestrationFailureInjector,
-    OrchestrationFailureType,
-)
-from agentprobe.injector.tool_failure import (
-    InjectionResult,
-    ToolCallAPIError,
-    ToolCallError,
-    ToolCallMalformedOutput,
-    ToolCallRateLimited,
-    ToolCallTimeout,
-    ToolFailureConfig,
-    ToolFailureInjector,
-    ToolFailureType,
-)
+from agentprobe._extras import missing_extra
+
+try:
+    from agentprobe.injector.context_failure import (
+        ContextFailureConfig,
+        ContextFailureInjector,
+        ContextFailureType,
+    )
+    from agentprobe.injector.latency_failure import (
+        LatencyFailureConfig,
+        LatencyFailureInjector,
+        LatencyFailureType,
+    )
+    from agentprobe.injector.orchestration_failure import (
+        OrchestrationFailureConfig,
+        OrchestrationFailureInjector,
+        OrchestrationFailureType,
+    )
+    from agentprobe.injector.tool_failure import (
+        InjectionResult,
+        ToolCallAPIError,
+        ToolCallError,
+        ToolCallMalformedOutput,
+        ToolCallRateLimited,
+        ToolCallTimeout,
+        ToolFailureConfig,
+        ToolFailureInjector,
+        ToolFailureType,
+    )
+except ModuleNotFoundError as exc:  # an optional dependency is not installed
+    raise missing_extra(exc, "agentprobe.injector") from exc
 
 __all__ = [
     # Tool-call faults (Category 1) — used in the paper

@@ -1,4 +1,5 @@
-# Mirror of the core dependencies in pyproject.toml (the source of truth).
+# The research toolkit's dependencies (the `research` extra in pyproject.toml, the
+# source of truth). agentprobe.testing itself has no required dependencies.
 # Prefer: pip install -e ".[ollama]"   (add dev, plotting, openai, anthropic, autogen as needed)
 
 # Agent frameworks (LangChain 1.x is required for langchain.agents.create_agent)

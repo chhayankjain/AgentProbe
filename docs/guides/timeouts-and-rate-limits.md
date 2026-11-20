@@ -13,13 +13,16 @@ The built-in faults cover the failures tools hit most: timeouts, rate limits, se
 | `"api_error"` | `ToolCallAPIError` (HTTP 503) | `ToolCallError` |
 | `"malformed_output"` | `ToolCallMalformedOutput` | `ToolCallError` |
 
-All four live in `agentprobe.injector.tool_failure`. To raise the exact exception your client raises instead, see [Inject the exceptions your code handles](real-exceptions.md).
+All four are importable from `agentprobe.testing`. To raise the exact exception your client raises instead, see [Inject the exceptions your code handles](real-exceptions.md).
+
+!!! note "Importing the fault classes"
+    From the next release they are importable from `agentprobe.testing`, which needs no other packages. In 1.4.0, import them from `agentprobe.injector.tool_failure`.
+
 
 ## A rate-limited search tool
 
 ```python
-from agentprobe.injector.tool_failure import ToolCallRateLimited
-from agentprobe.testing import probe
+from agentprobe.testing import ToolCallRateLimited, probe
 
 
 def search(query: str) -> str:

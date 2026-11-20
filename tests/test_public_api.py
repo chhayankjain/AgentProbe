@@ -18,8 +18,12 @@ import agentprobe
 from agentprobe.agents.base import AgentResult, BaseAgent
 from agentprobe.benchmark import PAPER_PROMPTS, corpus_task_fn, get_task, paper_task_fn
 from agentprobe.config import Settings
-from agentprobe.injector import ToolFailureConfig, ToolFailureInjector, ToolFailureType
-from agentprobe.injector import tool_failure as _tool_failure_module
+from agentprobe.injector import (
+    ToolFailureConfig,
+    ToolFailureInjector,
+    ToolFailureType,
+    tool_failure as _tool_failure_module,
+)
 
 
 class TestTopLevelExports:
