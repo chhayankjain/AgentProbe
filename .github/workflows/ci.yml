@@ -106,7 +106,7 @@ jobs:
       - name: Check metadata and README rendering
         run: twine check --strict dist/*
 
-      - name: Smoke-test the wheel (no extras, then [research]) in clean venvs
+      - name: Smoke-test the wheel (no extras, each extra, [research]) in clean venvs
         run: |
           python -m venv /tmp/core
           /tmp/core/bin/pip install --quiet dist/*.whl pytest
@@ -123,6 +123,14 @@ jobs:
           print("core install OK:", agentprobe.__version__)
           PY
           (cd examples/your_agent && /tmp/core/bin/python -m pytest -q -p no:cacheprovider)
+          python -m venv /tmp/langchain
+          /tmp/langchain/bin/pip install --quiet "$(ls dist/*.whl)[langchain]"
+          /tmp/langchain/bin/python -c "from agentprobe.fake_llm import ScriptedToolCallingModel; from agentprobe.testing import probe"
+          /tmp/langchain/bin/python -c "import agentprobe.agents.langgraph_agent" 2>&1 | grep -q 'agentprobe-toolkit\[research\]'
+          python -m venv /tmp/observability
+          /tmp/observability/bin/pip install --quiet "$(ls dist/*.whl)[observability]"
+          /tmp/observability/bin/python -c "from agentprobe import AgentProbeTracer, ToolFailureInjector, FailureClassifier; AgentProbeTracer(console=False)"
+          /tmp/observability/bin/python -c "import agentprobe; agentprobe.BenchmarkRunner" 2>&1 | grep -q 'agentprobe-toolkit\[research\]'
           python -m venv /tmp/research
           /tmp/research/bin/pip install --quiet "$(ls dist/*.whl)[research]"
           /tmp/research/bin/python -c "from agentprobe import ToolFailureInjector, AgentProbeTracer, BenchmarkRunner"

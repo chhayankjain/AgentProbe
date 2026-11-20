@@ -45,9 +45,11 @@ The package installs as `agentprobe-toolkit` and imports as `agentprobe`. Requir
 
 | Extra | Adds |
 |---|---|
-| `[langchain]` | LangChain and LangGraph, for the adapters and the scripted test model |
-| `[observability]` | OpenTelemetry tracing export and the Prometheus exporter |
-| `[research]` | The benchmark harness, injectors, statistics and `python -m agentprobe.demo` |
+| `[langchain]` | LangChain and LangGraph, and the scripted test model (`agentprobe.fake_llm`) for offline LangGraph tests |
+| `[observability]` | `AgentProbeTracer` (OTLP export), the Prometheus exporter, the fault injectors and the failure classifier |
+| `[research]` | Both of the above, plus the framework adapters, the benchmark harness, statistics and `python -m agentprobe.demo` |
+
+Wrapping your own LangChain tools with `probe()` needs no extra: it uses the LangChain your agent already has.
 
 Probe spans are emitted whenever OpenTelemetry is installed, with or without the extra.
 

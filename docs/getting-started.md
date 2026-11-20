@@ -12,7 +12,7 @@ This page takes about five minutes and needs no model or API key.
 pip install "agentprobe-toolkit>=1.4" pytest
 ```
 
-You install `agentprobe-toolkit` and import `agentprobe`. Python 3.11 or later. From the next release, this installs nothing else: `agentprobe.testing` has no required dependencies. Optional extras add LangChain support (`[langchain]`), tracing export (`[observability]`) and the research toolkit (`[research]`).
+You install `agentprobe-toolkit` and import `agentprobe`. Python 3.11 or later. From the next release, this installs nothing else: `agentprobe.testing` has no required dependencies. Optional extras add LangChain, LangGraph and a scripted test model (`[langchain]`), tracing export and the fault injectors (`[observability]`), and the research toolkit with the framework adapters (`[research]`).
 
 ## The one requirement
 

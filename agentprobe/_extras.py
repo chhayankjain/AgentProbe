@@ -36,3 +36,25 @@ def missing_extra(
         f"{feature} needs the optional dependency {root!r}. "
         f'Install it with: pip install "agentprobe-toolkit[{extra}]"'
     )
+
+
+def require(feature: str, extra: str, *modules: str) -> None:
+    """Raise an ImportError naming *extra* unless every module in *modules* exists.
+
+    Used where a feature needs packages from more than one extra, so the error
+    names the extra that covers all of them instead of the first missing one.
+    """
+    import importlib.util
+
+    def absent(module: str) -> bool:
+        try:
+            return importlib.util.find_spec(module) is None
+        except (ImportError, ValueError):  # e.g. a dotted name whose parent is missing
+            return True
+
+    missing = [m for m in modules if absent(m)]
+    if missing:
+        raise ImportError(
+            f"{feature} needs {', '.join(repr(m) for m in missing)}. "
+            f'Install it with: pip install "agentprobe-toolkit[{extra}]"'
+        )

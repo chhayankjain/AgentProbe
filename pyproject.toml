@@ -39,14 +39,16 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# LangChain tools, LangGraph agents and the scripted model in agentprobe.fake_llm.
-# (Wrapping LangChain tools only needs langchain-core, which your agent already has.)
+# LangChain and LangGraph, and the scripted model in agentprobe.fake_llm. Wrapping
+# your own LangChain tools needs no extra (it uses your agent's langchain-core).
+# The framework adapters also need OpenTelemetry: install [research].
 langchain = [
     "langchain-core>=1.0.0",
     "langchain>=1.0.0",
     "langgraph>=1.0.0",
 ]
-# Tracing and metrics export: AgentProbeTracer, OTLP and the Prometheus exporter.
+# Tracing and metrics export (AgentProbeTracer, OTLP, Prometheus), the fault
+# injectors and the failure classifier.
 observability = [
     "opentelemetry-api>=1.27.0",
     "opentelemetry-sdk>=1.27.0",

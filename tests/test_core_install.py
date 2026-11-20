@@ -28,9 +28,16 @@ OPTIONAL = [
     "scipy",
 ]
 
-BLOCKER = f"""
+#: What each extra installs, as measured from real installs of the wheel
+#: (langchain-core brings pydantic; the OpenTelemetry exporter brings grpc).
+PROVIDED = {
+    "langchain": {"langchain", "langchain_core", "langgraph", "pydantic"},
+    "observability": {"opentelemetry", "prometheus_client", "grpc"},
+}
+
+BLOCKER = """
 import importlib.abc, sys
-BLOCKED = {OPTIONAL!r}
+BLOCKED = {blocked!r}
 class Blocker(importlib.abc.MetaPathFinder):
     def find_spec(self, name, path=None, target=None):
         if name.split(".")[0] in BLOCKED:
@@ -40,8 +47,10 @@ sys.meta_path.insert(0, Blocker())
 """
 
 
-def run_minimal(code: str) -> subprocess.CompletedProcess[str]:
-    script = BLOCKER + textwrap.dedent(code)
+def run_minimal(code: str, extra: str | None = None) -> subprocess.CompletedProcess[str]:
+    """Run *code* as if only the core (and *extra*, if given) were installed."""
+    blocked = sorted(set(OPTIONAL) - PROVIDED.get(extra or "", set()))
+    script = BLOCKER.format(blocked=blocked) + textwrap.dedent(code)
     return subprocess.run(
         [sys.executable, "-c", script],
         cwd=ROOT,
@@ -153,3 +162,83 @@ def test_unrelated_missing_modules_are_not_disguised():
 
     exc = ModuleNotFoundError("No module named 'agentprobe.nope'", name="agentprobe.nope")
     assert missing_extra(exc, "x") is exc
+
+
+ADAPTERS_NEED_RESEARCH = """
+for module in ["agentprobe.agents.langgraph_agent", "agentprobe.agents.langchain_agent"]:
+    try:
+        __import__(module)
+    except ImportError as exc:
+        assert 'pip install "agentprobe-toolkit[research]"' in str(exc), (module, exc)
+    else:
+        raise AssertionError(f"{module} imported without OpenTelemetry")
+"""
+
+
+def test_langchain_extra_runs_an_offline_langgraph_fault_test():
+    result = run_minimal(
+        textwrap.dedent("""
+        import sys
+        from langchain_core.tools import tool
+        from langgraph.graph import START, MessagesState, StateGraph
+        from langgraph.prebuilt import ToolNode, tools_condition
+
+        from agentprobe.fake_llm import ScriptedToolCallingModel
+        from agentprobe.testing import probe
+
+        @tool
+        def payment_status(order_id: str) -> str:
+            \"\"\"Payment status for an order.\"\"\"
+            return f"Order {order_id} is paid."
+
+        with probe() as p:
+            tools = p.wrap([payment_status])
+            p.on("payment_status").always_fail(with_="timeout")
+            model = ScriptedToolCallingModel(
+                tool_name="payment_status", tool_args={"order_id": "42"}
+            ).bind_tools(tools)
+            graph = StateGraph(MessagesState)
+            graph.add_node("agent", lambda s: {"messages": [model.invoke(s["messages"])]})
+            graph.add_node("tools", ToolNode(tools, handle_tool_errors=True))
+            graph.add_edge(START, "agent")
+            graph.add_conditional_edges("agent", tools_condition)
+            graph.add_edge("tools", "agent")
+            result = p.run(graph.compile(), {"messages": [("user", "Did order 42 go through?")]})
+            result.assert_no_crash().assert_answer_contains("could not complete")
+
+        assert "opentelemetry" not in {m.split(".")[0] for m in sys.modules}
+        """)
+        + ADAPTERS_NEED_RESEARCH,
+        extra="langchain",
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_observability_extra_runs_the_tracer_injectors_and_classifier():
+    result = run_minimal(
+        textwrap.dedent("""
+        from agentprobe import AgentProbeTracer, FailureClassifier, ToolFailureInjector
+        from agentprobe.injector import LatencyFailureInjector
+        from agentprobe.injector.tool_failure import ToolFailureConfig, ToolFailureType
+        from agentprobe.observer.dashboard import PrometheusExporter
+
+        tracer = AgentProbeTracer(service_name="extras-test", console=False)
+        with tracer.span("check"):
+            pass
+        injector = ToolFailureInjector(ToolFailureConfig(failure_type=ToolFailureType.NONE))
+        assert injector.call(lambda: 41) == 41
+        assert FailureClassifier().classify_exception(TimeoutError("t")) is not None
+        assert PrometheusExporter is not None and LatencyFailureInjector is not None
+
+        import agentprobe
+        try:
+            agentprobe.BenchmarkRunner
+        except ImportError as exc:
+            assert 'pip install "agentprobe-toolkit[research]"' in str(exc), exc
+        else:
+            raise AssertionError("BenchmarkRunner imported without the research extra")
+        """)
+        + ADAPTERS_NEED_RESEARCH,
+        extra="observability",
+    )
+    assert result.returncode == 0, result.stderr
