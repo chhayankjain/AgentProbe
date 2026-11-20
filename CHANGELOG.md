@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Security
+- Docs site: Material for MkDocs 9.7.7 fixes a DOM cross-site scripting issue in search suggestions (GHSA-xvg9-69gf-fjrf, CVE-2026-73295); the site was built with 9.7.6 for about a day. The `agentprobe-toolkit` package itself was not affected
+
 ### Changed
 - Research material moved under `research/`: the benchmark scripts and every result batch (`research/experiments/`), the paper source (`research/paper/`), the sample target agent (`research/samples/`) and the observability stack (`research/observability/`). The README now focuses on testing your own agent; the benchmark, taxonomy and reproduction steps moved to `research/README.md`. Run experiment scripts as `python research/experiments/<script>.py`.
 
