@@ -266,7 +266,9 @@ def _patch_openai_compat() -> None:
                 }
         return resp
 
-    openai.ChatCompletion.create = _patched_create  # type: ignore[method-assign]  # legacy client shim
+    # Deliberate monkeypatch of the legacy client. The ignore is needed only where
+    # openai<1.0 is installed (the autogen extra); elsewhere openai is untyped.
+    openai.ChatCompletion.create = _patched_create  # type: ignore[method-assign,unused-ignore]
     _COMPAT_PATCHED = True
 
 
